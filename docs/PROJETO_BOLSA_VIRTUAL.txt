@@ -769,3 +769,32 @@ Nome provisório:
 Bolsa Virtual RP
 
 Pode ser alterado depois.
+
+## 16. Status da Fase 2 (implementada)
+
+A Fase 2 do MVP foi implementada com foco no fluxo econômico central:
+
+ADM Chefe da Moeda -> Tesouraria Central -> Corretor Virtual -> Usuário.
+
+### Regras econômicas implementadas
+
+- Emissão de moeda fictícia apenas por cargo autorizado (COIN_CHIEF_ADMIN/SUPER_ADMIN).
+- Consulta de saldo da Tesouraria Central por cargos administrativos autorizados.
+- Transferência da Tesouraria para corretor com registro obrigatório de motivo.
+- Consulta de saldo do corretor virtual.
+- Repasse de moeda do corretor para usuário com registro em transação de carteira.
+- Histórico de emissões e transferências disponível para auditoria administrativa.
+
+### Proteções contra saldo negativo e abuso
+
+- Validação de saldo antes de qualquer baixa na Tesouraria.
+- Validação de saldo antes de qualquer repasse de corretor para usuário.
+- Bloqueio de acesso para usuário comum em endpoints administrativos.
+- Bloqueio de criação de moeda por cargos sem autorização.
+- Bloqueio de repasse para usuário por conta que não seja corretor virtual.
+- Registro de AdminLog em toda ação sensível para rastreabilidade e investigação.
+
+### Observação de segurança funcional
+
+Este sistema permanece estritamente fictício para gameplay/simulação.
+Não representa dinheiro real, criptoativo real, investimento real, saque real, rendimento real ou promessa de lucro real.

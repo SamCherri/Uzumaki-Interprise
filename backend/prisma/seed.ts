@@ -39,6 +39,9 @@ async function main() {
   const adminRole = await prisma.role.findUniqueOrThrow({ where: { key: 'ADMIN' } });
   const userRole = await prisma.role.findUniqueOrThrow({ where: { key: 'USER' } });
 
+  const coinChiefRole = await prisma.role.findUniqueOrThrow({ where: { key: 'COIN_CHIEF_ADMIN' } });
+  const brokerRole = await prisma.role.findUniqueOrThrow({ where: { key: 'VIRTUAL_BROKER' } });
+
   const adminEmail = 'admin@bolsavirtual.local';
   const passwordHash = await bcrypt.hash('Admin1234!', 10);
 
@@ -55,6 +58,7 @@ async function main() {
 
   await prisma.userRole.upsert({ where: { userId_roleId: { userId: admin.id, roleId: superAdminRole.id } }, update: {}, create: { userId: admin.id, roleId: superAdminRole.id } });
   await prisma.userRole.upsert({ where: { userId_roleId: { userId: admin.id, roleId: adminRole.id } }, update: {}, create: { userId: admin.id, roleId: adminRole.id } });
+  await prisma.userRole.upsert({ where: { userId_roleId: { userId: admin.id, roleId: coinChiefRole.id } }, update: {}, create: { userId: admin.id, roleId: coinChiefRole.id } });
 
   const treasuryExists = await prisma.treasuryAccount.findFirst();
   if (!treasuryExists) {
@@ -78,6 +82,31 @@ async function main() {
     update: {},
     create: { userId: userDemo.id, roleId: userRole.id },
   });
+
+
+  const brokerDemo = await prisma.user.upsert({
+    where: { email: 'corretor@bolsavirtual.local' },
+    update: {},
+    create: {
+      name: 'Corretor Demo',
+      email: 'corretor@bolsavirtual.local',
+      passwordHash: await bcrypt.hash('Corretor123!', 10),
+      wallet: { create: {} },
+    },
+  });
+
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: brokerDemo.id, roleId: brokerRole.id } },
+    update: {},
+    create: { userId: brokerDemo.id, roleId: brokerRole.id },
+  });
+
+  await prisma.brokerAccount.upsert({
+    where: { userId: brokerDemo.id },
+    update: {},
+    create: { userId: brokerDemo.id },
+  });
+
 }
 
 main()

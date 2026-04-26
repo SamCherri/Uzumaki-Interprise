@@ -63,17 +63,45 @@ npm run build               # build backend + frontend
 npm run start:backend       # sobe backend em produção
 ```
 
-## Fase atual (MVP - bloco 1)
+## Fase atual (MVP - bloco 2)
 
-Implementado neste bloco:
+Implementado até esta fase:
 
-1. Estrutura inicial frontend/backend.
-2. Schema Prisma inicial (roles, permissões, usuário, carteira, tesouraria, corretor, logs e transações).
-3. Seed com cargos e permissões iniciais.
-4. Cadastro e login com senha criptografada e JWT.
-5. Criação automática de carteira fictícia no cadastro.
-6. APIs iniciais para perfil, carteira e painel admin básico.
-7. Telas iniciais: Login, Cadastro, Dashboard do Usuário e Painel Admin básico.
+1. Estrutura inicial frontend/backend e autenticação.
+2. Fluxo econômico central da moeda fictícia: ADM Chefe da Moeda → Tesouraria → Corretor → Usuário.
+3. Endpoints de emissão, transferências e histórico com validações de saldo e permissões.
+4. Registro obrigatório de CoinIssuance, CoinTransfer, Transaction e AdminLog nas ações sensíveis.
+5. Atualização do painel Admin com emissão, transferência para corretor e histórico.
+6. Novo painel do Corretor com saldo, repasse ao usuário e histórico básico.
+
+
+## Fluxo da moeda fictícia (Fase 2)
+
+A moeda virtual agora segue obrigatoriamente este caminho:
+
+1. **COIN_CHIEF_ADMIN / SUPER_ADMIN** emite moeda para a Tesouraria Central.
+2. Tesouraria Central envia saldo para um usuário com cargo **VIRTUAL_BROKER**.
+3. Corretor virtual repassa saldo para o usuário final.
+4. Cada etapa gera registro permanente para auditoria.
+
+### Endpoints econômicos criados
+
+- `GET /api/admin/treasury/balance` → consulta saldo da Tesouraria.
+- `POST /api/admin/treasury/issuance` → emissão de moeda fictícia para Tesouraria.
+- `POST /api/admin/treasury/transfer-to-broker` → transferência da Tesouraria para corretor.
+- `GET /api/admin/coin-history` → histórico de emissões e transferências.
+- `GET /api/broker/balance` → saldo disponível do corretor.
+- `POST /api/broker/transfer-to-user` → corretor repassa moeda ao usuário.
+- `GET /api/broker/history` → histórico de repasses do corretor.
+
+### Regras de permissão e segurança
+
+- Usuário comum não acessa endpoints administrativos.
+- Apenas `COIN_CHIEF_ADMIN` ou `SUPER_ADMIN` pode emitir moeda.
+- Apenas corretor virtual (`VIRTUAL_BROKER`) pode repassar moeda ao usuário.
+- Tesouraria nunca fica negativa.
+- Saldo de corretor nunca fica negativo.
+- Toda ação sensível registra `AdminLog` com motivo, valores e origem da chamada.
 
 ## Deploy no Railway
 

@@ -5,6 +5,7 @@ import authPlugin from './plugins/auth.js';
 import { authRoutes } from './routes/auth.js';
 import { userRoutes } from './routes/user.js';
 import { adminRoutes } from './routes/admin.js';
+import { brokerRoutes } from './routes/broker.js';
 import { prisma } from './lib/prisma.js';
 
 declare module 'fastify' {
@@ -47,6 +48,7 @@ app.get('/health', async () => ({ status: 'ok' }));
 app.register(authRoutes, { prefix: '/api' });
 app.register(userRoutes, { prefix: '/api' });
 app.register(adminRoutes, { prefix: '/api' });
+app.register(brokerRoutes, { prefix: '/api' });
 
 const port = Number(process.env.PORT ?? 3333);
 app.listen({ port, host: '0.0.0.0' }).catch((error: unknown) => {
