@@ -96,7 +96,7 @@ Passo a passo simples para quem não é técnico:
 2. Configure **Root Directory** para `backend`.
 3. Configure os comandos:
    - **Build Command:** `npm install && npm run prisma:generate && npm run build`
-   - **Start Command:** `npm run prisma:migrate && npm run prisma:seed && npm run start`
+   - **Start Command:** `npm run start`
 4. Variáveis do backend:
    - `DATABASE_URL` = valor do Postgres (copiar/colar da aba Variables ou Reference Variable)
    - `JWT_SECRET` = segredo forte
@@ -109,7 +109,7 @@ Passo a passo simples para quem não é técnico:
 2. Configure **Root Directory** para `frontend`.
 3. Comandos:
    - **Build Command:** `npm install && npm run build`
-   - **Start Command:** `npm run dev -- --host 0.0.0.0 --port $PORT` (MVP inicial)
+   - **Start Command:** `npm run preview -- --port $PORT`
 4. Variável do frontend:
    - `VITE_API_URL` = URL pública do backend (ex.: `https://seu-backend.up.railway.app`)
 
@@ -125,14 +125,17 @@ WEB_ORIGIN="https://seu-frontend.up.railway.app,https://www.seudominio.com"
 
 ### 6) Rodar migration e seed
 
-No backend em produção, rode:
+No backend em produção, rode **separadamente**:
 
 ```bash
 npm run prisma:migrate
-npm run prisma:seed
 ```
 
-No fluxo acima, isso já está no `Start Command`.
+Depois, execute o seed **apenas uma vez no bootstrap inicial**:
+
+```bash
+npm run prisma:seed
+```
 
 ### 7) Validar funcionamento
 
