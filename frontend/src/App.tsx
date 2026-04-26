@@ -3,8 +3,9 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { UserDashboard } from './pages/UserDashboard';
 import { AdminDashboard } from './pages/AdminDashboard';
+import { BrokerDashboard } from './pages/BrokerDashboard';
 
-type Screen = 'login' | 'register' | 'user' | 'admin';
+type Screen = 'login' | 'register' | 'user' | 'admin' | 'broker';
 
 export function App() {
   const [screen, setScreen] = useState<Screen>('login');
@@ -21,12 +22,14 @@ export function App() {
         <button onClick={() => setScreen('register')}>Cadastro</button>
         <button onClick={() => setScreen('user')}>Painel Usuário</button>
         <button onClick={() => setScreen('admin')}>Painel Admin</button>
+        <button onClick={() => setScreen('broker')}>Painel Corretor</button>
       </nav>
 
       {screen === 'login' && <LoginPage />}
       {screen === 'register' && <RegisterPage />}
       {screen === 'user' && <UserDashboard />}
       {screen === 'admin' && <AdminDashboard />}
+      {screen === 'broker' && <BrokerDashboard />}
     </main>
   );
 }

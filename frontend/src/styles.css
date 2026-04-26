@@ -44,3 +44,10 @@ form {
   font-size: 0.9rem;
   color: #f2cc60;
 }
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
