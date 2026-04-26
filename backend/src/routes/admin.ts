@@ -1,9 +1,12 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma.js';
 
+type AuthRequest = FastifyRequest & { user: { sub: string; roles?: string[] } };
+
 export async function adminRoutes(app: FastifyInstance) {
-  app.get('/admin/overview', { preHandler: [app.authenticate] }, async (request: any, reply) => {
-    const roles = (request.user.roles ?? []) as string[];
+  app.get('/admin/overview', { preHandler: [app.authenticate] }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const authRequest = request as AuthRequest;
+    const roles = authRequest.user.roles ?? [];
     const isAdmin = roles.includes('ADMIN') || roles.includes('SUPER_ADMIN');
 
     if (!isAdmin) {

@@ -1,9 +1,12 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma.js';
 
+type AuthRequest = FastifyRequest & { user: { sub: string; roles?: string[] } };
+
 export async function userRoutes(app: FastifyInstance) {
-  app.get('/me', { preHandler: [app.authenticate] }, async (request: any, reply) => {
-    const userId = request.user.sub as string;
+  app.get('/me', { preHandler: [app.authenticate] }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const authRequest = request as AuthRequest;
+    const userId = authRequest.user.sub;
 
     const user = await prisma.user.findUnique({
       where: { id: userId },

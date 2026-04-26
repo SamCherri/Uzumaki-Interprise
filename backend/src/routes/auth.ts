@@ -1,9 +1,9 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { loginUser, registerUser } from '../services/auth-service.js';
 
 export async function authRoutes(app: FastifyInstance) {
-  app.post('/auth/register', async (request, reply) => {
+  app.post('/auth/register', async (request: FastifyRequest, reply: FastifyReply) => {
     const schema = z.object({
       name: z.string().min(3),
       email: z.string().email(),
@@ -26,7 +26,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/auth/login', async (request, reply) => {
+  app.post('/auth/login', async (request: FastifyRequest, reply: FastifyReply) => {
     const schema = z.object({ email: z.string().email(), password: z.string().min(8) });
     const body = schema.parse(request.body);
 

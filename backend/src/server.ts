@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import { FastifyReply, FastifyRequest } from 'fastify';
 import authPlugin from './plugins/auth.js';
 import { authRoutes } from './routes/auth.js';
 import { userRoutes } from './routes/user.js';
@@ -8,7 +9,7 @@ import { prisma } from './lib/prisma.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
-    authenticate: any;
+    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
     logAdmin: (input: {
       action: string;
       entity: string;
@@ -22,7 +23,11 @@ declare module 'fastify' {
 
 const app = Fastify({ logger: true });
 
-app.register(cors, { origin: true });
+const webOrigin = process.env.WEB_ORIGIN;
+app.register(cors, {
+  origin: webOrigin ? webOrigin.split(',').map((origin: string) => origin.trim()) : true,
+  credentials: true,
+});
 app.register(authPlugin);
 
 app.decorate('logAdmin', async (input) => {
@@ -44,7 +49,7 @@ app.register(userRoutes, { prefix: '/api' });
 app.register(adminRoutes, { prefix: '/api' });
 
 const port = Number(process.env.PORT ?? 3333);
-app.listen({ port, host: '0.0.0.0' }).catch((error) => {
+app.listen({ port, host: '0.0.0.0' }).catch((error: unknown) => {
   app.log.error(error);
   process.exit(1);
 });
