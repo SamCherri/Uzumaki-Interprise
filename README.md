@@ -150,3 +150,30 @@ npm run prisma:seed
 - **Não commitar `.env` real** com segredos.
 - Em produção, preferir variáveis no painel do Railway.
 - Se `npm install` falhar por bloqueio externo (ex.: erro 403 de registry), registrar o incidente e manter os arquivos de configuração corretos.
+
+
+## Checklist de mergeabilidade da PR #1
+
+Se o GitHub mostrar `mergeable: false`, normalmente é por branch desatualizada ou conflito com `main`.
+
+Passos recomendados para o mantenedor (com acesso ao remoto):
+
+```bash
+git fetch origin
+git checkout work
+git rebase origin/main
+# resolver conflitos, se aparecerem
+git push --force-with-lease
+```
+
+Alternativa sem rebase:
+
+```bash
+git fetch origin
+git checkout work
+git merge origin/main
+# resolver conflitos, se aparecerem
+git push
+```
+
+Após isso, revalidar no GitHub se a PR voltou para `mergeable: true`.
