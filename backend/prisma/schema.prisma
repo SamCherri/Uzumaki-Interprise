@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CompanyStatus {
+  PENDING
+  APPROVED
+  ACTIVE
+  SUSPENDED
+  BANKRUPT
+  CLOSED
+}
+
+enum TransferType {
+  ISSUANCE_TO_TREASURY
+  TREASURY_TO_BROKER
+  BROKER_TO_USER
+  USER_TRADE
+  ADJUSTMENT
+}
+
+model User {
+  id           String         @id @default(cuid())
+  name         String
+  email        String         @unique
+  passwordHash String
+  isBlocked    Boolean        @default(false)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  wallet       Wallet?
+  roles        UserRole[]
+  companies    Company[]
+  logs         AdminLog[]
+  transfersOut CoinTransfer[] @relation("transfer_sender")
+  transfersIn  CoinTransfer[] @relation("transfer_receiver")
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  key         String           @unique
+  name        String
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id    String           @id @default(cuid())
+  key   String           @unique
+  roles RolePermission[]
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id])
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+model Wallet {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  availableBalance  Decimal  @default(0) @db.Decimal(18, 2)
+  lockedBalance     Decimal  @default(0) @db.Decimal(18, 2)
+  investedValue     Decimal  @default(0) @db.Decimal(18, 2)
+  fictitiousProfit  Decimal  @default(0) @db.Decimal(18, 2)
+  user              User     @relation(fields: [userId], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model TreasuryAccount {
+  id        String   @id @default(cuid())
+  balance   Decimal  @default(0) @db.Decimal(18, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BrokerAccount {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  receivedTotal Decimal  @default(0) @db.Decimal(18, 2)
+  available     Decimal  @default(0) @db.Decimal(18, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Company {
+  id                 String        @id @default(cuid())
+  name               String
+  ticker             String        @unique
+  description        String
+  sector             String
+  founderId          String
+  status             CompanyStatus @default(PENDING)
+  totalShares        Int
+  circulatingShares  Int
+  initialPrice       Decimal       @db.Decimal(18, 2)
+  currentPrice       Decimal       @db.Decimal(18, 2)
+  fictitiousMarketCap Decimal      @db.Decimal(18, 2)
+  createdAt          DateTime      @default(now())
+  approvedAt         DateTime?
+  founder            User          @relation(fields: [founderId], references: [id])
+}
+
+model CoinIssuance {
+  id            String   @id @default(cuid())
+  createdById   String
+  amount        Decimal  @db.Decimal(18, 2)
+  reason        String
+  destination   String
+  previousValue Decimal  @db.Decimal(18, 2)
+  newValue      Decimal  @db.Decimal(18, 2)
+  createdAt     DateTime @default(now())
+}
+
+model CoinTransfer {
+  id            String       @id @default(cuid())
+  type          TransferType
+  senderId      String?
+  receiverId    String?
+  amount        Decimal      @db.Decimal(18, 2)
+  reason        String
+  previousValue Decimal      @db.Decimal(18, 2)
+  newValue      Decimal      @db.Decimal(18, 2)
+  createdAt     DateTime     @default(now())
+  sender        User?        @relation("transfer_sender", fields: [senderId], references: [id])
+  receiver      User?        @relation("transfer_receiver", fields: [receiverId], references: [id])
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  walletId    String
+  type        String
+  amount      Decimal  @db.Decimal(18, 2)
+  description String
+  createdAt   DateTime @default(now())
+}
+
+model AdminLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  entity     String
+  previous   String?
+  current    String?
+  reason     String?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id])
+}
