@@ -1,0 +1,771 @@
+# PROJETO: BOLSA VIRTUAL DE EMPRESAS FICTÍCIAS
+
+## 1. Visão geral
+
+Criar um site de simulação econômica onde jogadores podem criar empresas fictícias, emitir cotas virtuais e negociar essas cotas dentro de uma bolsa virtual usando uma moeda interna fictícia.
+
+O sistema deve funcionar como um jogo de economia, com login, carteira, moeda virtual, empresas criadas por jogadores, compra e venda de cotas, gráfico de preço, livro de ofertas, painel administrativo, corretores virtuais e auditoria completa.
+
+Não deve existir dinheiro real, saque real, promessa de lucro real ou investimento real.
+
+## 2. Objetivo do sistema
+
+O objetivo é criar uma experiência parecida com uma bolsa de valores fictícia para comunidade, servidor RP ou jogo online.
+
+Os usuários devem poder:
+
+- criar conta;
+- receber moedas virtuais;
+- comprar cotas virtuais de empresas fictícias;
+- vender cotas virtuais;
+- criar empresas fictícias;
+- acompanhar gráficos;
+- abrir ofertas de compra;
+- abrir ofertas de venda;
+- acompanhar patrimônio fictício;
+- ver histórico de transações.
+
+A administração deve poder:
+
+- criar moeda virtual;
+- distribuir moeda para corretores;
+- controlar a tesouraria central;
+- aprovar empresas;
+- suspender empresas;
+- bloquear usuários;
+- auditar transações;
+- ver logs completos;
+- controlar permissões;
+- investigar movimentações suspeitas.
+
+## 3. Stack sugerida
+
+Criar o projeto usando:
+
+Frontend:
+- React
+- Vite
+- TypeScript
+- CSS responsivo/mobile-first
+
+Backend:
+- Node.js
+- TypeScript
+- Fastify
+
+Banco de dados:
+- PostgreSQL
+- Prisma ORM
+
+Deploy:
+- Railway
+
+Autenticação:
+- login com e-mail e senha
+- senha criptografada
+- sessão segura
+- permissões por cargo
+
+Observação:
+Não criar arquivo .env com segredo real.
+Criar apenas .env.example com as variáveis necessárias.
+
+## 4. Perfis de usuário
+
+O sistema deve ter os seguintes cargos:
+
+### 4.1 Usuário comum
+
+Pode:
+
+- acessar painel pessoal;
+- ver saldo;
+- comprar cotas virtuais;
+- vender cotas virtuais;
+- abrir ordens de compra;
+- abrir ordens de venda;
+- cancelar ordens próprias;
+- ver empresas listadas;
+- criar solicitação de empresa fictícia;
+- ver histórico da própria carteira.
+
+### 4.2 Empresário
+
+É um usuário que possui empresa aprovada.
+
+Pode:
+
+- editar descrição da própria empresa;
+- publicar comunicados oficiais da empresa;
+- solicitar nova emissão de cotas;
+- acompanhar investidores da empresa;
+- acompanhar gráfico da empresa.
+
+Não pode:
+
+- alterar preço manualmente;
+- criar cotas infinitas;
+- apagar histórico;
+- mexer em saldo de usuários.
+
+### 4.3 Corretor virtual
+
+É um membro autorizado pela administração para distribuir moeda virtual aos usuários.
+
+Pode:
+
+- receber moeda da Tesouraria Central;
+- repassar moeda virtual para usuários;
+- ver histórico dos repasses que ele fez;
+- justificar cada repasse;
+- consultar usuários atendidos por ele.
+
+Não pode:
+
+- criar moeda;
+- apagar registros;
+- alterar saldo manualmente sem registro;
+- alterar preço das cotas;
+- aprovar empresas;
+- manipular mercado.
+
+Todo repasse feito por corretor deve gerar log permanente.
+
+### 4.4 Auditor
+
+Pode:
+
+- ver todos os logs;
+- ver transações;
+- ver repasses;
+- ver emissões de moeda;
+- ver movimentações suspeitas;
+- exportar relatórios.
+
+Não pode:
+
+- alterar saldo;
+- criar moeda;
+- aprovar empresas;
+- bloquear usuários;
+- apagar dados.
+
+### 4.5 Administrador
+
+Pode:
+
+- aprovar empresas;
+- suspender empresas;
+- bloquear usuários;
+- desbloquear usuários;
+- ver painel geral;
+- gerenciar usuários;
+- gerenciar empresas;
+- gerenciar ordens;
+- investigar denúncias.
+
+Não pode criar moeda se não for ADM Chefe da Moeda.
+
+### 4.6 ADM Chefe da Moeda
+
+É o cargo equivalente ao Banco Central do jogo.
+
+Pode:
+
+- criar moeda virtual;
+- enviar moeda para a Tesouraria Central;
+- enviar moeda para corretores;
+- definir limites de emissão;
+- configurar taxas;
+- controlar inflação;
+- revisar grandes movimentações;
+- congelar contas suspeitas;
+- aprovar ou negar geração de moeda;
+- visualizar todos os registros econômicos.
+
+Esse cargo deve ser extremamente limitado.
+
+### 4.7 Super Admin
+
+É o dono técnico do sistema.
+
+Pode:
+
+- gerenciar permissões;
+- gerenciar cargos;
+- acessar configurações gerais;
+- corrigir erros críticos;
+- executar manutenção.
+
+Mesmo o Super Admin não deve apagar logs financeiros. Correções devem ser feitas por estorno registrado.
+
+## 5. Fluxo da moeda virtual
+
+A moeda deve seguir este fluxo:
+
+ADM Chefe da Moeda
+↓
+Tesouraria Central
+↓
+Corretores virtuais
+↓
+Usuários
+↓
+Compra e venda de cotas virtuais
+
+A moeda nunca deve aparecer sem registro.
+
+Toda criação de moeda precisa registrar:
+
+- quem criou;
+- quantidade;
+- data;
+- motivo;
+- destino;
+- saldo anterior;
+- saldo posterior.
+
+Todo repasse para corretor precisa registrar:
+
+- quem enviou;
+- quem recebeu;
+- quantidade;
+- data;
+- motivo.
+
+Todo repasse para usuário precisa registrar:
+
+- corretor responsável;
+- usuário beneficiado;
+- quantidade;
+- data;
+- motivo;
+- saldo anterior;
+- saldo posterior.
+
+## 6. Tesouraria Central
+
+Criar uma conta especial do sistema chamada Tesouraria Central.
+
+A Tesouraria Central deve receber a moeda criada pelo ADM Chefe da Moeda.
+
+Ela deve permitir:
+
+- ver saldo total;
+- ver entradas;
+- ver saídas;
+- enviar moeda para corretores;
+- registrar motivo de cada operação;
+- gerar relatório.
+
+## 7. Carteira do usuário
+
+Cada usuário deve ter uma carteira com:
+
+- saldo disponível;
+- saldo bloqueado em ordens abertas;
+- valor investido;
+- cotas possuídas;
+- patrimônio total fictício;
+- lucro/prejuízo fictício;
+- histórico de transações;
+- histórico de repasses recebidos.
+
+Exemplo:
+
+Saldo disponível: 5.000 moedas
+Saldo bloqueado: 2.000 moedas
+Valor em cotas: 8.500 moedas
+Patrimônio total: 13.500 moedas
+
+## 8. Empresas fictícias
+
+Usuários podem solicitar criação de empresas fictícias.
+
+Cada empresa deve ter:
+
+- nome;
+- sigla/ticker;
+- descrição;
+- setor;
+- dono/fundador;
+- status;
+- total de cotas;
+- cotas em circulação;
+- preço inicial;
+- valor de mercado fictício;
+- data de criação;
+- data de aprovação;
+- logo opcional;
+- comunicados oficiais;
+- histórico de negociações.
+
+Status possíveis:
+
+- pendente;
+- aprovada;
+- ativa;
+- suspensa;
+- falida;
+- encerrada.
+
+Empresas só podem ser negociadas depois de aprovação administrativa.
+
+## 9. Emissão de cotas virtuais
+
+Cada empresa deve ter uma quantidade inicial de cotas.
+
+Exemplo:
+
+Empresa: SamTech
+Ticker: SAMT
+Total de cotas: 100.000
+Preço inicial: 1 moeda
+Valor inicial de mercado: 100.000 moedas
+
+Regras:
+
+- empresa não pode criar cotas infinitas;
+- nova emissão precisa de solicitação;
+- nova emissão precisa de aprovação administrativa;
+- toda emissão deve gerar log;
+- o sistema deve registrar diluição fictícia, se aplicável.
+
+## 10. Bolsa virtual
+
+Criar uma página principal da bolsa com:
+
+- lista de empresas;
+- preço atual;
+- variação percentual;
+- volume negociado;
+- valor de mercado fictício;
+- botão de comprar;
+- botão de vender;
+- gráfico resumido;
+- ranking das mais valorizadas;
+- ranking das mais negociadas;
+- ranking das maiores quedas.
+
+## 11. Página da empresa
+
+Cada empresa deve ter uma página própria com:
+
+- nome;
+- ticker;
+- descrição;
+- setor;
+- dono;
+- preço atual;
+- variação;
+- gráfico;
+- livro de ofertas;
+- últimas negociações;
+- botão comprar;
+- botão vender;
+- comunicados oficiais;
+- histórico da empresa.
+
+## 12. Livro de ofertas
+
+Criar sistema de ordens com:
+
+- ordem de compra;
+- ordem de venda;
+- preço;
+- quantidade;
+- usuário;
+- empresa;
+- status;
+- data;
+- execução parcial;
+- cancelamento.
+
+Status da ordem:
+
+- aberta;
+- parcialmente executada;
+- executada;
+- cancelada;
+- expirada;
+- bloqueada.
+
+## 13. Motor de negociação
+
+Criar um matching engine simples.
+
+Regras:
+
+- uma ordem de compra deve cruzar com a menor ordem de venda compatível;
+- uma ordem de venda deve cruzar com a maior ordem de compra compatível;
+- ordens mais antigas têm prioridade quando o preço é igual;
+- permitir execução parcial;
+- bloquear saldo quando usuário abre ordem de compra;
+- bloquear cotas quando usuário abre ordem de venda;
+- liberar saldo/cotas quando ordem for cancelada;
+- gerar trade quando compra e venda forem executadas;
+- atualizar preço atual da empresa com base no último trade;
+- atualizar gráfico com base nos trades.
+
+## 14. Tipos de ordem
+
+Criar inicialmente dois tipos:
+
+### Ordem a mercado
+
+Compra ou vende usando o melhor preço disponível.
+
+### Ordem limitada
+
+Usuário escolhe preço máximo de compra ou preço mínimo de venda.
+
+Exemplo de compra limitada:
+
+Quero comprar 100 cotas da SAMT pagando no máximo 5 moedas cada.
+
+Exemplo de venda limitada:
+
+Quero vender 100 cotas da SAMT recebendo no mínimo 8 moedas cada.
+
+## 15. Gráficos
+
+Criar gráfico de preço com base nos trades.
+
+Exibir:
+
+- preço atual;
+- abertura;
+- máxima;
+- mínima;
+- fechamento;
+- volume;
+- período diário;
+- período semanal;
+- período mensal.
+
+Pode começar com gráfico simples de linha.
+Depois evoluir para candlestick.
+
+## 16. Taxas da economia
+
+Criar sistema de taxas para controlar inflação.
+
+Taxas possíveis:
+
+- taxa para criar empresa;
+- taxa de listagem;
+- taxa por compra;
+- taxa por venda;
+- taxa para destacar empresa;
+- imposto fictício sobre lucro;
+- multa para empresa inativa.
+
+As taxas devem ir para uma conta do sistema ou ser queimadas.
+
+Criar configuração administrativa para definir percentual de taxa.
+
+## 17. Controle de inflação
+
+Criar painel para ADM Chefe da Moeda acompanhar:
+
+- total de moedas criadas;
+- total de moedas em circulação;
+- total de moedas na Tesouraria;
+- total de moedas com corretores;
+- total de moedas com usuários;
+- total de moedas queimadas;
+- volume negociado na bolsa;
+- inflação fictícia do sistema.
+
+## 18. Antifraude
+
+Criar alertas para:
+
+- usuário negociando muito com a mesma pessoa;
+- alta variação de preço em pouco tempo;
+- corretor repassando moeda demais;
+- admin fazendo muitas alterações;
+- empresa recebendo pump artificial;
+- múltiplas contas suspeitas;
+- ordens anormais;
+- movimentação muito acima da média.
+
+A primeira versão pode apenas registrar alertas em tabela.
+Depois criar painel visual de alertas.
+
+## 19. Logs e auditoria
+
+Tudo deve gerar log permanente.
+
+Eventos que precisam de log:
+
+- login;
+- criação de conta;
+- criação de empresa;
+- aprovação de empresa;
+- suspensão de empresa;
+- emissão de cotas;
+- compra;
+- venda;
+- criação de ordem;
+- cancelamento de ordem;
+- execução de ordem;
+- criação de moeda;
+- envio para Tesouraria;
+- envio para corretor;
+- envio para usuário;
+- alteração de cargo;
+- bloqueio de conta;
+- desbloqueio de conta;
+- alteração administrativa;
+- estorno.
+
+Logs devem registrar:
+
+- usuário responsável;
+- ação;
+- entidade afetada;
+- valor anterior;
+- valor novo;
+- data e hora;
+- motivo;
+- IP, se possível;
+- user agent, se possível.
+
+Logs financeiros não podem ser apagados.
+
+## 20. Painel administrativo
+
+Criar painel com abas:
+
+- visão geral;
+- usuários;
+- empresas;
+- ordens;
+- trades;
+- carteiras;
+- corretores;
+- tesouraria;
+- emissão de moeda;
+- logs;
+- alertas antifraude;
+- configurações.
+
+## 21. Painel do corretor
+
+Criar painel específico para corretor com:
+
+- saldo recebido;
+- saldo disponível para repasse;
+- usuários atendidos;
+- enviar moeda para usuário;
+- motivo obrigatório;
+- histórico de repasses;
+- limite diário;
+- limite mensal;
+- alertas.
+
+## 22. Painel do usuário
+
+Criar dashboard do usuário com:
+
+- saldo disponível;
+- saldo bloqueado;
+- patrimônio fictício;
+- cotas em carteira;
+- ordens abertas;
+- últimas transações;
+- empresas favoritas;
+- botão comprar;
+- botão vender;
+- histórico completo.
+
+## 23. Segurança
+
+Implementar:
+
+- senha criptografada;
+- autenticação por sessão ou token seguro;
+- controle de permissão no backend;
+- validação de dados;
+- proteção contra saldo negativo;
+- proteção contra cotas negativas;
+- proteção contra ordem duplicada;
+- logs de alterações sensíveis;
+- bloqueio de usuário;
+- bloqueio de empresa;
+- tratamento de erros.
+
+Nunca confiar apenas no frontend para validar permissões.
+Toda regra econômica deve ser validada no backend.
+
+## 24. Banco de dados sugerido
+
+Criar tabelas Prisma para:
+
+- User
+- Role
+- Permission
+- Wallet
+- Company
+- CompanyShare
+- Order
+- Trade
+- Transaction
+- TreasuryAccount
+- BrokerAccount
+- CoinIssuance
+- CoinTransfer
+- AdminLog
+- AuditLog
+- FraudAlert
+- CompanyAnnouncement
+- MarketCandle
+- SystemSetting
+
+## 25. Regras críticas de saldo
+
+O sistema nunca pode permitir:
+
+- saldo negativo;
+- cotas negativas;
+- ordem de compra sem saldo suficiente;
+- ordem de venda sem cotas suficientes;
+- moeda criada sem log;
+- corretor repassar mais moeda do que possui;
+- usuário comprar ativo suspenso;
+- usuário vender ativo bloqueado;
+- admin apagar histórico financeiro.
+
+## 26. MVP inicial
+
+Implementar primeiro:
+
+1. cadastro e login;
+2. cargos e permissões;
+3. carteira;
+4. Tesouraria Central;
+5. ADM Chefe criando moeda;
+6. repasse da Tesouraria para corretor;
+7. repasse do corretor para usuário;
+8. criação de empresa;
+9. aprovação de empresa;
+10. compra e venda simples de cotas;
+11. histórico de transações;
+12. logs administrativos;
+13. painel básico do usuário;
+14. painel básico do admin.
+
+## 27. Segunda fase
+
+Depois implementar:
+
+1. livro de ofertas;
+2. ordem limitada;
+3. ordem a mercado;
+4. matching engine;
+5. execução parcial;
+6. gráfico de preço;
+7. volume de negociação;
+8. ranking de empresas;
+9. painel do corretor;
+10. alertas antifraude.
+
+## 28. Terceira fase
+
+Depois implementar:
+
+1. candlestick;
+2. sistema de notícias;
+3. comunicados oficiais;
+4. eventos econômicos;
+5. taxas configuráveis;
+6. imposto fictício;
+7. queima de moeda;
+8. relatórios exportáveis;
+9. reputação de empresas;
+10. ranking de jogadores.
+
+## 29. Interface
+
+A interface deve ser:
+
+- moderna;
+- responsiva;
+- mobile-first;
+- parecida com painel financeiro, mas deixando claro que é simulação;
+- com dashboard;
+- cards;
+- tabelas;
+- gráficos;
+- botões claros de comprar e vender;
+- tela administrativa separada.
+
+Toda página deve exibir aviso discreto:
+
+"Ambiente fictício de simulação econômica. Nenhum valor possui conversão para dinheiro real."
+
+## 30. Regras legais e de comunicação
+
+O sistema deve deixar claro:
+
+- a moeda é fictícia;
+- as cotas são fictícias;
+- empresas são fictícias;
+- não existe investimento real;
+- não existe saque real;
+- não existe promessa de lucro;
+- não existe vínculo com corretora real;
+- não existe oferta pública de valores mobiliários;
+- é apenas um jogo/simulação.
+
+Criar uma página "Regras da Simulação" com esses avisos.
+
+## 31. Entrega esperada
+
+Depois de criar este arquivo TXT, começar a implementação do projeto em etapas.
+
+A cada etapa:
+
+- mostrar arquivos criados;
+- explicar o que foi implementado;
+- garantir que não removeu funcionalidade anterior;
+- rodar testes quando existirem;
+- corrigir erros encontrados;
+- manter o código organizado.
+
+Não remover funcionalidades, painéis ou fluxos sem confirmação.
+
+## 32. Preferências de código
+
+- Usar TypeScript.
+- Usar nomes claros.
+- Separar frontend e backend.
+- Criar validações no backend.
+- Criar migrations Prisma.
+- Criar seed inicial com cargos.
+- Criar usuário admin inicial apenas via seed/configuração segura.
+- Criar .env.example, mas não criar .env com segredo real.
+- Preparar para deploy no Railway.
+- Documentar comandos no README.md.
+
+## 33. Primeiro passo obrigatório
+
+Antes de codar funcionalidades complexas:
+
+1. Criar estrutura do projeto.
+2. Criar docs/PROJETO_BOLSA_VIRTUAL.txt com este conteúdo.
+3. Criar README.md com visão geral e comandos.
+4. Criar schema inicial do banco.
+5. Criar cargos e permissões iniciais.
+6. Criar autenticação.
+7. Criar carteira.
+8. Criar painel inicial.
+
+## 34. Nome provisório do projeto
+
+Nome provisório:
+
+Bolsa Virtual RP
+
+Pode ser alterado depois.

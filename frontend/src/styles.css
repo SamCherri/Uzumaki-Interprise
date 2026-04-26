@@ -1,0 +1,46 @@
+:root {
+  font-family: Inter, system-ui, sans-serif;
+  color: #e6edf3;
+  background: #0d1117;
+}
+
+body { margin: 0; }
+
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.menu {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+button, input {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #30363d;
+  background: #161b22;
+  color: #e6edf3;
+}
+
+.card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.warning {
+  font-size: 0.9rem;
+  color: #f2cc60;
+}
