@@ -21,7 +21,7 @@ export function AdminDashboard() {
   const [issuanceAmount, setIssuanceAmount] = useState('');
   const [issuanceReason, setIssuanceReason] = useState('');
 
-  const [brokerUserId, setBrokerUserId] = useState('');
+  const [brokerEmail, setBrokerEmail] = useState('');
   const [brokerAmount, setBrokerAmount] = useState('');
   const [brokerReason, setBrokerReason] = useState('');
 
@@ -63,9 +63,9 @@ export function AdminDashboard() {
     try {
       await api('/admin/treasury/transfer-to-broker', {
         method: 'POST',
-        body: JSON.stringify({ brokerUserId, amount: brokerAmount, reason: brokerReason }),
+        body: JSON.stringify({ brokerEmail, amount: brokerAmount, reason: brokerReason }),
       });
-      setBrokerUserId('');
+      setBrokerEmail('');
       setBrokerAmount('');
       setBrokerReason('');
       await load();
@@ -96,7 +96,7 @@ export function AdminDashboard() {
 
       <h3>Enviar moeda da tesouraria para corretor</h3>
       <form onSubmit={submitBrokerTransfer} className="form-grid">
-        <input value={brokerUserId} onChange={(e) => setBrokerUserId(e.target.value)} placeholder="ID do corretor" required />
+        <input value={brokerEmail} onChange={(e) => setBrokerEmail(e.target.value)} placeholder="E-mail do corretor" type="email" required />
         <input value={brokerAmount} onChange={(e) => setBrokerAmount(e.target.value)} placeholder="Quantidade" required />
         <input value={brokerReason} onChange={(e) => setBrokerReason(e.target.value)} placeholder="Motivo" required />
         <button type="submit">Enviar ao corretor</button>
