@@ -15,6 +15,14 @@ type ViewerRoles = {
   canSeeBroker: boolean;
 };
 
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+};
+
+const ADMIN_ROLES = new Set(['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN']);
+const BROKER_ROLES = new Set(['VIRTUAL_BROKER']);
+
 function decodeRolesFromToken(token: string | null): ViewerRoles {
   if (!token) return { canSeeAdmin: false, canSeeBroker: false };
 
@@ -24,22 +32,19 @@ function decodeRolesFromToken(token: string | null): ViewerRoles {
 
     const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
     const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
-    const parsed = JSON.parse(atob(padded)) as {
-      role?: string;
-      roles?: string[];
-      isAdmin?: boolean;
-      isBroker?: boolean;
-    };
+    const parsed = JSON.parse(atob(padded)) as { role?: unknown; roles?: unknown };
 
-    const declaredRoles = [
+    const extractedRoles = [
       ...(Array.isArray(parsed.roles) ? parsed.roles : []),
-      ...(parsed.role ? [parsed.role] : []),
-    ].map((role) => role.toLowerCase());
+      ...(typeof parsed.role === 'string' ? [parsed.role] : []),
+    ]
+      .filter((role): role is string => typeof role === 'string')
+      .map((role) => role.trim().toUpperCase());
 
-    const canSeeAdmin = parsed.isAdmin === true || declaredRoles.some((role) => role.includes('admin'));
-    const canSeeBroker = parsed.isBroker === true || declaredRoles.some((role) => role.includes('broker') || role.includes('corretor'));
-
-    return { canSeeAdmin, canSeeBroker };
+    return {
+      canSeeAdmin: extractedRoles.some((role) => ADMIN_ROLES.has(role)),
+      canSeeBroker: extractedRoles.some((role) => BROKER_ROLES.has(role)),
+    };
   } catch {
     return { canSeeAdmin: false, canSeeBroker: false };
   }
@@ -49,6 +54,11 @@ export function App() {
   const [token, setToken] = useState(() => localStorage.getItem('token'));
   const [publicTab, setPublicTab] = useState<PublicTab>('login');
   const [screen, setScreen] = useState<PrivateScreen>('home');
+  const [installPromptEvent, setInstallPromptEvent] = useState<InstallPromptEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState(
+    () => window.matchMedia('(display-mode: standalone)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true,
+  );
+  const [installHint, setInstallHint] = useState('');
 
   const roles = useMemo(() => decodeRolesFromToken(token), [token]);
 
@@ -69,13 +79,58 @@ export function App() {
     }
   }, [roles.canSeeAdmin, roles.canSeeBroker, screen]);
 
+  useEffect(() => {
+    const onBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPromptEvent(event as InstallPromptEvent);
+      setInstallHint('');
+    };
+
+    const onInstalled = () => {
+      setIsInstalled(true);
+      setInstallPromptEvent(null);
+      setInstallHint('App instalado com sucesso no seu dispositivo.');
+    };
+
+    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+    window.addEventListener('appinstalled', onInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
+  }, []);
+
   const canGoBack = useMemo(() => screen !== 'home', [screen]);
+
+  async function handleInstallClick() {
+    if (isInstalled) {
+      setInstallHint('App instalado. Abra pela sua tela inicial.');
+      return;
+    }
+
+    if (installPromptEvent) {
+      await installPromptEvent.prompt();
+      const choice = await installPromptEvent.userChoice;
+      if (choice.outcome === 'accepted') {
+        setInstallHint('Instalação iniciada.');
+      } else {
+        setInstallHint('Instalação cancelada. Você pode tentar novamente depois.');
+      }
+      setInstallPromptEvent(null);
+      return;
+    }
+
+    setInstallHint('No navegador, toque nos três pontos e escolha Adicionar à tela inicial.');
+  }
 
   function handleLogout() {
     setToken(null);
     setScreen('home');
     setPublicTab('login');
   }
+
+  const showInstallCard = !isInstalled;
 
   if (!token) {
     return (
@@ -87,7 +142,22 @@ export function App() {
             <p className="warning">Sem dinheiro real.</p>
           </header>
 
-          <nav className="pill-nav" aria-label="Alternar entre login e cadastro">
+          <article className="card install-card nested-card">
+            <h3>📲 Instalar aplicativo</h3>
+            <p className="info-text">Use a Bolsa Virtual RP como app no celular.</p>
+            <button className="button-primary" onClick={handleInstallClick} type="button">
+              Instalar aplicativo
+            </button>
+            {installHint && <p className="info-text">{installHint}</p>}
+          </article>
+
+          <div className="benefits-grid nested-card">
+            <span>🏢 Empresas fictícias</span>
+            <span>📈 Cotas virtuais</span>
+            <span>💰 Economia RP</span>
+          </div>
+
+          <nav className="pill-nav nested-card" aria-label="Alternar entre login e cadastro">
             <button className={publicTab === 'login' ? 'pill active' : 'pill'} onClick={() => setPublicTab('login')}>
               Login
             </button>
@@ -125,7 +195,7 @@ export function App() {
           )}
           <div>
             <h1>Bolsa Virtual RP</h1>
-            <p className="subtitle">Simulação econômica fictícia</p>
+            <p className="subtitle">Ambiente fictício</p>
           </div>
           <button className="button-danger small-button" onClick={handleLogout}>
             Sair
@@ -135,15 +205,27 @@ export function App() {
 
       {screen === 'home' && (
         <section className="card">
-          <h2>🏠 Início</h2>
-          <p className="info-text">Escolha uma seção.</p>
-          <div className="home-grid home-grid-actions">
-            <button className="home-tile" onClick={() => setScreen('markets')}>🏢 Mercados</button>
-            <button className="home-tile" onClick={() => setScreen('wallet')}>💼 Carteira</button>
-            {roles.canSeeBroker && <button className="home-tile" onClick={() => setScreen('broker')}>🤝 Painel Corretor</button>}
-            {roles.canSeeAdmin && <button className="home-tile" onClick={() => setScreen('admin')}>🛠️ Painel Admin</button>}
-            <button className="home-tile" onClick={() => setScreen('company-request')}>🏦 Solicitar Empresa</button>
-            <button className="home-tile home-tile-danger" onClick={handleLogout}>🚪 Sair</button>
+          <h2>Bem-vindo à Bolsa Virtual RP</h2>
+          <p className="info-text">Ambiente fictício</p>
+
+          {showInstallCard && (
+            <article className="summary-item install-card nested-card">
+              <h3>📲 Instalar aplicativo</h3>
+              <p className="info-text">Use a Bolsa Virtual RP como app no celular.</p>
+              <button className="button-primary" onClick={handleInstallClick} type="button">
+                Instalar aplicativo
+              </button>
+              {installHint && <p className="info-text">{installHint}</p>}
+            </article>
+          )}
+
+          <div className="home-grid home-grid-actions nested-card">
+            <button className="home-tile" onClick={() => setScreen('markets')}><span>🏢</span><strong>Mercados</strong><small>Empresas e cotações</small></button>
+            <button className="home-tile" onClick={() => setScreen('wallet')}><span>💼</span><strong>Carteira</strong><small>Saldo e posições</small></button>
+            <button className="home-tile" onClick={() => setScreen('company-request')}><span>🏦</span><strong>Criar empresa</strong><small>Solicite aprovação</small></button>
+            {roles.canSeeAdmin && <button className="home-tile" onClick={() => setScreen('admin')}><span>🛠️</span><strong>Admin</strong><small>Painel administrativo</small></button>}
+            {roles.canSeeBroker && <button className="home-tile" onClick={() => setScreen('broker')}><span>🤝</span><strong>Corretor</strong><small>Painel corretor</small></button>}
+            <button className="home-tile home-tile-danger" onClick={handleLogout}><span>🚪</span><strong>Sair</strong><small>Encerrar sessão</small></button>
           </div>
         </section>
       )}
