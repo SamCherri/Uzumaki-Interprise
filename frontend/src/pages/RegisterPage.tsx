@@ -28,12 +28,21 @@ export function RegisterPage({ onSwitchLogin }: RegisterPageProps) {
   }
 
   return (
-    <section className="auth-panel">
+    <section className="auth-panel nested-card">
       <h2>Criar conta</h2>
       <form onSubmit={handleSubmit}>
-        <input placeholder="Nome" value={name} onChange={(event) => setName(event.target.value)} required />
-        <input placeholder="E-mail" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-        <input placeholder="Senha" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} />
+        <label>
+          Nome
+          <input placeholder="Seu nome" value={name} onChange={(event) => setName(event.target.value)} required />
+        </label>
+        <label>
+          E-mail
+          <input placeholder="seuemail@exemplo.com" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+        </label>
+        <label>
+          Senha
+          <input placeholder="Mínimo 8 caracteres" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} />
+        </label>
         <button className="button-primary" type="submit">Cadastrar</button>
       </form>
       {message && <p className="info-text">{message}</p>}

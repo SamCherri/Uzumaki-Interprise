@@ -27,11 +27,17 @@ export function LoginPage({ onSuccess, onSwitchRegister }: LoginPageProps) {
   }
 
   return (
-    <section className="auth-panel">
+    <section className="auth-panel nested-card">
       <h2>Entrar</h2>
       <form onSubmit={handleSubmit}>
-        <input placeholder="E-mail" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-        <input placeholder="Senha" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+        <label>
+          E-mail
+          <input placeholder="seuemail@exemplo.com" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+        </label>
+        <label>
+          Senha
+          <input placeholder="********" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+        </label>
         <button className="button-primary" type="submit">Entrar</button>
       </form>
       {message && <p className="info-text">{message}</p>}

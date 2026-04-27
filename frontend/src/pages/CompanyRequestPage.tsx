@@ -2,16 +2,7 @@ import { FormEvent, useState } from 'react';
 import { api } from '../services/api';
 
 const initialForm = {
-  name: '',
-  ticker: '',
-  sector: '',
-  description: '',
-  totalShares: '100000',
-  initialPrice: '1',
-  ownerSharePercent: '40',
-  publicOfferPercent: '60',
-  buyFeePercent: '1',
-  sellFeePercent: '1',
+  name: '', ticker: '', sector: '', description: '', totalShares: '100000', initialPrice: '1', ownerSharePercent: '40', publicOfferPercent: '60', buyFeePercent: '1', sellFeePercent: '1',
 };
 
 export function CompanyRequestPage() {
@@ -34,8 +25,9 @@ export function CompanyRequestPage() {
 
   return (
     <section className="card">
-      <h2>Solicitar nova empresa fictícia</h2>
-      <form onSubmit={submit} className="form-grid two-cols">
+      <h2>🏦 Solicitar empresa</h2>
+      <p className="info-text">Preencha os dados da empresa fictícia para análise administrativa.</p>
+      <form onSubmit={submit} className="form-grid two-cols nested-card">
         <input placeholder="Nome da empresa" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
         <input placeholder="Ticker" value={form.ticker} onChange={(e) => setForm({ ...form, ticker: e.target.value.toUpperCase() })} required />
         <input placeholder="Setor" value={form.sector} onChange={(e) => setForm({ ...form, sector: e.target.value })} required />
@@ -45,11 +37,11 @@ export function CompanyRequestPage() {
         <input placeholder="% oferta inicial" type="number" step="0.01" value={form.publicOfferPercent} onChange={(e) => setForm({ ...form, publicOfferPercent: e.target.value })} required />
         <input placeholder="Taxa compra (%)" type="number" step="0.01" value={form.buyFeePercent} onChange={(e) => setForm({ ...form, buyFeePercent: e.target.value })} required />
         <input placeholder="Taxa venda (%)" type="number" step="0.01" value={form.sellFeePercent} onChange={(e) => setForm({ ...form, sellFeePercent: e.target.value })} required />
-        <textarea placeholder="Descrição" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required />
-        <button type="submit">Enviar solicitação</button>
+        <textarea placeholder="Descrição da empresa" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required />
+        <button className="button-primary" type="submit">Solicitar empresa</button>
       </form>
-      {message && <p>{message}</p>}
-      {error && <p>{error}</p>}
+      {message && <p className="status-message success">{message}</p>}
+      {error && <p className="status-message error">{error}</p>}
     </section>
   );
 }
