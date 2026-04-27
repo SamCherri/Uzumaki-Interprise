@@ -1,7 +1,11 @@
 import { FormEvent, useState } from 'react';
 import { api } from '../services/api';
 
-export function RegisterPage() {
+type RegisterPageProps = {
+  onSwitchLogin?: () => void;
+};
+
+export function RegisterPage({ onSwitchLogin }: RegisterPageProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -15,21 +19,32 @@ export function RegisterPage() {
         body: JSON.stringify({ name, email, password }),
       });
       setMessage('Conta criada com sucesso. Faça login para continuar.');
+      setName('');
+      setEmail('');
+      setPassword('');
     } catch (error) {
       setMessage((error as Error).message);
     }
   }
 
   return (
-    <section className="card">
-      <h2>Cadastro</h2>
+    <section className="auth-panel">
+      <h2>Criar conta</h2>
       <form onSubmit={handleSubmit}>
         <input placeholder="Nome" value={name} onChange={(event) => setName(event.target.value)} required />
         <input placeholder="E-mail" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
         <input placeholder="Senha" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} />
-        <button type="submit">Criar conta</button>
+        <button className="button-primary" type="submit">Cadastrar</button>
       </form>
-      {message && <p>{message}</p>}
+      {message && <p className="info-text">{message}</p>}
+      {onSwitchLogin && (
+        <p className="auth-switch-row">
+          Já tem conta?{' '}
+          <button className="link-button" type="button" onClick={onSwitchLogin}>
+            Ir para login
+          </button>
+        </p>
+      )}
     </section>
   );
 }

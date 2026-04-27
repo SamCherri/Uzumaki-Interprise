@@ -1,7 +1,12 @@
 import { FormEvent, useState } from 'react';
 import { api } from '../services/api';
 
-export function LoginPage() {
+type LoginPageProps = {
+  onSuccess?: (token: string) => void;
+  onSwitchRegister?: () => void;
+};
+
+export function LoginPage({ onSuccess, onSwitchRegister }: LoginPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
@@ -15,20 +20,29 @@ export function LoginPage() {
       });
       localStorage.setItem('token', result.token);
       setMessage('Login realizado com sucesso.');
+      onSuccess?.(result.token);
     } catch (error) {
       setMessage((error as Error).message);
     }
   }
 
   return (
-    <section className="card">
-      <h2>Login</h2>
+    <section className="auth-panel">
+      <h2>Entrar</h2>
       <form onSubmit={handleSubmit}>
         <input placeholder="E-mail" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
         <input placeholder="Senha" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
-        <button type="submit">Entrar</button>
+        <button className="button-primary" type="submit">Entrar</button>
       </form>
-      {message && <p>{message}</p>}
+      {message && <p className="info-text">{message}</p>}
+      {onSwitchRegister && (
+        <p className="auth-switch-row">
+          Novo por aqui?{' '}
+          <button className="link-button" type="button" onClick={onSwitchRegister}>
+            Criar cadastro
+          </button>
+        </p>
+      )}
     </section>
   );
 }
