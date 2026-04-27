@@ -2,10 +2,12 @@ const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3333';
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const token = localStorage.getItem('token');
+  const hasBody = typeof init?.body !== 'undefined' && init.body !== null;
+
   const response = await fetch(`${API_URL}/api${path}`, {
     ...init,
     headers: {
-      'Content-Type': 'application/json',
+      ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },

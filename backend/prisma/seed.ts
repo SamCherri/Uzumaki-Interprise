@@ -84,6 +84,54 @@ async function main() {
   });
 
 
+  const companyDemo = await prisma.company.upsert({
+    where: { ticker: 'DEMO3' },
+    update: {},
+    create: {
+      name: 'Empresa Demo Fase 3',
+      ticker: 'DEMO3',
+      description: 'Empresa fictícia para validar oferta inicial de cotas.',
+      sector: 'Tecnologia',
+      founderUserId: userDemo.id,
+      status: 'ACTIVE',
+      totalShares: 100000,
+      circulatingShares: 0,
+      ownerSharePercent: 40,
+      publicOfferPercent: 60,
+      ownerShares: 40000,
+      publicOfferShares: 60000,
+      availableOfferShares: 60000,
+      initialPrice: 1,
+      currentPrice: 1,
+      buyFeePercent: 1,
+      sellFeePercent: 1,
+      fictitiousMarketCap: 100000,
+      approvedAt: new Date(),
+    },
+  });
+
+  await prisma.companyHolding.upsert({
+    where: { userId_companyId: { userId: userDemo.id, companyId: companyDemo.id } },
+    update: {},
+    create: {
+      userId: userDemo.id,
+      companyId: companyDemo.id,
+      shares: 40000,
+      averageBuyPrice: 1,
+      estimatedValue: 40000,
+    },
+  });
+
+  await prisma.companyInitialOffer.upsert({
+    where: { companyId: companyDemo.id },
+    update: {},
+    create: {
+      companyId: companyDemo.id,
+      totalShares: 60000,
+      availableShares: 60000,
+    },
+  });
+
   const brokerDemo = await prisma.user.upsert({
     where: { email: 'corretor@bolsavirtual.local' },
     update: {},
