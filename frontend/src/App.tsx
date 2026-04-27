@@ -10,10 +10,47 @@ import { CompaniesPage } from './pages/CompaniesPage';
 type PublicTab = 'login' | 'register';
 type PrivateScreen = 'home' | 'markets' | 'wallet' | 'company-request' | 'admin' | 'broker';
 
+type ViewerRoles = {
+  canSeeAdmin: boolean;
+  canSeeBroker: boolean;
+};
+
+function decodeRolesFromToken(token: string | null): ViewerRoles {
+  if (!token) return { canSeeAdmin: false, canSeeBroker: false };
+
+  try {
+    const [, payload] = token.split('.');
+    if (!payload) return { canSeeAdmin: false, canSeeBroker: false };
+
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+    const parsed = JSON.parse(atob(padded)) as {
+      role?: string;
+      roles?: string[];
+      isAdmin?: boolean;
+      isBroker?: boolean;
+    };
+
+    const declaredRoles = [
+      ...(Array.isArray(parsed.roles) ? parsed.roles : []),
+      ...(parsed.role ? [parsed.role] : []),
+    ].map((role) => role.toLowerCase());
+
+    const canSeeAdmin = parsed.isAdmin === true || declaredRoles.some((role) => role.includes('admin'));
+    const canSeeBroker = parsed.isBroker === true || declaredRoles.some((role) => role.includes('broker') || role.includes('corretor'));
+
+    return { canSeeAdmin, canSeeBroker };
+  } catch {
+    return { canSeeAdmin: false, canSeeBroker: false };
+  }
+}
+
 export function App() {
   const [token, setToken] = useState(() => localStorage.getItem('token'));
   const [publicTab, setPublicTab] = useState<PublicTab>('login');
   const [screen, setScreen] = useState<PrivateScreen>('home');
+
+  const roles = useMemo(() => decodeRolesFromToken(token), [token]);
 
   useEffect(() => {
     if (token) {
@@ -22,6 +59,15 @@ export function App() {
     }
     localStorage.removeItem('token');
   }, [token]);
+
+  useEffect(() => {
+    if (screen === 'admin' && !roles.canSeeAdmin) {
+      setScreen('home');
+    }
+    if (screen === 'broker' && !roles.canSeeBroker) {
+      setScreen('home');
+    }
+  }, [roles.canSeeAdmin, roles.canSeeBroker, screen]);
 
   const canGoBack = useMemo(() => screen !== 'home', [screen]);
 
@@ -90,13 +136,14 @@ export function App() {
       {screen === 'home' && (
         <section className="card">
           <h2>🏠 Início</h2>
-          <p className="info-text">Escolha uma seção para continuar.</p>
-          <div className="home-grid">
+          <p className="info-text">Escolha uma seção.</p>
+          <div className="home-grid home-grid-actions">
             <button className="home-tile" onClick={() => setScreen('markets')}>🏢 Mercados</button>
             <button className="home-tile" onClick={() => setScreen('wallet')}>💼 Carteira</button>
+            {roles.canSeeBroker && <button className="home-tile" onClick={() => setScreen('broker')}>🤝 Painel Corretor</button>}
+            {roles.canSeeAdmin && <button className="home-tile" onClick={() => setScreen('admin')}>🛠️ Painel Admin</button>}
             <button className="home-tile" onClick={() => setScreen('company-request')}>🏦 Solicitar Empresa</button>
-            <button className="home-tile" onClick={() => setScreen('admin')}>🛠️ Admin</button>
-            <button className="home-tile" onClick={() => setScreen('broker')}>🤝 Corretor</button>
+            <button className="home-tile home-tile-danger" onClick={handleLogout}>🚪 Sair</button>
           </div>
         </section>
       )}
@@ -104,16 +151,8 @@ export function App() {
       {screen === 'markets' && <CompaniesPage />}
       {screen === 'wallet' && <UserDashboard />}
       {screen === 'company-request' && <CompanyRequestPage />}
-      {screen === 'admin' && <AdminDashboard />}
-      {screen === 'broker' && <BrokerDashboard />}
-
-      <nav className="card mobile-bottom-nav" aria-label="Menu principal">
-        <button className={screen === 'markets' ? 'active' : ''} onClick={() => setScreen('markets')}>Mercados</button>
-        <button className={screen === 'wallet' ? 'active' : ''} onClick={() => setScreen('wallet')}>Carteira</button>
-        <button className={screen === 'company-request' ? 'active' : ''} onClick={() => setScreen('company-request')}>Empresa</button>
-        <button className={screen === 'admin' ? 'active' : ''} onClick={() => setScreen('admin')}>Admin</button>
-        <button className={screen === 'broker' ? 'active' : ''} onClick={() => setScreen('broker')}>Corretor</button>
-      </nav>
+      {screen === 'admin' && roles.canSeeAdmin && <AdminDashboard />}
+      {screen === 'broker' && roles.canSeeBroker && <BrokerDashboard />}
     </main>
   );
 }

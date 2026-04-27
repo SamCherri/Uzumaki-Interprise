@@ -79,8 +79,7 @@ form { display: flex; flex-direction: column; gap: 10px; }
 }
 
 .pill.active,
-.quick-pill.active,
-.mobile-bottom-nav .active {
+.quick-pill.active {
   background: #111827;
   color: #fff;
   border-color: #111827;
@@ -98,7 +97,6 @@ form { display: flex; flex-direction: column; gap: 10px; }
 }
 
 .mobile-app-shell {
-  padding-bottom: 88px;
   max-width: 760px;
 }
 
@@ -123,11 +121,20 @@ form { display: flex; flex-direction: column; gap: 10px; }
   gap: 10px;
 }
 
+.home-grid-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .home-tile {
   border-radius: 14px;
   background: #f0f4fa;
   border: 1px solid #d5dfec;
   text-align: left;
+}
+
+.home-tile-danger {
+  background: #fff2f0;
+  border-color: #f0b5af;
 }
 
 .info-text { margin: 4px 0 10px; color: #4b5563; font-size: 0.93rem; }
@@ -142,6 +149,13 @@ form { display: flex; flex-direction: column; gap: 10px; }
 .trade-header h3 { margin: 8px 0 2px; font-size: 1.5rem; }
 .trade-price-big { margin: 2px 0 10px; font-size: 2rem; font-weight: 700; }
 
+.trade-main-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
 .summary-item {
   border: 1px solid #d4deea;
   border-radius: 12px;
@@ -151,8 +165,6 @@ form { display: flex; flex-direction: column; gap: 10px; }
 .summary-label { display: block; color: #64748b; font-size: 0.8rem; }
 .summary-value { display: block; margin-top: 2px; font-weight: 700; }
 
-.order-book-stack { display: grid; gap: 8px; }
-.order-price-center { text-align: center; }
 .sell-side { border-color: #f5c0ba; background: #fff5f4; }
 .buy-side { border-color: #bce9d4; background: #f2fff8; }
 
@@ -176,35 +188,6 @@ form { display: flex; flex-direction: column; gap: 10px; }
 
 .compact-card p { margin: 4px 0; }
 .nested-card { margin-top: 12px; }
-.inline-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-
-.trade-footer-actions {
-  position: sticky;
-  bottom: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  background: #f3f5f8;
-  padding-top: 10px;
-  margin-top: 14px;
-}
-
-.mobile-bottom-nav {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 6px;
-  border-radius: 18px 18px 0 0;
-  padding: 10px;
-}
-.mobile-bottom-nav button {
-  min-height: 44px;
-  border-radius: 999px;
-  background: #eef2f7;
-}
 
 .table-scroll { overflow-x: auto; }
 .data-table { width: 100%; min-width: 520px; border-collapse: collapse; }
@@ -218,8 +201,5 @@ form { display: flex; flex-direction: column; gap: 10px; }
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .inline-actions { flex-direction: row; }
   .desktop-only { display: block; }
-  .mobile-bottom-nav { position: static; margin-top: 12px; border-radius: 18px; }
-  .mobile-app-shell { padding-bottom: 18px; }
 }
