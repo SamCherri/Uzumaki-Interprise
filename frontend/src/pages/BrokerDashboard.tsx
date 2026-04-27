@@ -15,7 +15,7 @@ export function BrokerDashboard() {
   const [history, setHistory] = useState<BrokerHistory | null>(null);
   const [error, setError] = useState('');
 
-  const [userId, setUserId] = useState('');
+  const [userEmail, setUserEmail] = useState('');
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
 
@@ -42,9 +42,9 @@ export function BrokerDashboard() {
     try {
       await api('/broker/transfer-to-user', {
         method: 'POST',
-        body: JSON.stringify({ userId, amount, reason }),
+        body: JSON.stringify({ userEmail, amount, reason }),
       });
-      setUserId('');
+      setUserEmail('');
       setAmount('');
       setReason('');
       await load();
@@ -67,7 +67,13 @@ export function BrokerDashboard() {
 
       <h3>Repassar moeda para usuário</h3>
       <form onSubmit={submitTransfer} className="form-grid">
-        <input value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="ID do usuário" required />
+        <input
+          value={userEmail}
+          onChange={(e) => setUserEmail(e.target.value)}
+          placeholder="E-mail do usuário (ex.: jogador@bolsavirtual.local)"
+          type="email"
+          required
+        />
         <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Quantidade" required />
         <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo" required />
         <button type="submit">Enviar ao usuário</button>

@@ -782,7 +782,7 @@ ADM Chefe da Moeda -> Tesouraria Central -> Corretor Virtual -> Usuário.
 - Consulta de saldo da Tesouraria Central por cargos administrativos autorizados.
 - Transferência da Tesouraria para corretor usando o e-mail do corretor (com registro obrigatório de motivo).
 - Consulta de saldo do corretor virtual.
-- Repasse de moeda do corretor para usuário com registro em transação de carteira.
+- Repasse de moeda do corretor para usuário usando e-mail do usuário como identificador principal (com fallback por ID para compatibilidade), com registro em transação de carteira.
 - Histórico de emissões e transferências disponível para auditoria administrativa.
 
 ### Proteções contra saldo negativo e abuso

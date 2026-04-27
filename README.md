@@ -91,7 +91,7 @@ A moeda virtual agora segue obrigatoriamente este caminho:
 - `POST /api/admin/treasury/transfer-to-broker` → transferência da Tesouraria para corretor (usando e-mail do corretor; `brokerUserId` permanece como fallback).
 - `GET /api/admin/coin-history` → histórico de emissões e transferências.
 - `GET /api/broker/balance` → saldo disponível do corretor.
-- `POST /api/broker/transfer-to-user` → corretor repassa moeda ao usuário.
+- `POST /api/broker/transfer-to-user` → corretor repassa moeda ao usuário usando e-mail do usuário (`userEmail`), com `userId` como fallback de compatibilidade.
 - `GET /api/broker/history` → histórico de repasses do corretor.
 
 ### Regras de permissão e segurança
