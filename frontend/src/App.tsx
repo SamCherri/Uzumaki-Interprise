@@ -14,19 +14,20 @@ export function App() {
 
   return (
     <main className="container">
-      <header>
+      <header className="app-header card">
         <h1>Bolsa Virtual RP</h1>
-        <p className="warning">Ambiente fictício de simulação econômica. Nenhum valor possui conversão para dinheiro real.</p>
+        <p className="subtitle">Simulação econômica fictícia</p>
+        <p className="warning">Sem dinheiro real.</p>
       </header>
 
-      <nav className="menu">
-        <button onClick={() => setScreen('login')}>Login</button>
-        <button onClick={() => setScreen('register')}>Cadastro</button>
-        <button onClick={() => setScreen('user')}>Painel Usuário</button>
-        <button onClick={() => setScreen('admin')}>Painel Admin</button>
-        <button onClick={() => setScreen('broker')}>Painel Corretor</button>
-        <button onClick={() => setScreen('company-request')}>Solicitar Empresa</button>
-        <button onClick={() => setScreen('companies')}>Empresas</button>
+      <nav className="menu app-menu">
+        <button onClick={() => setScreen('login')}>🔐 Login</button>
+        <button onClick={() => setScreen('register')}>📝 Cadastro</button>
+        <button onClick={() => setScreen('user')}>👤 Painel Usuário</button>
+        <button onClick={() => setScreen('admin')}>🛡️ Painel Admin</button>
+        <button onClick={() => setScreen('broker')}>💼 Painel Corretor</button>
+        <button onClick={() => setScreen('company-request')}>🏦 Solicitar Empresa</button>
+        <button onClick={() => setScreen('companies')}>🏢 Empresas</button>
       </nav>
 
       {screen === 'login' && <LoginPage />}
