@@ -43,8 +43,44 @@ type Trade = {
   createdAt: string;
 };
 
+type ChartPoint = {
+  x: number;
+  y: number;
+};
+
 function moeda(value: number) {
   return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function toChartData(trades: Trade[], fallbackPrice: number) {
+  const ordered = [...trades].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  const prices = ordered.map((trade) => Number(trade.unitPrice)).filter((price) => Number.isFinite(price) && price > 0);
+  const hasRealHistory = prices.length >= 2;
+
+  const series =
+    prices.length === 0
+      ? [fallbackPrice, fallbackPrice]
+      : prices.length === 1
+        ? [prices[0], prices[0]]
+        : prices;
+
+  const minPrice = Math.min(...series);
+  const maxPrice = Math.max(...series);
+  const range = Math.max(maxPrice - minPrice, 1);
+
+  const points: ChartPoint[] = series.map((price, index) => {
+    const x = series.length === 1 ? 0 : (index / (series.length - 1)) * 100;
+    const y = 100 - ((price - minPrice) / range) * 100;
+    return { x, y };
+  });
+
+  return {
+    points,
+    minPrice,
+    maxPrice,
+    lastPrice: series[series.length - 1],
+    hasRealHistory,
+  };
 }
 
 export function CompaniesPage() {
@@ -117,6 +153,7 @@ export function CompaniesPage() {
   async function selectCompany(id: string) {
     try {
       setError('');
+      setMessage('');
       await refreshSelected(id);
     } catch (err) {
       setError((err as Error).message);
@@ -129,10 +166,11 @@ export function CompaniesPage() {
     try {
       await api(`/companies/${selected.id}/buy-initial-offer`, { method: 'POST', body: JSON.stringify({ quantity: Number(initialQty) }) });
       setInitialQty('');
-      setMessage('Compra da oferta inicial realizada com sucesso.');
+      setMessage('Compra da oferta inicial concluída com sucesso.');
+      setError('');
       await refreshSelected(selected.id);
     } catch (err) {
-      setError((err as Error).message);
+      setError(`Não foi possível concluir a compra inicial: ${(err as Error).message}`);
       setMessage('');
     }
   }
@@ -154,10 +192,11 @@ export function CompaniesPage() {
       });
       setLimitQty('');
       setLimitPrice('');
-      setMessage('Ordem limitada criada e enviada para o livro.');
+      setMessage('Ordem limitada criada e enviada para o livro de ofertas.');
+      setError('');
       await refreshSelected(selected.id);
     } catch (err) {
-      setError((err as Error).message);
+      setError(`Não foi possível criar a ordem limitada: ${(err as Error).message}`);
       setMessage('');
     }
   }
@@ -175,9 +214,10 @@ export function CompaniesPage() {
       if (type === 'BUY') setMarketBuyQty('');
       if (type === 'SELL') setMarketSellQty('');
       setMessage(`${type === 'BUY' ? 'Compra' : 'Venda'} a mercado enviada com sucesso.`);
+      setError('');
       await refreshSelected(selected.id);
     } catch (err) {
-      setError((err as Error).message);
+      setError(`Não foi possível enviar a ordem a mercado: ${(err as Error).message}`);
       setMessage('');
     }
   }
@@ -186,10 +226,11 @@ export function CompaniesPage() {
     if (!selected) return;
     try {
       await api(`/market/orders/${orderId}/cancel`, { method: 'POST' });
-      setMessage('Ordem cancelada e recursos liberados.');
+      setMessage('Ordem cancelada com sucesso e recursos liberados.');
+      setError('');
       await refreshSelected(selected.id);
     } catch (err) {
-      setError((err as Error).message);
+      setError(`Falha ao cancelar ordem: ${(err as Error).message}`);
       setMessage('');
     }
   }
@@ -207,52 +248,175 @@ export function CompaniesPage() {
   const bestAsk = useMemo(() => (book.sellOrders.length > 0 ? Number(book.sellOrders[0].limitPrice ?? 0) : 0), [book.sellOrders]);
   const bestBid = useMemo(() => (book.buyOrders.length > 0 ? Number(book.buyOrders[0].limitPrice ?? 0) : 0), [book.buyOrders]);
 
+  const chartData = useMemo(() => {
+    const fallback = Number(selected?.currentPrice ?? selected?.initialPrice ?? '0') || 0;
+    return toChartData(trades, fallback);
+  }, [trades, selected?.currentPrice, selected?.initialPrice]);
+
+  const linePoints = chartData.points.map((point) => `${point.x},${point.y}`).join(' ');
+
+  const lastTradePrice = trades.length > 0 ? Number(trades[0].unitPrice) : null;
+
   return (
     <section className="card">
       <h2>Empresas e Mercado Secundário</h2>
-      {error && <p>{error}</p>}
-      {message && <p>{message}</p>}
+      <p className="info-text">Selecione uma empresa para acompanhar o preço, enviar ordens e ver o histórico de negociações.</p>
 
-      <ul>
+      {error && <p className="status-message error">{error}</p>}
+      {message && <p className="status-message success">{message}</p>}
+
+      <ul className="company-list">
         {companies.map((company) => (
-          <li key={company.id}>
-            <strong>{company.name}</strong> ({company.ticker}) — Preço inicial: {company.initialPrice}
-            <button onClick={() => selectCompany(company.id)}>Detalhes</button>
+          <li key={company.id} className="card company-list-item">
+            <div>
+              <strong>
+                {company.name} ({company.ticker})
+              </strong>
+              <p className="info-text">Preço inicial: {moeda(Number(company.initialPrice))} moedas</p>
+            </div>
+            <button onClick={() => selectCompany(company.id)}>Ver detalhes e operar</button>
           </li>
         ))}
       </ul>
 
       {selectedId && selected && (
         <div className="card nested-card">
-          <h3>{selected.name} ({selected.ticker})</h3>
+          <h3>
+            {selected.name} ({selected.ticker})
+          </h3>
+          <p className="info-text">Setor: {selected.sector}</p>
           <p>{selected.description}</p>
-          <p>Saldo disponível: {moeda(walletBalance)} moedas | Suas cotas: {holdingQty}</p>
+          <p className="warning">Ambiente fictício de simulação econômica. Nenhum valor possui conversão para dinheiro real.</p>
+          <p>
+            Saldo disponível: <strong>{moeda(walletBalance)}</strong> moedas | Suas cotas: <strong>{holdingQty}</strong>
+          </p>
+
+          <div className="summary-grid nested-card">
+            <div className="summary-item">
+              <span className="summary-label">Preço atual</span>
+              <strong className="summary-value">{moeda(Number(selected.currentPrice))}</strong>
+            </div>
+            <div className="summary-item">
+              <span className="summary-label">Preço inicial</span>
+              <strong className="summary-value">{moeda(Number(selected.initialPrice))}</strong>
+            </div>
+            <div className="summary-item">
+              <span className="summary-label">Cotas disponíveis</span>
+              <strong className="summary-value">{selected.availableOfferShares}</strong>
+            </div>
+            <div className="summary-item">
+              <span className="summary-label">Taxa de compra</span>
+              <strong className="summary-value">{selected.buyFeePercent}%</strong>
+            </div>
+            <div className="summary-item">
+              <span className="summary-label">Taxa de venda</span>
+              <strong className="summary-value">{selected.sellFeePercent}%</strong>
+            </div>
+            <div className="summary-item">
+              <span className="summary-label">Último preço negociado</span>
+              <strong className="summary-value">{lastTradePrice !== null ? moeda(lastTradePrice) : 'Sem negociações'}</strong>
+            </div>
+          </div>
 
           <div className="card nested-card">
-            <h4>Oferta inicial (Fase anterior preservada)</h4>
+            <h4>Histórico de preço</h4>
+            <p className="info-text">Linha simples com base nas últimas negociações da empresa.</p>
+            <div className="chart-wrap">
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="line-chart" role="img" aria-label="Gráfico de linha do histórico de preço">
+                <polyline points={linePoints} fill="none" stroke="#58a6ff" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+              </svg>
+              <div className="chart-meta">
+                <div>
+                  <span>Menor preço</span>
+                  <strong>{moeda(chartData.minPrice)}</strong>
+                </div>
+                <div>
+                  <span>Maior preço</span>
+                  <strong>{moeda(chartData.maxPrice)}</strong>
+                </div>
+                <div>
+                  <span>Último preço</span>
+                  <strong>{moeda(chartData.lastPrice)}</strong>
+                </div>
+              </div>
+            </div>
+            {!chartData.hasRealHistory && <p className="warning">Sem negociações suficientes ainda.</p>}
+          </div>
+
+          <div className="card nested-card">
+            <h4>Oferta inicial</h4>
+            <p className="info-text">Compra direta de cotas ainda disponíveis na oferta inicial da empresa.</p>
             <form onSubmit={buyInitialOffer} className="form-grid">
               <input type="number" min="1" value={initialQty} onChange={(e) => setInitialQty(e.target.value)} placeholder="Quantidade de cotas" required />
               <button type="submit">Comprar da oferta inicial</button>
             </form>
           </div>
 
-          <div className="grid-two">
-            <div className="card nested-card">
+          <div className="company-grid nested-card">
+            <div className="card">
               <h4>Livro de ofertas (compra)</h4>
-              {book.buyOrders.map((order) => (
-                <p key={order.id}>Preço: {order.limitPrice} | Qtde: {order.remainingQuantity} | Total: {moeda(Number(order.limitPrice ?? 0) * order.remainingQuantity)}</p>
-              ))}
+              <p className="info-text">Ordens de compra aguardando execução.</p>
+              <div className="table-scroll">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Preço</th>
+                      <th>Qtd restante</th>
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {book.buyOrders.length === 0 && (
+                      <tr>
+                        <td colSpan={3}>Sem ordens de compra no momento.</td>
+                      </tr>
+                    )}
+                    {book.buyOrders.map((order) => (
+                      <tr key={order.id}>
+                        <td>{moeda(Number(order.limitPrice ?? 0))}</td>
+                        <td>{order.remainingQuantity}</td>
+                        <td>{moeda(Number(order.limitPrice ?? 0) * order.remainingQuantity)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className="card nested-card">
+
+            <div className="card">
               <h4>Livro de ofertas (venda)</h4>
-              {book.sellOrders.map((order) => (
-                <p key={order.id}>Preço: {order.limitPrice} | Qtde: {order.remainingQuantity} | Total: {moeda(Number(order.limitPrice ?? 0) * order.remainingQuantity)}</p>
-              ))}
+              <p className="info-text">Ordens de venda aguardando execução.</p>
+              <div className="table-scroll">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Preço</th>
+                      <th>Qtd restante</th>
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {book.sellOrders.length === 0 && (
+                      <tr>
+                        <td colSpan={3}>Sem ordens de venda no momento.</td>
+                      </tr>
+                    )}
+                    {book.sellOrders.map((order) => (
+                      <tr key={order.id}>
+                        <td>{moeda(Number(order.limitPrice ?? 0))}</td>
+                        <td>{order.remainingQuantity}</td>
+                        <td>{moeda(Number(order.limitPrice ?? 0) * order.remainingQuantity)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
           <div className="card nested-card">
-            <h4>Nova ordem limitada</h4>
+            <h4>Criar ordem limitada</h4>
+            <p className="info-text">Use preço limite para entrar no livro de ofertas e aguardar execução.</p>
             <form onSubmit={createLimitOrder} className="form-grid">
               <select value={limitType} onChange={(e) => setLimitType(e.target.value as 'BUY' | 'SELL')}>
                 <option value="BUY">Comprar</option>
@@ -262,26 +426,28 @@ export function CompaniesPage() {
               <input type="number" min="0.01" step="0.01" value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço limite" required />
 
               {limitType === 'BUY' ? (
-                <div>
-                  <p><strong>Resumo compra limitada</strong></p>
+                <div className="summary-item">
+                  <p>
+                    <strong>Resumo compra limitada</strong>
+                  </p>
                   <p>Quantidade: {limitQtyN}</p>
                   <p>Preço limite por cota: {moeda(limitPriceN)}</p>
                   <p>Subtotal: {moeda(limitSubtotal)}</p>
                   <p>Taxa de compra: {buyFee}%</p>
                   <p>Total necessário: {moeda(limitTotalBuy)}</p>
                   <p>Saldo disponível: {moeda(walletBalance)}</p>
-                  <p>Saldo que será bloqueado: {moeda(limitTotalBuy)}</p>
                 </div>
               ) : (
-                <div>
-                  <p><strong>Resumo venda limitada</strong></p>
+                <div className="summary-item">
+                  <p>
+                    <strong>Resumo venda limitada</strong>
+                  </p>
                   <p>Quantidade: {limitQtyN}</p>
                   <p>Preço mínimo por cota: {moeda(limitPriceN)}</p>
                   <p>Subtotal esperado: {moeda(limitSubtotal)}</p>
                   <p>Taxa de venda: {sellFee}%</p>
                   <p>Total líquido estimado: {moeda(limitNetSell)}</p>
                   <p>Cotas disponíveis: {holdingQty}</p>
-                  <p>Cotas que serão bloqueadas: {limitQtyN}</p>
                 </div>
               )}
 
@@ -289,26 +455,23 @@ export function CompaniesPage() {
             </form>
           </div>
 
-          <div className="grid-two">
-            <div className="card nested-card">
+          <div className="company-grid nested-card">
+            <div className="card">
               <h4>Compra a mercado</h4>
+              <p className="info-text">Executa imediatamente nas melhores ofertas de venda disponíveis.</p>
               <input type="number" min="1" value={marketBuyQty} onChange={(e) => setMarketBuyQty(e.target.value)} placeholder="Quantidade" />
               <input type="number" min="0" max="100" value={marketBuySlip} onChange={(e) => setMarketBuySlip(e.target.value)} placeholder="Slippage %" />
-              <p>Quantidade desejada: {Number(marketBuyQty) || 0}</p>
               <p>Melhor preço atual: {moeda(bestAsk)}</p>
-              <p>Preço estimado: {moeda((Number(marketBuyQty) || 0) * bestAsk)}</p>
-              <p>Slippage máximo: {marketBuySlip}%</p>
               <p>Total estimado: {moeda((Number(marketBuyQty) || 0) * bestAsk * (1 + Number(marketBuySlip || '0') / 100))}</p>
               <button onClick={() => sendMarket('BUY')}>Comprar a mercado</button>
             </div>
 
-            <div className="card nested-card">
+            <div className="card">
               <h4>Venda a mercado</h4>
+              <p className="info-text">Executa imediatamente nas melhores ofertas de compra disponíveis.</p>
               <input type="number" min="1" value={marketSellQty} onChange={(e) => setMarketSellQty(e.target.value)} placeholder="Quantidade" />
               <input type="number" min="0" max="100" value={marketSellSlip} onChange={(e) => setMarketSellSlip(e.target.value)} placeholder="Slippage %" />
-              <p>Quantidade desejada: {Number(marketSellQty) || 0}</p>
               <p>Melhor comprador atual: {moeda(bestBid)}</p>
-              <p>Slippage máximo: {marketSellSlip}%</p>
               <p>Total líquido estimado: {moeda((Number(marketSellQty) || 0) * bestBid * (1 - Number(selected.sellFeePercent) / 100))}</p>
               <button onClick={() => sendMarket('SELL')}>Vender a mercado</button>
             </div>
@@ -316,21 +479,76 @@ export function CompaniesPage() {
 
           <div className="card nested-card">
             <h4>Minhas ordens</h4>
-            {myOrders.map((order) => (
-              <p key={order.id}>
-                [{order.status}] {order.mode} {order.type} | Qtd: {order.quantity} | Restante: {order.remainingQuantity} | Preço: {order.limitPrice ?? '-'}
-                {(order.status === 'OPEN' || order.status === 'PARTIALLY_FILLED') && order.mode === 'LIMIT' && (
-                  <button onClick={() => cancelOrder(order.id)}>Cancelar</button>
-                )}
-              </p>
-            ))}
+            <p className="info-text">Acompanhe status e cancele ordens limitadas em aberto.</p>
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Status</th>
+                    <th>Tipo</th>
+                    <th>Quantidade</th>
+                    <th>Restante</th>
+                    <th>Preço</th>
+                    <th>Ação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {myOrders.length === 0 && (
+                    <tr>
+                      <td colSpan={6}>Você ainda não possui ordens nesta empresa.</td>
+                    </tr>
+                  )}
+                  {myOrders.map((order) => (
+                    <tr key={order.id}>
+                      <td>{order.status}</td>
+                      <td>
+                        {order.mode} {order.type}
+                      </td>
+                      <td>{order.quantity}</td>
+                      <td>{order.remainingQuantity}</td>
+                      <td>{order.limitPrice ? moeda(Number(order.limitPrice)) : '-'}</td>
+                      <td>
+                        {(order.status === 'OPEN' || order.status === 'PARTIALLY_FILLED') && order.mode === 'LIMIT' ? (
+                          <button onClick={() => cancelOrder(order.id)}>Cancelar</button>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="card nested-card">
             <h4>Últimas negociações</h4>
-            {trades.map((trade) => (
-              <p key={trade.id}>Preço: {trade.unitPrice} | Quantidade: {trade.quantity} | {new Date(trade.createdAt).toLocaleString('pt-BR')}</p>
-            ))}
+            <p className="info-text">Histórico recente de trades executados no mercado secundário.</p>
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Preço</th>
+                    <th>Quantidade</th>
+                    <th>Data/Hora</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trades.length === 0 && (
+                    <tr>
+                      <td colSpan={3}>Sem negociações registradas para esta empresa.</td>
+                    </tr>
+                  )}
+                  {trades.map((trade) => (
+                    <tr key={trade.id}>
+                      <td>{moeda(Number(trade.unitPrice))}</td>
+                      <td>{trade.quantity}</td>
+                      <td>{new Date(trade.createdAt).toLocaleString('pt-BR')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
