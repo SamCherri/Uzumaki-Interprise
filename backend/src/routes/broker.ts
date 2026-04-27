@@ -5,11 +5,17 @@ import { prisma } from '../lib/prisma.js';
 
 type AuthRequest = FastifyRequest & { user: { sub: string; roles?: string[] } };
 
-const transferSchema = z.object({
-  userId: z.string().min(1),
-  amount: z.coerce.number().positive(),
-  reason: z.string().min(3),
-});
+const transferSchema = z
+  .object({
+    userEmail: z.string().email().optional(),
+    userId: z.string().min(1).optional(),
+    amount: z.coerce.number().positive(),
+    reason: z.string().min(3),
+  })
+  .refine((data) => Boolean(data.userEmail || data.userId), {
+    message: 'Informe o e-mail do usuário ou ID do usuário.',
+    path: ['userEmail'],
+  });
 
 function requireBroker(reply: FastifyReply, roles: string[]) {
   const isBroker = roles.includes('VIRTUAL_BROKER') || roles.includes('SUPER_ADMIN');
@@ -78,7 +84,10 @@ export async function brokerRoutes(app: FastifyInstance) {
         throw new Error('Saldo insuficiente no corretor.');
       }
 
-      const targetUser = await tx.user.findUnique({ where: { id: body.userId }, include: { wallet: true } });
+      const normalizedEmail = body.userEmail?.trim().toLowerCase();
+      const targetUser = normalizedEmail
+        ? await tx.user.findUnique({ where: { email: normalizedEmail }, include: { wallet: true } })
+        : await tx.user.findUnique({ where: { id: body.userId }, include: { wallet: true } });
       if (!targetUser) {
         throw new Error('Usuário de destino não encontrado.');
       }
@@ -121,7 +130,13 @@ export async function brokerRoutes(app: FastifyInstance) {
           entity: 'Wallet',
           reason: body.reason,
           previous: JSON.stringify({ brokerBalance: brokerPrevious.toString(), userBalance: userPrevious.toString() }),
-          current: JSON.stringify({ brokerBalance: brokerNext.toString(), userBalance: userNext.toString(), amount: amount.toString(), targetUserId: targetUser.id }),
+          current: JSON.stringify({
+            brokerBalance: brokerNext.toString(),
+            userBalance: userNext.toString(),
+            amount: amount.toString(),
+            targetUserId: targetUser.id,
+            targetUserEmail: targetUser.email,
+          }),
           ip: request.ip,
           userAgent: request.headers['user-agent'] ?? null,
         },
