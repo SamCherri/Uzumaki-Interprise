@@ -53,7 +53,7 @@ export function UserDashboard() {
               <strong className="summary-value">{data.totalCompanies}</strong>
             </div>
             <div className="summary-item">
-              <span className="summary-label">Valor estimado da carteira</span>
+              <span className="summary-label">Valor estimado</span>
               <strong className="summary-value">{moeda(totalEstimado)} moedas</strong>
             </div>
           </div>
@@ -64,7 +64,7 @@ export function UserDashboard() {
               <article key={holding.companyId} className="summary-item">
                 <p className="company-emoji">🏢 {holding.ticker}</p>
                 <strong>{holding.companyName}</strong>
-                <p className="info-text">Cotas: {holding.quantity}</p>
+                <p className="info-text">Minhas cotas: {holding.quantity}</p>
                 <p className="info-text">Preço médio: {moeda(Number(holding.averageBuyPrice))}</p>
                 <p className="info-text">Preço atual: {moeda(Number(holding.currentPrice))}</p>
                 <p className="info-text">Valor estimado: {moeda(Number(holding.estimatedValue))}</p>
