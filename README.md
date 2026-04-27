@@ -63,7 +63,7 @@ npm run build               # build backend + frontend
 npm run start:backend       # sobe backend em produção
 ```
 
-## Fase atual (MVP - bloco 3: empresas e cotas virtuais)
+## Fase atual (MVP - bloco 4A: livro de ofertas e matching simples)
 
 Implementado nesta fase:
 
@@ -89,9 +89,21 @@ Implementado nesta fase:
    - atualização de carteira e holdings;
    - registro em `Transaction`, `CompanyOperation` e `AdminLog`.
 6. Dashboard do usuário atualizado com holdings e empresas investidas.
-7. Preparação de modelagem para ordens limitadas e ordens a mercado via tabela `MarketOrder` (sem matching engine nesta PR).
+7. Livro de ofertas com ordens limitadas de compra e venda entre usuários.
+8. Ordens a mercado (compra e venda) com execução parcial e proteção de slippage.
+9. Matching engine simples:
+   - compra limitada cruza menor preço vendedor (FIFO por empate);
+   - venda limitada cruza maior preço comprador (FIFO por empate);
+   - ordens a mercado consomem livro respeitando tolerância.
+10. Bloqueio de recursos:
+   - compra limitada bloqueia saldo em carteira (`availableBalance -> lockedBalance`);
+   - venda limitada bloqueia cotas (retiradas da holding até execução/cancelamento).
+11. Cancelamento de ordem limitada liberando saldo/cotas bloqueadas.
+12. Registro de trades na tabela `Trade`.
+13. Atualização de preço atual da empresa pelo último trade executado.
+14. Registro de auditoria (`Transaction`, `CompanyOperation`, `AdminLog`) no fluxo de negociação.
 
-## Novos endpoints da Fase 3
+## Endpoints principais da Fase 4A
 
 Empresas:
 - `POST /api/companies/request`
@@ -106,13 +118,20 @@ Cotas e carteira:
 - `POST /api/companies/:id/buy-initial-offer`
 - `GET /api/me/holdings`
 
+Mercado secundário:
+- `POST /api/market/orders` (ordem limitada BUY/SELL)
+- `GET /api/market/orders/me`
+- `GET /api/market/companies/:companyId/order-book`
+- `POST /api/market/orders/:id/cancel`
+- `POST /api/market/companies/:companyId/buy-market`
+- `POST /api/market/companies/:companyId/sell-market`
+- `GET /api/market/companies/:companyId/trades`
+
 ## Observações importantes da simulação
 
 - Este projeto é exclusivamente uma simulação fictícia.
 - Não há dinheiro real, saque real, criptoativo real, investimento real ou promessa de lucro real.
 - Não foi implementado nesta fase:
-  - livro de ofertas completo;
-  - matching engine completo;
   - gráfico candlestick.
 
 ## Deploy no Railway

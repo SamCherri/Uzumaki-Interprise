@@ -27,6 +27,14 @@ button, input, textarea {
   color: #e6edf3;
 }
 
+select {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #30363d;
+  background: #161b22;
+  color: #e6edf3;
+}
+
 textarea {
   min-height: 90px;
   resize: vertical;
@@ -69,4 +77,10 @@ form {
   display: flex;
   gap: 8px;
   margin-top: 8px;
+}
+
+.grid-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }

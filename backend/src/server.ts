@@ -7,6 +7,7 @@ import { userRoutes } from './routes/user.js';
 import { adminRoutes } from './routes/admin.js';
 import { brokerRoutes } from './routes/broker.js';
 import { companyRoutes } from './routes/companies.js';
+import { marketRoutes } from './routes/market.js';
 import { prisma } from './lib/prisma.js';
 
 declare module 'fastify' {
@@ -51,6 +52,7 @@ app.register(userRoutes, { prefix: '/api' });
 app.register(adminRoutes, { prefix: '/api' });
 app.register(brokerRoutes, { prefix: '/api' });
 app.register(companyRoutes, { prefix: '/api' });
+app.register(marketRoutes, { prefix: '/api' });
 
 const port = Number(process.env.PORT ?? 3333);
 app.listen({ port, host: '0.0.0.0' }).catch((error: unknown) => {
