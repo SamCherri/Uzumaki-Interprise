@@ -1,0 +1,52 @@
+-- AlterEnum
+ALTER TYPE "CompanyOperationType" ADD VALUE IF NOT EXISTS 'MARKET_ORDER_CREATE';
+ALTER TYPE "CompanyOperationType" ADD VALUE IF NOT EXISTS 'MARKET_ORDER_CANCEL';
+ALTER TYPE "CompanyOperationType" ADD VALUE IF NOT EXISTS 'MARKET_TRADE_EXECUTED';
+
+-- AlterTable
+ALTER TABLE "MarketOrder"
+ADD COLUMN IF NOT EXISTS "remainingQuantity" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN IF NOT EXISTS "lockedCash" DECIMAL(18,2) NOT NULL DEFAULT 0,
+ADD COLUMN IF NOT EXISTS "lockedShares" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN IF NOT EXISTS "canceledAt" TIMESTAMP(3);
+
+UPDATE "MarketOrder" SET "remainingQuantity" = "quantity" WHERE "remainingQuantity" = 0;
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "Trade" (
+  "id" TEXT NOT NULL,
+  "companyId" TEXT NOT NULL,
+  "buyerId" TEXT NOT NULL,
+  "sellerId" TEXT NOT NULL,
+  "buyOrderId" TEXT,
+  "sellOrderId" TEXT,
+  "quantity" INTEGER NOT NULL,
+  "unitPrice" DECIMAL(18,2) NOT NULL,
+  "grossAmount" DECIMAL(18,2) NOT NULL,
+  "buyFeeAmount" DECIMAL(18,2) NOT NULL,
+  "sellFeeAmount" DECIMAL(18,2) NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "Trade_pkey" PRIMARY KEY ("id")
+);
+
+-- AddForeignKey
+DO $$ BEGIN
+  ALTER TABLE "Trade" ADD CONSTRAINT "Trade_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "Trade" ADD CONSTRAINT "Trade_buyerId_fkey" FOREIGN KEY ("buyerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "Trade" ADD CONSTRAINT "Trade_sellerId_fkey" FOREIGN KEY ("sellerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "Trade" ADD CONSTRAINT "Trade_buyOrderId_fkey" FOREIGN KEY ("buyOrderId") REFERENCES "MarketOrder"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "Trade" ADD CONSTRAINT "Trade_sellOrderId_fkey" FOREIGN KEY ("sellOrderId") REFERENCES "MarketOrder"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;

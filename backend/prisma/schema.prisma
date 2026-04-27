@@ -30,6 +30,9 @@ enum CompanyOperationType {
   ADMIN_APPROVE
   ADMIN_REJECT
   ADMIN_SUSPEND
+  MARKET_ORDER_CREATE
+  MARKET_ORDER_CANCEL
+  MARKET_TRADE_EXECUTED
 }
 
 enum MarketOrderType {
@@ -67,6 +70,8 @@ model User {
   holdings     CompanyHolding[]
   operations   CompanyOperation[]
   marketOrders MarketOrder[]
+  buyTrades    Trade[]            @relation("trade_buyer")
+  sellTrades   Trade[]            @relation("trade_seller")
 }
 
 model Role {
@@ -158,6 +163,7 @@ model Company {
   operations          CompanyOperation[]
   initialOffer        CompanyInitialOffer?
   marketOrders        MarketOrder[]
+  trades              Trade[]
 }
 
 model CompanyHolding {
@@ -208,13 +214,40 @@ model MarketOrder {
   type            MarketOrderType
   mode            MarketOrderMode
   quantity        Int
+  remainingQuantity Int
+  lockedCash      Decimal           @default(0) @db.Decimal(18, 2)
+  lockedShares    Int               @default(0)
   limitPrice      Decimal?          @db.Decimal(18, 2)
   slippagePercent Decimal?          @db.Decimal(5, 2)
   status          MarketOrderStatus @default(OPEN)
   createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
   executedAt      DateTime?
+  canceledAt      DateTime?
   company         Company           @relation(fields: [companyId], references: [id])
   user            User              @relation(fields: [userId], references: [id])
+  buyTrades       Trade[]           @relation("trade_buy_order")
+  sellTrades      Trade[]           @relation("trade_sell_order")
+}
+
+model Trade {
+  id            String      @id @default(cuid())
+  companyId     String
+  buyerId       String
+  sellerId      String
+  buyOrderId    String?
+  sellOrderId   String?
+  quantity      Int
+  unitPrice     Decimal     @db.Decimal(18, 2)
+  grossAmount   Decimal     @db.Decimal(18, 2)
+  buyFeeAmount  Decimal     @db.Decimal(18, 2)
+  sellFeeAmount Decimal     @db.Decimal(18, 2)
+  createdAt     DateTime    @default(now())
+  company       Company     @relation(fields: [companyId], references: [id])
+  buyer         User        @relation("trade_buyer", fields: [buyerId], references: [id])
+  seller        User        @relation("trade_seller", fields: [sellerId], references: [id])
+  buyOrder      MarketOrder? @relation("trade_buy_order", fields: [buyOrderId], references: [id])
+  sellOrder     MarketOrder? @relation("trade_sell_order", fields: [sellOrderId], references: [id])
 }
 
 model CoinIssuance {

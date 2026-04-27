@@ -842,3 +842,68 @@ Importante:
 - Não há dinheiro real, saque real, investimento real, criptoativo real ou promessa de lucro real.
 - Livro de ofertas completo, matching engine e candlestick ficam para fases futuras.
 
+
+## 20. FASE 4A IMPLEMENTADA — LIVRO DE OFERTAS E MATCHING ENGINE SIMPLES
+
+A Fase 4A adiciona negociação entre usuários no mercado secundário com regras de proteção e auditoria.
+
+### 20.1 Tipos de ordem
+
+- Ordem limitada de compra: bloqueia saldo e entra no livro de compras.
+- Ordem limitada de venda: bloqueia cotas e entra no livro de vendas.
+- Compra a mercado: consome as menores ofertas de venda, permite parcial e respeita slippage.
+- Venda a mercado: consome as maiores ofertas de compra, permite parcial e respeita slippage.
+
+### 20.2 Regras econômicas aplicadas
+
+- Nunca permite saldo negativo ou cotas negativas.
+- Empresa inexistente ou suspensa não pode ser negociada.
+- Ordem parcialmente executada permanece com quantidade restante.
+- Ordem totalmente executada vira FILLED.
+- Cancelamento libera saldo/cotas bloqueadas.
+- Cada execução gera Trade + Transaction + CompanyOperation + AdminLog.
+- Preço atual da empresa é atualizado pelo último trade.
+- Taxa de compra é aplicada ao comprador e taxa de venda ao vendedor.
+
+### 20.3 Banco de dados
+
+Foi adicionado o modelo `Trade` com:
+- companyId, buyerId, sellerId;
+- buyOrderId, sellOrderId;
+- quantity, unitPrice, grossAmount;
+- buyFeeAmount, sellFeeAmount;
+- createdAt.
+
+Também foram adicionados campos em `MarketOrder` para controle de execução e bloqueio:
+- remainingQuantity;
+- lockedCash;
+- lockedShares;
+- updatedAt;
+- canceledAt.
+
+### 20.4 Endpoints do mercado
+
+- `POST /api/market/orders`
+- `GET /api/market/orders/me`
+- `GET /api/market/companies/:companyId/order-book`
+- `POST /api/market/orders/:id/cancel`
+- `POST /api/market/companies/:companyId/buy-market`
+- `POST /api/market/companies/:companyId/sell-market`
+- `GET /api/market/companies/:companyId/trades`
+
+### 20.5 Slippage
+
+Slippage é a tolerância máxima de variação de preço para ordens a mercado.
+
+Exemplo simples:
+- melhor venda atual = 10;
+- slippage = 5%;
+- compra a mercado aceita até 10,50.
+
+Se o livro exigir preço acima da tolerância, a execução é bloqueada.
+
+### 20.6 Escopo não implementado nesta fase
+
+- gráfico candlestick;
+- motor avançado de candles;
+- qualquer operação com dinheiro real, saque real ou cripto real.
