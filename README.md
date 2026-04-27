@@ -18,6 +18,11 @@ O banco oficial é **PostgreSQL/Postgres** com **Prisma ORM** usando `DATABASE_U
 - `backend/`: Fastify + Prisma + TypeScript (API e regras de backend).
 - `docs/`: documentação principal da simulação.
 
+## Documentação técnica
+
+- [Arquitetura da Bolsa RP](docs/ARQUITETURA_BOLSA_RP.md)
+- [Auditoria do estado atual](docs/AUDITORIA_ATUAL.md)
+
 ## Requisitos
 
 - Node.js 20+
