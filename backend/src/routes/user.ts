@@ -21,7 +21,7 @@ export async function userRoutes(app: FastifyInstance) {
       id: user.id,
       name: user.name,
       email: user.email,
-      roles: user.roles.map((item) => item.role.key),
+      roles: user.roles.map((item: { role: { key: string } }) => item.role.key),
       wallet: user.wallet,
     };
   });

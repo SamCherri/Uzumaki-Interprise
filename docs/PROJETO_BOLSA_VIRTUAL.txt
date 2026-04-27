@@ -798,3 +798,47 @@ ADM Chefe da Moeda -> Tesouraria Central -> Corretor Virtual -> Usuário.
 
 Este sistema permanece estritamente fictício para gameplay/simulação.
 Não representa dinheiro real, criptoativo real, investimento real, saque real, rendimento real ou promessa de lucro real.
+
+
+## 0. Atualização de implementação — Fase 3 (Empresas e Cotas)
+
+Status implementado no código:
+
+- Solicitação de empresa fictícia com validação de:
+  - nome, ticker, setor, descrição;
+  - total de cotas > 0;
+  - preço inicial > 0;
+  - dono% + oferta% = 100%;
+  - taxa de compra e venda não negativas;
+  - ticker único.
+- Limites fixos de sistema (preparados para futura tela administrativa):
+  - taxa máxima de compra: 5%;
+  - taxa máxima de venda: 5%;
+  - oferta inicial mínima ao mercado: 10%;
+  - percentual máximo mantido pelo dono: 90%.
+- Fluxo admin:
+  - listar pendentes;
+  - aprovar;
+  - rejeitar;
+  - suspender.
+- Na aprovação:
+  - empresa vira ACTIVE;
+  - cria posição de cotas do fundador;
+  - cria estoque inicial da oferta;
+  - gera CompanyOperation + AdminLog (auditoria).
+- Compra da oferta inicial:
+  - calcula bruto, taxa e total;
+  - impede saldo negativo;
+  - impede compra acima do estoque disponível;
+  - debita carteira;
+  - credita cotas na holding;
+  - reduz oferta disponível;
+  - registra Transaction + CompanyOperation + AdminLog.
+- Preparação para próxima fase de ordens:
+  - modelagem de MarketOrder com campos para LIMIT/MARKET, slippage e status.
+
+Importante:
+- Continua sendo simulação econômica fictícia.
+- Não há dinheiro real, saque real, investimento real, criptoativo real ou promessa de lucro real.
+- Livro de ofertas completo, matching engine e candlestick ficam para fases futuras.
+

@@ -32,7 +32,7 @@ export async function authRoutes(app: FastifyInstance) {
 
     try {
       const user = await loginUser(body.email, body.password);
-      const roles = user.roles.map((item) => item.role.key);
+      const roles = user.roles.map((item: { role: { key: string } }) => item.role.key);
 
       const token = await reply.jwtSign({ sub: user.id, roles });
       await app.logAdmin({ action: 'LOGIN', entity: 'User', userId: user.id, reason: 'Login bem-sucedido' });
