@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
@@ -70,9 +71,9 @@ export async function adminRoutes(app: FastifyInstance) {
       });
       const body = schema.parse(request.body);
 
-      const result = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const treasury = await tx.treasuryAccount.findFirstOrThrow();
-      const amount = new Prisma.Decimal(body.amount);
+      const amount = new Decimal(body.amount);
       const previous = treasury.balance;
       const next = treasury.balance.add(amount);
 
@@ -139,9 +140,9 @@ export async function adminRoutes(app: FastifyInstance) {
       });
       const body = schema.parse(request.body);
 
-      const result = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const treasury = await tx.treasuryAccount.findFirstOrThrow();
-      const amount = new Prisma.Decimal(body.amount);
+      const amount = new Decimal(body.amount);
 
       if (treasury.balance.lessThan(amount)) {
         throw new Error('Saldo insuficiente na tesouraria.');

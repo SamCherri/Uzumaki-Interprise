@@ -8,31 +8,37 @@ type Overview = {
   treasuryBalance: string | number;
 };
 
-type CoinHistory = {
-  issuances: Array<{ id: string; amount: string; reason: string; createdAt: string; createdById: string }>;
-  transfers: Array<{ id: string; type: string; amount: string; reason: string; createdAt: string; receiverId: string | null }>;
+type PendingCompany = {
+  id: string;
+  name: string;
+  ticker: string;
+  ownerSharePercent: string;
+  publicOfferPercent: string;
+  buyFeePercent: string;
+  sellFeePercent: string;
+  ownerShares: number;
+  publicOfferShares: number;
 };
 
 export function AdminDashboard() {
   const [data, setData] = useState<Overview | null>(null);
-  const [history, setHistory] = useState<CoinHistory | null>(null);
+  const [pending, setPending] = useState<PendingCompany[]>([]);
   const [error, setError] = useState('');
 
   const [issuanceAmount, setIssuanceAmount] = useState('');
   const [issuanceReason, setIssuanceReason] = useState('');
-
   const [brokerEmail, setBrokerEmail] = useState('');
   const [brokerAmount, setBrokerAmount] = useState('');
   const [brokerReason, setBrokerReason] = useState('');
 
   async function load() {
     try {
-      const [overview, coinHistory] = await Promise.all([
+      const [overview, pendingCompanies] = await Promise.all([
         api<Overview>('/admin/overview'),
-        api<CoinHistory>('/admin/coin-history'),
+        api<{ companies: PendingCompany[] }>('/admin/companies/pending'),
       ]);
       setData(overview);
-      setHistory(coinHistory);
+      setPending(pendingCompanies.companies);
       setError('');
     } catch (err) {
       setError((err as Error).message);
@@ -46,10 +52,7 @@ export function AdminDashboard() {
   async function submitIssuance(event: FormEvent) {
     event.preventDefault();
     try {
-      await api('/admin/treasury/issuance', {
-        method: 'POST',
-        body: JSON.stringify({ amount: issuanceAmount, reason: issuanceReason }),
-      });
+      await api('/admin/treasury/issuance', { method: 'POST', body: JSON.stringify({ amount: issuanceAmount, reason: issuanceReason }) });
       setIssuanceAmount('');
       setIssuanceReason('');
       await load();
@@ -74,9 +77,18 @@ export function AdminDashboard() {
     }
   }
 
+  async function moderateCompany(id: string, action: 'approve' | 'reject' | 'suspend') {
+    try {
+      await api(`/admin/companies/${id}/${action}`, { method: 'POST' });
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
   return (
     <section className="card">
-      <h2>Painel Administrativo (Fase 2)</h2>
+      <h2>Painel Administrativo</h2>
       {error && <p>{error}</p>}
       {data && (
         <ul>
@@ -86,6 +98,22 @@ export function AdminDashboard() {
           <li>Saldo da tesouraria central: {data.treasuryBalance}</li>
         </ul>
       )}
+
+      <h3>Empresas pendentes</h3>
+      <ul>
+        {pending.map((company) => (
+          <li key={company.id}>
+            <strong>{company.name}</strong> ({company.ticker}) | Dono: {company.ownerSharePercent}% ({company.ownerShares} cotas) | Oferta: {company.publicOfferPercent}% ({company.publicOfferShares} cotas)
+            <br />
+            Taxa compra: {company.buyFeePercent}% | Taxa venda: {company.sellFeePercent}%
+            <div className="inline-actions">
+              <button onClick={() => moderateCompany(company.id, 'approve')}>Aprovar</button>
+              <button onClick={() => moderateCompany(company.id, 'reject')}>Rejeitar</button>
+              <button onClick={() => moderateCompany(company.id, 'suspend')}>Suspender</button>
+            </div>
+          </li>
+        ))}
+      </ul>
 
       <h3>Emitir moeda fictícia para tesouraria</h3>
       <form onSubmit={submitIssuance} className="form-grid">
@@ -101,25 +129,6 @@ export function AdminDashboard() {
         <input value={brokerReason} onChange={(e) => setBrokerReason(e.target.value)} placeholder="Motivo" required />
         <button type="submit">Enviar ao corretor</button>
       </form>
-
-      <h3>Histórico básico</h3>
-      {history && (
-        <div>
-          <p><strong>Emissões:</strong></p>
-          <ul>
-            {history.issuances.slice(0, 5).map((item) => (
-              <li key={item.id}>{item.amount} moedas - {item.reason} ({new Date(item.createdAt).toLocaleString()})</li>
-            ))}
-          </ul>
-
-          <p><strong>Transferências:</strong></p>
-          <ul>
-            {history.transfers.slice(0, 5).map((item) => (
-              <li key={item.id}>{item.type} - {item.amount} moedas - {item.reason}</li>
-            ))}
-          </ul>
-        </div>
-      )}
     </section>
   );
 }

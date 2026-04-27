@@ -63,45 +63,57 @@ npm run build               # build backend + frontend
 npm run start:backend       # sobe backend em produção
 ```
 
-## Fase atual (MVP - bloco 2)
+## Fase atual (MVP - bloco 3: empresas e cotas virtuais)
 
-Implementado até esta fase:
+Implementado nesta fase:
 
-1. Estrutura inicial frontend/backend e autenticação.
-2. Fluxo econômico central da moeda fictícia: ADM Chefe da Moeda → Tesouraria → Corretor → Usuário.
-3. Endpoints de emissão, transferências e histórico com validações de saldo e permissões.
-4. Registro obrigatório de CoinIssuance, CoinTransfer, Transaction e AdminLog nas ações sensíveis.
-5. Atualização do painel Admin com emissão, transferência para corretor e histórico.
-6. Novo painel do Corretor com saldo, repasse ao usuário e histórico básico.
+1. Solicitação de empresas fictícias por usuários autenticados, com validações de percentuais, taxas e ticker único.
+2. Limites administrativos fixos no backend (documentados para virar configuração dinâmica futuramente):
+   - taxa máxima de compra: 5%;
+   - taxa máxima de venda: 5%;
+   - oferta pública mínima: 10%;
+   - percentual máximo do dono: 90%.
+3. Fluxo administrativo de empresas:
+   - listar pendentes;
+   - aprovar;
+   - rejeitar;
+   - suspender.
+4. Aprovação de empresa gera automaticamente:
+   - posição inicial de cotas do dono;
+   - estoque da oferta inicial;
+   - logs administrativos e operação de auditoria.
+5. Compra de cotas da oferta inicial:
+   - cálculo de custo bruto, taxa e custo total;
+   - bloqueio por saldo insuficiente;
+   - bloqueio por falta de cotas na oferta;
+   - atualização de carteira e holdings;
+   - registro em `Transaction`, `CompanyOperation` e `AdminLog`.
+6. Dashboard do usuário atualizado com holdings e empresas investidas.
+7. Preparação de modelagem para ordens limitadas e ordens a mercado via tabela `MarketOrder` (sem matching engine nesta PR).
 
+## Novos endpoints da Fase 3
 
-## Fluxo da moeda fictícia (Fase 2)
+Empresas:
+- `POST /api/companies/request`
+- `GET /api/companies`
+- `GET /api/companies/:id`
+- `GET /api/admin/companies/pending`
+- `POST /api/admin/companies/:id/approve`
+- `POST /api/admin/companies/:id/reject`
+- `POST /api/admin/companies/:id/suspend`
 
-A moeda virtual agora segue obrigatoriamente este caminho:
+Cotas e carteira:
+- `POST /api/companies/:id/buy-initial-offer`
+- `GET /api/me/holdings`
 
-1. **COIN_CHIEF_ADMIN / SUPER_ADMIN** emite moeda para a Tesouraria Central.
-2. Tesouraria Central envia saldo para um usuário com cargo **VIRTUAL_BROKER**.
-3. Corretor virtual repassa saldo para o usuário final.
-4. Cada etapa gera registro permanente para auditoria.
+## Observações importantes da simulação
 
-### Endpoints econômicos criados
-
-- `GET /api/admin/treasury/balance` → consulta saldo da Tesouraria.
-- `POST /api/admin/treasury/issuance` → emissão de moeda fictícia para Tesouraria.
-- `POST /api/admin/treasury/transfer-to-broker` → transferência da Tesouraria para corretor (usando e-mail do corretor; `brokerUserId` permanece como fallback).
-- `GET /api/admin/coin-history` → histórico de emissões e transferências.
-- `GET /api/broker/balance` → saldo disponível do corretor.
-- `POST /api/broker/transfer-to-user` → corretor repassa moeda ao usuário usando e-mail do usuário (`userEmail`), com `userId` como fallback de compatibilidade.
-- `GET /api/broker/history` → histórico de repasses do corretor.
-
-### Regras de permissão e segurança
-
-- Usuário comum não acessa endpoints administrativos.
-- Apenas `COIN_CHIEF_ADMIN` ou `SUPER_ADMIN` pode emitir moeda.
-- Apenas corretor virtual (`VIRTUAL_BROKER`) pode repassar moeda ao usuário.
-- Tesouraria nunca fica negativa.
-- Saldo de corretor nunca fica negativo.
-- Toda ação sensível registra `AdminLog` com motivo, valores e origem da chamada.
+- Este projeto é exclusivamente uma simulação fictícia.
+- Não há dinheiro real, saque real, criptoativo real, investimento real ou promessa de lucro real.
+- Não foi implementado nesta fase:
+  - livro de ofertas completo;
+  - matching engine completo;
+  - gráfico candlestick.
 
 ## Deploy no Railway
 
@@ -170,38 +182,11 @@ npm run prisma:seed
 1. Abrir frontend.
 2. Cadastrar usuário.
 3. Fazer login.
-4. Confirmar que backend responde em `/health`.
+4. Solicitar empresa fictícia ou comprar cotas da empresa demo.
+5. Confirmar que backend responde em `/health`.
 
-## Observações importantes
+## Observações finais
 
-- **Não usar SQLite como solução final** neste projeto.
-- **Não commitar `.env` real** com segredos.
+- Não commitar `.env` real com segredos.
 - Em produção, preferir variáveis no painel do Railway.
-- Se `npm install` falhar por bloqueio externo (ex.: erro 403 de registry), registrar o incidente e manter os arquivos de configuração corretos.
-
-
-## Checklist de mergeabilidade da PR #1
-
-Se o GitHub mostrar `mergeable: false`, normalmente é por branch desatualizada ou conflito com `main`.
-
-Passos recomendados para o mantenedor (com acesso ao remoto):
-
-```bash
-git fetch origin
-git checkout work
-git rebase origin/main
-# resolver conflitos, se aparecerem
-git push --force-with-lease
-```
-
-Alternativa sem rebase:
-
-```bash
-git fetch origin
-git checkout work
-git merge origin/main
-# resolver conflitos, se aparecerem
-git push
-```
-
-Após isso, revalidar no GitHub se a PR voltou para `mergeable: true`.
+- Se `npm install` falhar por bloqueio externo (ex.: erro 403 de registry), registrar o incidente na PR.

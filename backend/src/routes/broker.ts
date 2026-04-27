@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
@@ -71,14 +72,14 @@ export async function brokerRoutes(app: FastifyInstance) {
     try {
       const body = transferSchema.parse(request.body);
 
-      const result = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const broker = await tx.brokerAccount.upsert({
         where: { userId: authRequest.user.sub },
         update: {},
         create: { userId: authRequest.user.sub },
       });
 
-      const amount = new Prisma.Decimal(body.amount);
+      const amount = new Decimal(body.amount);
 
       if (broker.available.lessThan(amount)) {
         throw new Error('Saldo insuficiente no corretor.');

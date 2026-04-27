@@ -11,6 +11,7 @@ enum CompanyStatus {
   PENDING
   APPROVED
   ACTIVE
+  REJECTED
   SUSPENDED
   BANKRUPT
   CLOSED
@@ -24,20 +25,48 @@ enum TransferType {
   ADJUSTMENT
 }
 
+enum CompanyOperationType {
+  INITIAL_OFFER_BUY
+  ADMIN_APPROVE
+  ADMIN_REJECT
+  ADMIN_SUSPEND
+}
+
+enum MarketOrderType {
+  BUY
+  SELL
+}
+
+enum MarketOrderMode {
+  LIMIT
+  MARKET
+}
+
+enum MarketOrderStatus {
+  OPEN
+  PARTIALLY_FILLED
+  FILLED
+  CANCELED
+  REJECTED
+}
+
 model User {
-  id           String         @id @default(cuid())
+  id           String           @id @default(cuid())
   name         String
-  email        String         @unique
+  email        String           @unique
   passwordHash String
-  isBlocked    Boolean        @default(false)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  isBlocked    Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
   wallet       Wallet?
   roles        UserRole[]
-  companies    Company[]
+  companies    Company[]        @relation("CompanyFounder")
   logs         AdminLog[]
-  transfersOut CoinTransfer[] @relation("transfer_sender")
-  transfersIn  CoinTransfer[] @relation("transfer_receiver")
+  transfersOut CoinTransfer[]   @relation("transfer_sender")
+  transfersIn  CoinTransfer[]   @relation("transfer_receiver")
+  holdings     CompanyHolding[]
+  operations   CompanyOperation[]
+  marketOrders MarketOrder[]
 }
 
 model Role {
@@ -73,15 +102,15 @@ model RolePermission {
 }
 
 model Wallet {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  availableBalance  Decimal  @default(0) @db.Decimal(18, 2)
-  lockedBalance     Decimal  @default(0) @db.Decimal(18, 2)
-  investedValue     Decimal  @default(0) @db.Decimal(18, 2)
-  fictitiousProfit  Decimal  @default(0) @db.Decimal(18, 2)
-  user              User     @relation(fields: [userId], references: [id])
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  availableBalance Decimal  @default(0) @db.Decimal(18, 2)
+  lockedBalance    Decimal  @default(0) @db.Decimal(18, 2)
+  investedValue    Decimal  @default(0) @db.Decimal(18, 2)
+  fictitiousProfit Decimal  @default(0) @db.Decimal(18, 2)
+  user             User     @relation(fields: [userId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 model TreasuryAccount {
@@ -101,21 +130,91 @@ model BrokerAccount {
 }
 
 model Company {
-  id                 String        @id @default(cuid())
-  name               String
-  ticker             String        @unique
-  description        String
-  sector             String
-  founderId          String
-  status             CompanyStatus @default(PENDING)
-  totalShares        Int
-  circulatingShares  Int
-  initialPrice       Decimal       @db.Decimal(18, 2)
-  currentPrice       Decimal       @db.Decimal(18, 2)
-  fictitiousMarketCap Decimal      @db.Decimal(18, 2)
-  createdAt          DateTime      @default(now())
-  approvedAt         DateTime?
-  founder            User          @relation(fields: [founderId], references: [id])
+  id                  String              @id @default(cuid())
+  name                String
+  ticker              String              @unique
+  description         String
+  sector              String
+  founderUserId       String
+  status              CompanyStatus       @default(PENDING)
+  totalShares         Int
+  circulatingShares   Int                 @default(0)
+  ownerSharePercent   Decimal             @db.Decimal(5, 2)
+  publicOfferPercent  Decimal             @db.Decimal(5, 2)
+  ownerShares         Int                 @default(0)
+  publicOfferShares   Int                 @default(0)
+  availableOfferShares Int                @default(0)
+  initialPrice        Decimal             @db.Decimal(18, 2)
+  currentPrice        Decimal             @db.Decimal(18, 2)
+  buyFeePercent       Decimal             @db.Decimal(5, 2)
+  sellFeePercent      Decimal             @db.Decimal(5, 2)
+  fictitiousMarketCap Decimal             @db.Decimal(18, 2)
+  createdAt           DateTime            @default(now())
+  approvedAt          DateTime?
+  rejectedAt          DateTime?
+  suspendedAt         DateTime?
+  founder             User                @relation("CompanyFounder", fields: [founderUserId], references: [id])
+  holdings            CompanyHolding[]
+  operations          CompanyOperation[]
+  initialOffer        CompanyInitialOffer?
+  marketOrders        MarketOrder[]
+}
+
+model CompanyHolding {
+  id               String   @id @default(cuid())
+  userId           String
+  companyId        String
+  shares           Int      @default(0)
+  averageBuyPrice  Decimal  @default(0) @db.Decimal(18, 2)
+  estimatedValue   Decimal  @default(0) @db.Decimal(18, 2)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id])
+  company          Company  @relation(fields: [companyId], references: [id])
+
+  @@unique([userId, companyId])
+}
+
+model CompanyInitialOffer {
+  id               String   @id @default(cuid())
+  companyId        String   @unique
+  totalShares      Int
+  availableShares  Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  company          Company  @relation(fields: [companyId], references: [id])
+}
+
+model CompanyOperation {
+  id            String               @id @default(cuid())
+  companyId     String
+  userId        String?
+  type          CompanyOperationType
+  quantity      Int?
+  unitPrice     Decimal?             @db.Decimal(18, 2)
+  grossAmount   Decimal?             @db.Decimal(18, 2)
+  feeAmount     Decimal?             @db.Decimal(18, 2)
+  totalAmount   Decimal?             @db.Decimal(18, 2)
+  description   String
+  createdAt     DateTime             @default(now())
+  company       Company              @relation(fields: [companyId], references: [id])
+  user          User?                @relation(fields: [userId], references: [id])
+}
+
+model MarketOrder {
+  id              String            @id @default(cuid())
+  companyId       String
+  userId          String
+  type            MarketOrderType
+  mode            MarketOrderMode
+  quantity        Int
+  limitPrice      Decimal?          @db.Decimal(18, 2)
+  slippagePercent Decimal?          @db.Decimal(5, 2)
+  status          MarketOrderStatus @default(OPEN)
+  createdAt       DateTime          @default(now())
+  executedAt      DateTime?
+  company         Company           @relation(fields: [companyId], references: [id])
+  user            User              @relation(fields: [userId], references: [id])
 }
 
 model CoinIssuance {
