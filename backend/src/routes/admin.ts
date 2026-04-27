@@ -124,9 +124,18 @@ export async function adminRoutes(app: FastifyInstance) {
 
     try {
       const schema = z.object({
-        brokerUserId: z.string().min(1),
+        brokerUserId: z.string().min(1).optional(),
+        brokerEmail: z.string().email().optional(),
         amount: amountSchema,
         reason: z.string().min(3),
+      }).superRefine((value, ctx) => {
+        if (!value.brokerEmail && !value.brokerUserId) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Informe o e-mail do corretor.',
+            path: ['brokerEmail'],
+          });
+        }
       });
       const body = schema.parse(request.body);
 
@@ -140,20 +149,26 @@ export async function adminRoutes(app: FastifyInstance) {
 
       const brokerUser = await tx.user.findFirst({
         where: {
-          id: body.brokerUserId,
+          ...(body.brokerEmail ? { email: body.brokerEmail } : { id: body.brokerUserId }),
           roles: { some: { role: { key: 'VIRTUAL_BROKER' } } },
         },
       });
 
       if (!brokerUser) {
+        if (body.brokerEmail) {
+          const userByEmail = await tx.user.findUnique({ where: { email: body.brokerEmail } });
+          if (!userByEmail) {
+            throw new Error('Não existe usuário cadastrado com esse e-mail.');
+          }
+        }
         throw new Error('Usuário de destino não possui cargo de corretor virtual.');
       }
 
       const broker = await tx.brokerAccount.upsert({
-        where: { userId: body.brokerUserId },
+        where: { userId: brokerUser.id },
         update: {},
         create: {
-          userId: body.brokerUserId,
+          userId: brokerUser.id,
           available: 0,
           receivedTotal: 0,
         },
@@ -168,7 +183,7 @@ export async function adminRoutes(app: FastifyInstance) {
         data: {
           type: 'TREASURY_TO_BROKER',
           senderId: null,
-          receiverId: body.brokerUserId,
+          receiverId: brokerUser.id,
           amount,
           reason: body.reason,
           previousValue: treasuryPrevious,

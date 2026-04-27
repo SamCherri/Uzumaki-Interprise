@@ -88,7 +88,7 @@ A moeda virtual agora segue obrigatoriamente este caminho:
 
 - `GET /api/admin/treasury/balance` → consulta saldo da Tesouraria.
 - `POST /api/admin/treasury/issuance` → emissão de moeda fictícia para Tesouraria.
-- `POST /api/admin/treasury/transfer-to-broker` → transferência da Tesouraria para corretor.
+- `POST /api/admin/treasury/transfer-to-broker` → transferência da Tesouraria para corretor (usando e-mail do corretor; `brokerUserId` permanece como fallback).
 - `GET /api/admin/coin-history` → histórico de emissões e transferências.
 - `GET /api/broker/balance` → saldo disponível do corretor.
 - `POST /api/broker/transfer-to-user` → corretor repassa moeda ao usuário.
