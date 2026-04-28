@@ -118,6 +118,7 @@ export function CompaniesPage() {
   async function loadCompanyDetails(companyId: string) {
     const response = await api<{ company: Company }>(`/companies/${companyId}`);
     setSelected(response.company);
+    return response.company;
   }
 
   async function loadMarket(companyId: string) {
@@ -138,7 +139,17 @@ export function CompaniesPage() {
 
   async function refreshSelected(companyId?: string) {
     if (!companyId) return;
-    await Promise.all([loadCompanyDetails(companyId), loadWalletAndHolding(companyId)]);
+
+    const [company] = await Promise.all([loadCompanyDetails(companyId), loadWalletAndHolding(companyId)]);
+
+    if (company.status === 'SUSPENDED') {
+      setBook({ buyOrders: [], sellOrders: [] });
+      setMyOrders([]);
+      await loadTradesOnly(company.id);
+      return;
+    }
+
+    await loadMarket(company.id);
   }
 
   useEffect(() => {
