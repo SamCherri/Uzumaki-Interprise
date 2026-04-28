@@ -30,3 +30,17 @@ Auditoria consolidada do estado atual da **RPC Exchange**, mantendo o projeto ex
 - revisar mercados para reforçar pares dinâmicos `TICKER/RPC` e evitar pares fixos/oficiais;
 - ✅ linguagem admin como moderação de listagens;
 - validar que admin não aparece como criador de token/projeto.
+
+## Implementado em 2026-04-28
+- Gestão de usuários e roles via admin.
+- Gestão de tokens/mercados via admin.
+- Criação manual de token/projeto pelo admin.
+- Pausa, reativação e encerramento de mercado com auditoria.
+- Exclusão definitiva segura somente sem histórico econômico.
+
+## Pendente
+- Filtros avançados de logs.
+- Relatórios financeiros consolidados.
+- Gráficos avançados e ranking.
+- Gestão completa de receita de projeto.
+- Liquidação/devolução automática avançada para casos complexos.

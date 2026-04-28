@@ -10,6 +10,8 @@ import { companyRoutes } from './routes/companies.js';
 import { marketRoutes } from './routes/market.js';
 import { withdrawalsRoutes } from './routes/withdrawals.js';
 import { prisma } from './lib/prisma.js';
+import { adminUsersRoutes } from './routes/admin-users.js';
+import { adminTokensRoutes } from './routes/admin-tokens.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -55,6 +57,8 @@ app.register(brokerRoutes, { prefix: '/api' });
 app.register(companyRoutes, { prefix: '/api' });
 app.register(marketRoutes, { prefix: '/api' });
 app.register(withdrawalsRoutes, { prefix: '/api' });
+app.register(adminUsersRoutes, { prefix: '/api/admin' });
+app.register(adminTokensRoutes, { prefix: '/api/admin' });
 
 const port = Number(process.env.PORT ?? 3333);
 app.listen({ port, host: '0.0.0.0' }).catch((error: unknown) => {

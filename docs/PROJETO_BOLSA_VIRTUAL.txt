@@ -943,3 +943,9 @@ Modelo novo:
 - Wallet.pendingWithdrawalBalance
 - WithdrawalRequest (status: PENDING, PROCESSING, COMPLETED, REJECTED, CANCELED)
 
+
+ATUALIZAÇÃO 2026-04-28:
+- Painel admin reorganizado por seções.
+- Gestão de usuários, corretores e permissões.
+- Gestão de mercados com pausa, reativação, encerramento e exclusão segura.
+- Hard delete de mercado com histórico econômico não é recomendado e foi bloqueado.

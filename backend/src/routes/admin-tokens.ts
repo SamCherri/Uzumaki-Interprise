@@ -1,0 +1,474 @@
+import { Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { z } from 'zod';
+import { prisma } from '../lib/prisma.js';
+import { cancelOrderWithRelease } from './market.js';
+
+type AuthRequest = FastifyRequest & { user: { sub: string; roles?: string[] } };
+const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN'] as const;
+
+function ensureAdmin(reply: FastifyReply, roles: string[]) {
+  if (!ADMIN_ROLES.some((role) => roles.includes(role))) {
+    reply.code(403).send({ message: 'Sem permissão administrativa.' });
+    return false;
+  }
+
+  return true;
+}
+
+function splitShares(totalTokens: number, ownerPercent: number) {
+  const ownerShares = Math.floor((totalTokens * ownerPercent) / 100);
+  const publicOfferShares = totalTokens - ownerShares;
+  return { ownerShares, publicOfferShares };
+}
+
+function hasEconomicHistory(company: {
+  trades: number;
+  orders: number;
+  holdingsWithShares: number;
+  feeDistributions: number;
+  revenueBalance: Decimal;
+  revenueFees: Decimal;
+  economicOps: number;
+  initialOfferMoved: boolean;
+}) {
+  return company.trades > 0
+    || company.orders > 0
+    || company.holdingsWithShares > 0
+    || company.feeDistributions > 0
+    || company.revenueBalance.greaterThan(0)
+    || company.revenueFees.greaterThan(0)
+    || company.economicOps > 0
+    || company.initialOfferMoved;
+}
+
+export async function adminTokensRoutes(app: FastifyInstance) {
+  app.get('/tokens', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authRequest = request as AuthRequest;
+    const roles = authRequest.user.roles ?? [];
+    if (!ensureAdmin(reply, roles)) return;
+
+    const query = z.object({
+      status: z.string().optional(),
+      search: z.string().optional(),
+      founderUserId: z.string().optional(),
+    }).parse(request.query);
+
+    const companies = await prisma.company.findMany({
+      where: {
+        ...(query.status ? { status: query.status as never } : {}),
+        ...(query.founderUserId ? { founderUserId: query.founderUserId } : {}),
+        ...(query.search ? {
+          OR: [
+            { ticker: { contains: query.search, mode: 'insensitive' } },
+            { name: { contains: query.search, mode: 'insensitive' } },
+          ],
+        } : {}),
+      },
+      include: {
+        founder: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 300,
+    });
+
+    return {
+      tokens: companies.map((company) => ({
+        id: company.id,
+        name: company.name,
+        ticker: company.ticker,
+        sector: company.sector,
+        status: company.status,
+        founder: company.founder,
+        currentPrice: company.currentPrice,
+        totalTokens: company.totalShares,
+        availableTokens: company.availableOfferShares,
+        createdAt: company.createdAt,
+        approvedAt: company.approvedAt,
+        suspendedAt: company.suspendedAt,
+      })),
+    };
+  });
+
+  app.post('/tokens', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authRequest = request as AuthRequest;
+    const roles = authRequest.user.roles ?? [];
+    if (!ensureAdmin(reply, roles)) return;
+
+    try {
+      const body = z.object({
+        founderUserId: z.string().min(1),
+        name: z.string().min(3),
+        ticker: z.string().min(2).max(10),
+        description: z.string().min(5),
+        sector: z.string().min(2),
+        totalTokens: z.coerce.number().int().positive(),
+        ownerSharePercent: z.coerce.number().min(0),
+        publicOfferPercent: z.coerce.number().min(0),
+        initialPrice: z.coerce.number().positive(),
+        buyFeePercent: z.coerce.number().min(0),
+        sellFeePercent: z.coerce.number().min(0),
+      }).parse(request.body);
+
+      const ticker = body.ticker.trim().toUpperCase();
+      if (Math.abs((body.ownerSharePercent + body.publicOfferPercent) - 100) > 0.001) {
+        throw new Error('Percentuais do criador e lançamento devem somar 100%.');
+      }
+
+      const [tickerExists, founder, ownerRole] = await Promise.all([
+        prisma.company.findUnique({ where: { ticker } }),
+        prisma.user.findUnique({ where: { id: body.founderUserId } }),
+        prisma.role.findUnique({ where: { key: 'BUSINESS_OWNER' } }),
+      ]);
+
+      if (tickerExists) return reply.code(409).send({ message: 'Ticker já está em uso.' });
+      if (!founder) return reply.code(404).send({ message: 'Usuário dono do projeto não encontrado.' });
+      if (!ownerRole) return reply.code(400).send({ message: 'Role BUSINESS_OWNER não encontrada.' });
+
+      const initialPrice = new Decimal(body.initialPrice);
+      const { ownerShares, publicOfferShares } = splitShares(body.totalTokens, body.ownerSharePercent);
+
+      const company = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const created = await tx.company.create({
+          data: {
+            name: body.name.trim(),
+            ticker,
+            description: body.description.trim(),
+            sector: body.sector.trim(),
+            founderUserId: body.founderUserId,
+            status: 'ACTIVE',
+            totalShares: body.totalTokens,
+            circulatingShares: 0,
+            ownerSharePercent: new Decimal(body.ownerSharePercent),
+            publicOfferPercent: new Decimal(body.publicOfferPercent),
+            ownerShares,
+            publicOfferShares,
+            availableOfferShares: publicOfferShares,
+            initialPrice,
+            currentPrice: initialPrice,
+            buyFeePercent: new Decimal(body.buyFeePercent),
+            sellFeePercent: new Decimal(body.sellFeePercent),
+            fictitiousMarketCap: initialPrice.mul(body.totalTokens),
+            approvedAt: new Date(),
+          },
+        });
+
+        await tx.companyHolding.upsert({
+          where: { userId_companyId: { userId: body.founderUserId, companyId: created.id } },
+          update: {
+            shares: ownerShares,
+            averageBuyPrice: initialPrice,
+            estimatedValue: initialPrice.mul(ownerShares),
+          },
+          create: {
+            userId: body.founderUserId,
+            companyId: created.id,
+            shares: ownerShares,
+            averageBuyPrice: initialPrice,
+            estimatedValue: initialPrice.mul(ownerShares),
+          },
+        });
+
+        await tx.companyInitialOffer.create({
+          data: {
+            companyId: created.id,
+            totalShares: publicOfferShares,
+            availableShares: publicOfferShares,
+          },
+        });
+
+        await tx.companyRevenueAccount.create({ data: { companyId: created.id } });
+
+        await tx.userRole.upsert({
+          where: { userId_roleId: { userId: body.founderUserId, roleId: ownerRole.id } },
+          update: {},
+          create: { userId: body.founderUserId, roleId: ownerRole.id },
+        });
+
+        await tx.companyOperation.create({
+          data: {
+            companyId: created.id,
+            userId: authRequest.user.sub,
+            type: 'ADMIN_APPROVE',
+            description: 'Token/projeto criado manualmente por administrador.',
+          },
+        });
+
+        await tx.adminLog.create({
+          data: {
+            userId: authRequest.user.sub,
+            action: 'ADMIN_TOKEN_CREATED',
+            entity: `Company:${created.id}`,
+            reason: 'Criação manual de token/projeto.',
+            current: JSON.stringify({
+              ticker: created.ticker,
+              founderUserId: created.founderUserId,
+              totalTokens: created.totalShares,
+            }),
+            ip: request.ip,
+            userAgent: request.headers['user-agent'] ?? null,
+          },
+        });
+
+        return created;
+      });
+
+      return reply.code(201).send({ token: company });
+    } catch (error) {
+      return reply.code(400).send({ message: (error as Error).message });
+    }
+  });
+
+  app.patch('/tokens/:id/owner', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authRequest = request as AuthRequest;
+    const roles = authRequest.user.roles ?? [];
+    if (!ensureAdmin(reply, roles)) return;
+
+    try {
+      const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+      const body = z.object({ founderUserId: z.string().min(1), reason: z.string().min(2) }).parse(request.body);
+
+      const [company, ownerRole, nextOwner] = await Promise.all([
+        prisma.company.findUnique({ where: { id } }),
+        prisma.role.findUnique({ where: { key: 'BUSINESS_OWNER' } }),
+        prisma.user.findUnique({ where: { id: body.founderUserId } }),
+      ]);
+
+      if (!company) return reply.code(404).send({ message: 'Mercado não encontrado.' });
+      if (!ownerRole) return reply.code(400).send({ message: 'Role BUSINESS_OWNER não encontrada.' });
+      if (!nextOwner) return reply.code(404).send({ message: 'Novo dono não encontrado.' });
+
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await tx.company.update({ where: { id }, data: { founderUserId: body.founderUserId } });
+        await tx.userRole.upsert({
+          where: { userId_roleId: { userId: body.founderUserId, roleId: ownerRole.id } },
+          update: {},
+          create: { userId: body.founderUserId, roleId: ownerRole.id },
+        });
+
+        await tx.adminLog.create({
+          data: {
+            userId: authRequest.user.sub,
+            action: 'ADMIN_TOKEN_OWNER_UPDATED',
+            entity: `Company:${company.id}`,
+            reason: body.reason,
+            previous: JSON.stringify({ founderUserId: company.founderUserId }),
+            current: JSON.stringify({ founderUserId: body.founderUserId }),
+            ip: request.ip,
+            userAgent: request.headers['user-agent'] ?? null,
+          },
+        });
+      });
+
+      return { message: 'Responsável administrativo atualizado (sem mover tokens).' };
+    } catch (error) {
+      return reply.code(400).send({ message: (error as Error).message });
+    }
+  });
+
+  app.patch('/tokens/:id/suspend', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authRequest = request as AuthRequest;
+    const roles = authRequest.user.roles ?? [];
+    if (!ensureAdmin(reply, roles)) return;
+
+    try {
+      const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+      const { reason } = z.object({ reason: z.string().min(2) }).parse(request.body);
+
+      const company = await prisma.company.findUnique({ where: { id } });
+      if (!company) return reply.code(404).send({ message: 'Mercado não encontrado.' });
+      if (company.status !== 'ACTIVE') return reply.code(400).send({ message: 'Somente mercado ACTIVE pode ser pausado.' });
+
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await tx.company.update({ where: { id }, data: { status: 'SUSPENDED', suspendedAt: new Date() } });
+        await tx.companyOperation.create({
+          data: {
+            companyId: id,
+            userId: authRequest.user.sub,
+            type: 'ADMIN_SUSPEND',
+            description: 'Mercado pausado pelo admin.',
+          },
+        });
+        await tx.adminLog.create({
+          data: {
+            userId: authRequest.user.sub,
+            action: 'ADMIN_TOKEN_SUSPENDED',
+            entity: `Company:${id}`,
+            reason,
+            previous: JSON.stringify({ status: company.status }),
+            current: JSON.stringify({ status: 'SUSPENDED' }),
+            ip: request.ip,
+            userAgent: request.headers['user-agent'] ?? null,
+          },
+        });
+      });
+
+      return { message: 'Mercado pausado com sucesso.' };
+    } catch (error) {
+      return reply.code(400).send({ message: (error as Error).message });
+    }
+  });
+
+  app.patch('/tokens/:id/reactivate', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authRequest = request as AuthRequest;
+    const roles = authRequest.user.roles ?? [];
+    if (!ensureAdmin(reply, roles)) return;
+
+    try {
+      const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+      const { reason } = z.object({ reason: z.string().min(2) }).parse(request.body);
+
+      const company = await prisma.company.findUnique({ where: { id } });
+      if (!company) return reply.code(404).send({ message: 'Mercado não encontrado.' });
+      if (company.status !== 'SUSPENDED') return reply.code(400).send({ message: 'Somente mercado SUSPENDED pode ser reativado.' });
+
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await tx.company.update({ where: { id }, data: { status: 'ACTIVE' } });
+        await tx.adminLog.create({
+          data: {
+            userId: authRequest.user.sub,
+            action: 'ADMIN_TOKEN_REACTIVATED',
+            entity: `Company:${id}`,
+            reason,
+            previous: JSON.stringify({ status: company.status }),
+            current: JSON.stringify({ status: 'ACTIVE' }),
+            ip: request.ip,
+            userAgent: request.headers['user-agent'] ?? null,
+          },
+        });
+      });
+
+      return { message: 'Mercado reativado com sucesso.' };
+    } catch (error) {
+      return reply.code(400).send({ message: (error as Error).message });
+    }
+  });
+
+  app.patch('/tokens/:id/close', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authRequest = request as AuthRequest;
+    const roles = authRequest.user.roles ?? [];
+    if (!ensureAdmin(reply, roles)) return;
+
+    try {
+      const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+      const { reason } = z.object({ reason: z.string().min(2) }).parse(request.body);
+
+      const company = await prisma.company.findUnique({ where: { id } });
+      if (!company) return reply.code(404).send({ message: 'Mercado não encontrado.' });
+      if (company.status === 'CLOSED') return reply.code(400).send({ message: 'Mercado já está encerrado.' });
+
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const openOrders = await tx.marketOrder.findMany({
+          where: {
+            companyId: id,
+            status: { in: ['OPEN', 'PARTIALLY_FILLED'] },
+          },
+          select: { id: true },
+        });
+
+        for (const order of openOrders) {
+          await cancelOrderWithRelease(tx, {
+            orderId: order.id,
+            canceledByUserId: authRequest.user.sub,
+            reason: 'Cancelada por encerramento administrativo do mercado.',
+            ip: request.ip,
+            userAgent: request.headers['user-agent'] ?? null,
+          });
+        }
+
+        await tx.company.update({ where: { id }, data: { status: 'CLOSED' } });
+        await tx.companyOperation.create({
+          data: {
+            companyId: id,
+            userId: authRequest.user.sub,
+            type: 'ADMIN_SUSPEND',
+            description: 'Mercado encerrado pelo admin',
+          },
+        });
+
+        await tx.adminLog.create({
+          data: {
+            userId: authRequest.user.sub,
+            action: 'ADMIN_TOKEN_CLOSED',
+            entity: `Company:${id}`,
+            reason,
+            previous: JSON.stringify({ status: company.status, canceledOrders: openOrders.length }),
+            current: JSON.stringify({ status: 'CLOSED' }),
+            ip: request.ip,
+            userAgent: request.headers['user-agent'] ?? null,
+          },
+        });
+      });
+
+      return { message: 'Mercado encerrado com cancelamento de ordens abertas.' };
+    } catch (error) {
+      return reply.code(400).send({ message: (error as Error).message });
+    }
+  });
+
+  app.delete('/tokens/:id', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authRequest = request as AuthRequest;
+    const roles = authRequest.user.roles ?? [];
+    if (!ensureAdmin(reply, roles)) return;
+
+    try {
+      const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+
+      const company = await prisma.company.findUnique({ where: { id } });
+      if (!company) return reply.code(404).send({ message: 'Mercado não encontrado.' });
+
+      const [trades, orders, holdingsWithShares, feeDistributions, operations, initialOffer, revenue] = await Promise.all([
+        prisma.trade.count({ where: { companyId: id } }),
+        prisma.marketOrder.count({ where: { companyId: id } }),
+        prisma.companyHolding.count({ where: { companyId: id, shares: { gt: 0 } } }),
+        prisma.feeDistribution.count({ where: { companyId: id } }),
+        prisma.companyOperation.findMany({ where: { companyId: id }, select: { type: true, description: true } }),
+        prisma.companyInitialOffer.findUnique({ where: { companyId: id } }),
+        prisma.companyRevenueAccount.findUnique({ where: { companyId: id } }),
+      ]);
+
+      const economicOps = operations.filter((operation) => !(operation.type === 'ADMIN_APPROVE' && operation.description.includes('manualmente por administrador'))).length;
+
+      const blockedByHistory = hasEconomicHistory({
+        trades,
+        orders,
+        holdingsWithShares,
+        feeDistributions,
+        revenueBalance: revenue?.balance ?? new Decimal(0),
+        revenueFees: revenue?.totalReceivedFees ?? new Decimal(0),
+        economicOps,
+        initialOfferMoved: Boolean(initialOffer && initialOffer.availableShares < initialOffer.totalShares),
+      });
+
+      if (blockedByHistory) {
+        return reply.code(400).send({
+          message: 'Este mercado possui histórico e não pode ser excluído definitivamente. Use Encerrar mercado.',
+        });
+      }
+
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await tx.adminLog.create({
+          data: {
+            userId: authRequest.user.sub,
+            action: 'ADMIN_TOKEN_DELETED',
+            entity: `Company:${id}`,
+            reason: 'Exclusão definitiva de mercado sem histórico econômico.',
+            current: JSON.stringify({ id: company.id, ticker: company.ticker, name: company.name }),
+            ip: request.ip,
+            userAgent: request.headers['user-agent'] ?? null,
+          },
+        });
+
+        await tx.companyHolding.deleteMany({ where: { companyId: id, shares: { lte: 0 } } });
+        await tx.companyInitialOffer.deleteMany({ where: { companyId: id } });
+        await tx.companyRevenueAccount.deleteMany({ where: { companyId: id } });
+        await tx.company.delete({ where: { id } });
+      });
+
+      return { message: 'Mercado excluído definitivamente com segurança.' };
+    } catch (error) {
+      return reply.code(400).send({ message: (error as Error).message });
+    }
+  });
+}
