@@ -76,7 +76,7 @@ export function AdminDashboard() {
       {data && (
         <div className="summary-grid">
           <div className="summary-item"><span className="summary-label">Usuários</span><strong className="summary-value">{data.users}</strong></div>
-          <div className="summary-item"><span className="summary-label">Empresas</span><strong className="summary-value">{data.companies}</strong></div>
+          <div className="summary-item"><span className="summary-label">Mercados listados</span><strong className="summary-value">{data.companies}</strong></div>
           <div className="summary-item"><span className="summary-label">Logs</span><strong className="summary-value">{data.logs}</strong></div>
           <div className="summary-item"><span className="summary-label">Tesouraria</span><strong className="summary-value">{data.treasuryBalance}</strong></div>
         </div>
@@ -90,7 +90,7 @@ export function AdminDashboard() {
         </div>
       )}
 
-      <h3 className="nested-card">Receita das Empresas</h3>
+      <h3 className="nested-card">Receita dos projetos/tokens</h3>
       {companyRevenueAccounts.length === 0 && <p className="empty-state">Nenhuma carteira de receita criada ainda.</p>}
       <div className="mobile-card-list">
         {companyRevenueAccounts.map((account) => (
@@ -103,19 +103,21 @@ export function AdminDashboard() {
         ))}
       </div>
 
-      <h3 className="nested-card">Empresas pendentes</h3>
-      {pending.length === 0 && <p className="empty-state">Nenhuma empresa pendente no momento.</p>}
+      <h3 className="nested-card">Listagens pendentes</h3>
+      {pending.length === 0 && <p className="empty-state">Nenhuma listagem pendente no momento.</p>}
       <div className="mobile-card-list">
         {pending.map((company) => (
           <article key={company.id} className="summary-item compact-card">
             <strong>{company.name} ({company.ticker})</strong>
-            <p>Dono: {company.ownerSharePercent}% ({company.ownerShares})</p>
-            <p>Oferta: {company.publicOfferPercent}% ({company.publicOfferShares})</p>
+            <p>Projeto/token criado por usuário.</p>
+            <p>Criador do token: {company.ownerSharePercent}% ({company.ownerShares})</p>
+            <p>Lançamento: {company.publicOfferPercent}% ({company.publicOfferShares})</p>
             <p>Taxas: compra {company.buyFeePercent}% · venda {company.sellFeePercent}%</p>
+            <p>Código do token: {company.ticker}</p>
             <div className="action-grid">
-              <button className="button-success" onClick={() => moderateCompany(company.id, 'approve')}>Aprovar</button>
-              <button className="button-danger" onClick={() => moderateCompany(company.id, 'reject')}>Rejeitar</button>
-              <button onClick={() => moderateCompany(company.id, 'suspend')}>Suspender</button>
+              <button className="button-success" onClick={() => moderateCompany(company.id, 'approve')}>Aprovar listagem</button>
+              <button className="button-danger" onClick={() => moderateCompany(company.id, 'reject')}>Rejeitar listagem</button>
+              <button onClick={() => moderateCompany(company.id, 'suspend')}>Suspender mercado</button>
             </div>
           </article>
         ))}

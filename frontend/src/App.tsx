@@ -137,14 +137,15 @@ export function App() {
       <main className="container auth-shell">
         <section className="card public-entry-card">
           <header className="public-entry-header">
-            <h1>Bolsa Virtual RP</h1>
-            <p className="subtitle">Simulação econômica fictícia</p>
-            <p className="warning">Sem dinheiro real.</p>
+            <h1>RPC Exchange</h1>
+            <p className="subtitle">Plataforma de simulação econômica</p>
+            <p className="warning">Sem dinheiro real, sem cripto real e sem blockchain.</p>
+            <p className="info-text">Uso exclusivo para roleplay/simulação.</p>
           </header>
 
           <article className="card install-card nested-card">
             <h3>📲 Instalar aplicativo</h3>
-            <p className="info-text">Use a Bolsa Virtual RP como app no celular.</p>
+            <p className="info-text">Use a RPC Exchange como app no celular.</p>
             <button className="button-primary" onClick={handleInstallClick} type="button">
               Instalar aplicativo
             </button>
@@ -152,9 +153,10 @@ export function App() {
           </article>
 
           <div className="benefits-grid nested-card">
-            <span>🏢 Empresas fictícias</span>
-            <span>📈 Cotas virtuais</span>
-            <span>💰 Economia RP</span>
+            <span>🪙 Crie e negocie tokens</span>
+            <span>📈 Gráficos e ordens</span>
+            <span>💼 Carteira digital</span>
+            <span>📲 Instale como app</span>
           </div>
 
           <nav className="pill-nav nested-card" aria-label="Alternar entre login e cadastro">
@@ -194,8 +196,8 @@ export function App() {
             <span className="back-placeholder" />
           )}
           <div>
-            <h1>Bolsa Virtual RP</h1>
-            <p className="subtitle">Ambiente fictício</p>
+            <h1>RPC Exchange</h1>
+            <p className="subtitle">Ambiente de simulação econômica</p>
           </div>
           <button className="button-danger small-button" onClick={handleLogout}>
             Sair
@@ -205,13 +207,13 @@ export function App() {
 
       {screen === 'home' && (
         <section className="card">
-          <h2>Bem-vindo à Bolsa Virtual RP</h2>
-          <p className="info-text">Ambiente fictício</p>
+          <h2>Bem-vindo à RPC Exchange</h2>
+          <p className="info-text">Negocie tokens criados por usuários com RPC.</p>
 
           {showInstallCard && (
             <article className="summary-item install-card nested-card">
               <h3>📲 Instalar aplicativo</h3>
-              <p className="info-text">Use a Bolsa Virtual RP como app no celular.</p>
+              <p className="info-text">Use a RPC Exchange como app no celular.</p>
               <button className="button-primary" onClick={handleInstallClick} type="button">
                 Instalar aplicativo
               </button>
@@ -220,9 +222,9 @@ export function App() {
           )}
 
           <div className="home-grid home-grid-actions nested-card">
-            <button className="home-tile" onClick={() => setScreen('markets')}><span>🏢</span><strong>Mercados</strong><small>Empresas e cotações</small></button>
-            <button className="home-tile" onClick={() => setScreen('wallet')}><span>💼</span><strong>Carteira</strong><small>Saldo e posições</small></button>
-            <button className="home-tile" onClick={() => setScreen('company-request')}><span>🏦</span><strong>Criar empresa</strong><small>Solicite aprovação</small></button>
+            <button className="home-tile" onClick={() => setScreen('markets')}><span>🪙</span><strong>Mercados</strong><small>Veja ativos disponíveis para negociar.</small></button>
+            <button className="home-tile" onClick={() => setScreen('wallet')}><span>💼</span><strong>Carteira</strong><small>Acompanhe seu saldo e seus ativos.</small></button>
+            <button className="home-tile" onClick={() => setScreen('company-request')}><span>🚀</span><strong>Criar token</strong><small>Crie seu projeto e solicite listagem no mercado.</small></button>
             {roles.canSeeAdmin && <button className="home-tile" onClick={() => setScreen('admin')}><span>🛠️</span><strong>Admin</strong><small>Painel administrativo</small></button>}
             {roles.canSeeBroker && <button className="home-tile" onClick={() => setScreen('broker')}><span>🤝</span><strong>Corretor</strong><small>Painel corretor</small></button>}
             <button className="home-tile home-tile-danger" onClick={handleLogout}><span>🚪</span><strong>Sair</strong><small>Encerrar sessão</small></button>

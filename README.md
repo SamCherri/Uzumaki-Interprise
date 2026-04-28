@@ -1,4 +1,4 @@
-# Uzumaki Exchange
+# RPC Exchange
 
 Projeto de **simulação econômica** com mercados e tokens virtuais em uma experiência de exchange.
 
@@ -8,11 +8,20 @@ Projeto de **simulação econômica** com mercados e tokens virtuais em uma expe
 
 ## Direção atual do produto
 
-- O app agora usa linguagem visual de **exchange de tokens** (Uzumaki Exchange).
+- O app agora usa linguagem visual de **exchange de tokens** (RPC Exchange).
 - A moeda base visual da plataforma é **RPC**.
-- Os ativos são exibidos como pares de mercado, por exemplo **UZBK/RPC**.
+- Os ativos são exibidos como pares de mercado dinâmicos, por exemplo **TOKEN/RPC**, **ABC/RPC** ou **XYZ/RPC**.
 - O sistema continua sendo simulação econômica, sem dinheiro real, sem cripto real e sem blockchain.
-- Diretriz oficial: [Diretrizes de Produto — Uzumaki Exchange](docs/DIRETRIZES_DE_PRODUTO.md).
+- Diretriz oficial: [Diretrizes de Produto — RPC Exchange](docs/DIRETRIZES_DE_PRODUTO.md).
+
+## Criação de tokens por usuários
+
+- Tokens/projetos negociáveis são criados pelos próprios usuários da plataforma.
+- O usuário cria o projeto/token e envia a solicitação de listagem.
+- O admin apenas modera a listagem (aprovar, rejeitar, pausar/suspender).
+- A plataforma não cria tokens/projetos próprios negociáveis.
+- Cada token aprovado gera um mercado no formato **TICKER/RPC**.
+- A RPC é a moeda base operacional da plataforma e **não** é token criado por usuário.
 
 ## Banco oficial do projeto
 
@@ -30,7 +39,7 @@ O banco oficial é **PostgreSQL/Postgres** com **Prisma ORM** usando `DATABASE_U
 
 ## Documentação técnica
 
-- [Arquitetura da Uzumaki Exchange](docs/ARQUITETURA_BOLSA_RP.md)
+- [Arquitetura da RPC Exchange](docs/ARQUITETURA_BOLSA_RP.md)
 - [Auditoria do estado atual](docs/AUDITORIA_ATUAL.md)
 
 ## Requisitos
