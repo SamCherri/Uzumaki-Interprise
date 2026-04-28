@@ -564,7 +564,10 @@ export async function marketRoutes(app: FastifyInstance) {
   app.get('/market/companies/:companyId/order-book', { preHandler: [app.authenticate] }, async (request, reply) => {
     try {
       const { companyId } = companyParams.parse(request.params);
-      await getCompanyOrThrow(prisma, companyId);
+      const company = await prisma.company.findUnique({ where: { id: companyId }, select: { status: true } });
+      if (!company || !['ACTIVE', 'SUSPENDED'].includes(company.status)) {
+        throw new Error('Mercado indisponível na lista pública.');
+      }
 
       const [buyOrders, sellOrders] = await Promise.all([
         prisma.marketOrder.findMany({
