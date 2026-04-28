@@ -60,6 +60,12 @@ async function main() {
   await prisma.userRole.upsert({ where: { userId_roleId: { userId: admin.id, roleId: adminRole.id } }, update: {}, create: { userId: admin.id, roleId: adminRole.id } });
   await prisma.userRole.upsert({ where: { userId_roleId: { userId: admin.id, roleId: coinChiefRole.id } }, update: {}, create: { userId: admin.id, roleId: coinChiefRole.id } });
 
+
+  const platformAccount = await prisma.platformAccount.findFirst();
+  if (!platformAccount) {
+    await prisma.platformAccount.create({ data: {} });
+  }
+
   const treasuryExists = await prisma.treasuryAccount.findFirst();
   if (!treasuryExists) {
     await prisma.treasuryAccount.create({ data: {} });
@@ -132,6 +138,12 @@ async function main() {
     },
   });
 
+  await prisma.companyRevenueAccount.upsert({
+    where: { companyId: companyDemo.id },
+    update: {},
+    create: { companyId: companyDemo.id },
+  });
+
   const brokerDemo = await prisma.user.upsert({
     where: { email: 'corretor@bolsavirtual.local' },
     update: {},
@@ -154,6 +166,20 @@ async function main() {
     update: {},
     create: { userId: brokerDemo.id },
   });
+
+
+  const activeCompanies = await prisma.company.findMany({
+    where: { status: 'ACTIVE' },
+    select: { id: true },
+  });
+
+  for (const company of activeCompanies) {
+    await prisma.companyRevenueAccount.upsert({
+      where: { companyId: company.id },
+      update: {},
+      create: { companyId: company.id },
+    });
+  }
 
 }
 

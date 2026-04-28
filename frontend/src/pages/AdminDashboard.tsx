@@ -3,10 +3,21 @@ import { api } from '../services/api';
 
 type Overview = { users: number; companies: number; logs: number; treasuryBalance: string | number };
 type PendingCompany = { id: string; name: string; ticker: string; ownerSharePercent: string; publicOfferPercent: string; buyFeePercent: string; sellFeePercent: string; ownerShares: number; publicOfferShares: number };
+type PlatformAccount = { balance: string | number; totalReceivedFees: string | number };
+type CompanyRevenueAccount = {
+  companyId: string;
+  ticker: string;
+  companyName: string;
+  balance: string | number;
+  totalReceivedFees: string | number;
+  totalWithdrawn: string | number;
+};
 
 export function AdminDashboard() {
   const [data, setData] = useState<Overview | null>(null);
   const [pending, setPending] = useState<PendingCompany[]>([]);
+  const [platformAccount, setPlatformAccount] = useState<PlatformAccount | null>(null);
+  const [companyRevenueAccounts, setCompanyRevenueAccounts] = useState<CompanyRevenueAccount[]>([]);
   const [error, setError] = useState('');
 
   const [issuanceAmount, setIssuanceAmount] = useState('');
@@ -17,9 +28,16 @@ export function AdminDashboard() {
 
   async function load() {
     try {
-      const [overview, pendingCompanies] = await Promise.all([api<Overview>('/admin/overview'), api<{ companies: PendingCompany[] }>('/admin/companies/pending')]);
+      const [overview, pendingCompanies, platform, companyRevenue] = await Promise.all([
+        api<Overview>('/admin/overview'),
+        api<{ companies: PendingCompany[] }>('/admin/companies/pending'),
+        api<PlatformAccount>('/admin/platform-account'),
+        api<{ accounts: CompanyRevenueAccount[] }>('/admin/company-revenue-accounts'),
+      ]);
       setData(overview);
       setPending(pendingCompanies.companies);
+      setPlatformAccount(platform);
+      setCompanyRevenueAccounts(companyRevenue.accounts);
       setError('');
     } catch (err) {
       setError((err as Error).message);
@@ -63,6 +81,27 @@ export function AdminDashboard() {
           <div className="summary-item"><span className="summary-label">Tesouraria</span><strong className="summary-value">{data.treasuryBalance}</strong></div>
         </div>
       )}
+
+      <h3 className="nested-card">Receita da Plataforma</h3>
+      {platformAccount && (
+        <div className="summary-grid">
+          <div className="summary-item"><span className="summary-label">Saldo</span><strong className="summary-value">{platformAccount.balance}</strong></div>
+          <div className="summary-item"><span className="summary-label">Taxas recebidas</span><strong className="summary-value">{platformAccount.totalReceivedFees}</strong></div>
+        </div>
+      )}
+
+      <h3 className="nested-card">Receita das Empresas</h3>
+      {companyRevenueAccounts.length === 0 && <p className="empty-state">Nenhuma carteira de receita criada ainda.</p>}
+      <div className="mobile-card-list">
+        {companyRevenueAccounts.map((account) => (
+          <article key={account.companyId} className="summary-item compact-card">
+            <strong>{account.companyName} ({account.ticker})</strong>
+            <p>Saldo: {account.balance}</p>
+            <p>Total de taxas: {account.totalReceivedFees}</p>
+            <p>Total retirado: {account.totalWithdrawn}</p>
+          </article>
+        ))}
+      </div>
 
       <h3 className="nested-card">Empresas pendentes</h3>
       {pending.length === 0 && <p className="empty-state">Nenhuma empresa pendente no momento.</p>}

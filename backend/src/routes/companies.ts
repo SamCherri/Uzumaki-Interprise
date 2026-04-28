@@ -4,6 +4,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { COMPANY_RULES } from '../constants/company-rules.js';
+import { distributeFee, ensureCompanyRevenueAccount } from '../services/fee-distribution-service.js';
 
 type AuthRequest = FastifyRequest & { user: { sub: string; roles?: string[] } };
 
@@ -222,6 +223,8 @@ export async function companyRoutes(app: FastifyInstance) {
           create: { companyId: company.id, totalShares: company.publicOfferShares, availableShares: company.publicOfferShares },
         });
 
+        await ensureCompanyRevenueAccount(tx, company.id);
+
         await tx.companyOperation.create({
           data: {
             companyId: company.id,
@@ -429,6 +432,14 @@ export async function companyRoutes(app: FastifyInstance) {
             totalAmount,
             description: `Compra de oferta inicial (${company.ticker}).`,
           },
+        });
+
+        await distributeFee(tx, {
+          companyId: company.id,
+          operationId: operation.id,
+          payerUserId: authRequest.user.sub,
+          sourceType: 'INITIAL_OFFER_BUY',
+          totalFeeAmount: feeAmount,
         });
 
         await tx.adminLog.create({

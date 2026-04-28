@@ -68,7 +68,7 @@ npm run build               # build backend + frontend
 npm run start:backend       # sobe backend em produção
 ```
 
-## Fase atual (MVP - bloco 4A: livro de ofertas e matching simples)
+## Fase atual (MVP - bloco 4B: distribuição de taxas e carteiras de receita)
 
 Implementado nesta fase:
 
@@ -107,6 +107,12 @@ Implementado nesta fase:
 12. Registro de trades na tabela `Trade`.
 13. Atualização de preço atual da empresa pelo último trade executado.
 14. Registro de auditoria (`Transaction`, `CompanyOperation`, `AdminLog`) no fluxo de negociação.
+15. Distribuição de taxas implementada com regra fixa 50/50:
+   - 50% da taxa para carteira da plataforma (`PlatformAccount`);
+   - 50% da taxa para carteira de receita da empresa (`CompanyRevenueAccount`).
+16. Carteira de receita da empresa criada automaticamente na aprovação da empresa.
+17. Registro detalhado de distribuição em `FeeDistribution` para oferta inicial e trades de mercado.
+18. Endpoints admin para consulta da receita da plataforma e das empresas.
 
 ## Endpoints principais da Fase 4A
 
@@ -132,12 +138,23 @@ Mercado secundário:
 - `POST /api/market/companies/:companyId/sell-market`
 - `GET /api/market/companies/:companyId/trades`
 
+Admin (taxas):
+- `GET /api/admin/platform-account`
+- `GET /api/admin/company-revenue-accounts`
+
 ## Observações importantes da simulação
 
 - Este projeto é exclusivamente uma simulação fictícia.
 - Não há dinheiro real, saque real, criptoativo real, investimento real ou promessa de lucro real.
 - Não foi implementado nesta fase:
+  - retirada de receita da empresa;
+  - dividendos/reinvestimento;
+  - configuração dinâmica de percentual de taxa;
   - gráfico candlestick.
+
+- Taxas de compra e venda são sempre fictícias e divididas em 50% plataforma / 50% empresa.
+- A carteira da empresa nasce apenas na aprovação administrativa da empresa.
+- Retirada da receita da empresa ainda não foi implementada nesta fase.
 
 ## Deploy no Railway
 

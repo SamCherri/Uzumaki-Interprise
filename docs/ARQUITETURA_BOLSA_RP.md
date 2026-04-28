@@ -61,21 +61,23 @@ Todo o funcionamento é interno à plataforma e serve apenas para experiência d
 1. Admin cria moeda fictícia na tesouraria.
 2. Admin envia moeda para corretor.
 3. Corretor envia moeda para usuário.
-4. Usuário compra cotas.
-5. Usuário cria ordens de compra/venda.
+4. Usuário compra cotas (com taxa de compra).
+5. Usuário cria ordens de compra/venda (com taxas de trade).
 6. Matching engine executa trades compatíveis.
-7. Carteiras/holdings são atualizadas.
-8. Logs e registros operacionais são armazenados.
+7. Toda taxa cobrada é distribuída em 50% plataforma e 50% empresa.
+8. Carteiras/holdings são atualizadas.
+9. Logs e registros operacionais são armazenados (`Transaction`, `CompanyOperation`, `AdminLog`, `FeeDistribution`).
 
 ---
 
-## 5) Fluxo desejado futuro
+## 5) Fluxo de taxas implementado (fase atual)
 
-1. Introduzir **carteira da plataforma** para consolidar receitas da operação.
-2. Criar **carteira da empresa automaticamente** no momento de aprovação da empresa.
-3. Dividir taxas de negociação entre plataforma e empresa (regra parametrizável).
-4. Acumular receita da empresa em conta própria.
-5. Em fase futura, habilitar rotinas fictícias de retirada/reinvestimento/dividendos (sem dinheiro real).
+1. Existe uma carteira única da plataforma (`PlatformAccount`) para receitas de taxas.
+2. Cada empresa ativa possui carteira de receita (`CompanyRevenueAccount`).
+3. A carteira da empresa nasce no ato de aprovação administrativa (não na solicitação).
+4. A distribuição de taxa usa regra fixa de código: 50% plataforma / 50% empresa.
+5. A distribuição gera registro em `FeeDistribution` dentro da mesma transação econômica da operação origem.
+6. Retirada da receita da empresa ainda não está implementada.
 
 ---
 

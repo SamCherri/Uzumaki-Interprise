@@ -31,9 +31,9 @@ Auditoria consolidada do estado atual da **Bolsa Virtual RP**, mantendo o projet
 - ⚠️ PWA/app instalável
 - ⚠️ ranking
 - ⚠️ auditoria avançada
-- ⚠️ carteira da empresa
-- ⚠️ carteira da plataforma
-- ⚠️ distribuição de taxas
+- ✅ carteira da empresa (CompanyRevenueAccount)
+- ✅ carteira da plataforma (PlatformAccount)
+- ✅ distribuição de taxas (FeeDistribution, regra 50/50)
 - ⚠️ dashboard admin completo
 
 ## 3) O que ainda falta
@@ -42,9 +42,8 @@ Auditoria consolidada do estado atual da **Bolsa Virtual RP**, mantendo o projet
 - ❌ gráfico por período 1h/24h/7d/30d
 - ❌ volume negociado
 - ❌ ranking de empresas
-- ❌ carteira de receita da empresa
-- ❌ carteira da plataforma
-- ❌ histórico detalhado de taxas
+- ⚠️ retirada/reinvestimento da receita da empresa
+- ✅ histórico detalhado de taxas (FeeDistribution)
 - ❌ retirada/reinvestimento da receita da empresa
 - ❌ painel admin avançado de usuários/ordens/trades/logs
 - ❌ testes automatizados mais robustos
@@ -53,7 +52,7 @@ Auditoria consolidada do estado atual da **Bolsa Virtual RP**, mantendo o projet
 
 - frontend ainda pode parecer protótipo técnico se não melhorar visual;
 - gráfico pode ficar pobre sem trades;
-- taxas são calculadas, mas ainda precisam ser distribuídas contabilmente;
+- regra de taxa é fixa em código (50/50), ainda sem painel de configuração administrativa;
 - usuário comum pode se confundir com termos técnicos se eles reaparecerem;
 - PWA ainda não implementado;
 - fluxo multiusuário precisa ser testado manualmente.

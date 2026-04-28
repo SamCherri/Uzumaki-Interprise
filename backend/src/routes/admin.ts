@@ -223,6 +223,56 @@ export async function adminRoutes(app: FastifyInstance) {
     }
   });
 
+
+  app.get('/admin/platform-account', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authRequest = request as AuthRequest;
+    const roles = authRequest.user.roles ?? [];
+
+    if (!requireRole(reply, roles, ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN', 'AUDITOR'], 'Sem permissão para consultar receita da plataforma.')) {
+      return;
+    }
+
+    const platform = await prisma.platformAccount.findFirst();
+
+    return {
+      balance: platform?.balance ?? new Decimal(0),
+      totalReceivedFees: platform?.totalReceivedFees ?? new Decimal(0),
+    };
+  });
+
+  app.get('/admin/company-revenue-accounts', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authRequest = request as AuthRequest;
+    const roles = authRequest.user.roles ?? [];
+
+    if (!requireRole(reply, roles, ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN', 'AUDITOR'], 'Sem permissão para consultar receitas das empresas.')) {
+      return;
+    }
+
+    const accounts = await prisma.companyRevenueAccount.findMany({
+      include: {
+        company: {
+          select: {
+            id: true,
+            ticker: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return {
+      accounts: accounts.map((account) => ({
+        companyId: account.companyId,
+        ticker: account.company.ticker,
+        companyName: account.company.name,
+        balance: account.balance,
+        totalReceivedFees: account.totalReceivedFees,
+        totalWithdrawn: account.totalWithdrawn,
+      })),
+    };
+  });
+
   app.get('/admin/coin-history', { preHandler: [app.authenticate] }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
