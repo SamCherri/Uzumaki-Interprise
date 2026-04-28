@@ -1,8 +1,8 @@
-# ARQUITETURA_BOLSA_RP
+# ARQUITETURA_UZUMAKI_EXCHANGE
 
 ## 1) Visão geral
 
-A **Bolsa Virtual RP** é uma plataforma de **simulação econômica fictícia** para roleplay (RP), com negociação de cotas/ações fictícias entre usuários.
+A **Uzumaki Exchange** é uma plataforma de **simulação econômica** com experiência visual de exchange de tokens entre usuários, mantendo escopo totalmente fictício/simulado.
 
 Escopo obrigatório da simulação:
 - sem dinheiro real;
@@ -37,11 +37,11 @@ Todo o funcionamento é interno à plataforma e serve apenas para experiência d
 ### Módulos atuais (núcleo já existente)
 - Usuários
 - Roles/permissões
-- Carteira fictícia
+- Carteira
 - Tesouraria
 - Corretores virtuais
-- Empresas fictícias
-- Cotas/ações fictícias
+- Projetos/Mercados
+- Tokens
 - Livro de ofertas
 - Ordens
 - Matching engine
@@ -58,12 +58,12 @@ Todo o funcionamento é interno à plataforma e serve apenas para experiência d
 
 ## 4) Fluxo econômico atual
 
-1. Admin cria moeda fictícia na tesouraria.
+1. Admin cria moeda de simulação (RPC) na tesouraria.
 2. Admin envia moeda para corretor.
 3. Corretor envia moeda para usuário.
-4. Usuário compra cotas (com taxa de compra).
+4. Usuário compra tokens (com taxa de compra).
 5. Usuário cria ordens de compra/venda (com taxas de trade).
-6. Matching engine executa trades compatíveis.
+6. Matching engine executa ordens/trades compatíveis.
 7. Toda taxa cobrada é distribuída em 50% plataforma e 50% empresa.
 8. Carteiras/holdings são atualizadas.
 9. Logs e registros operacionais são armazenados (`Transaction`, `CompanyOperation`, `AdminLog`, `FeeDistribution`).
@@ -84,7 +84,7 @@ Todo o funcionamento é interno à plataforma e serve apenas para experiência d
 ## 6) Regras de segurança
 
 - Não permitir saldo negativo de moeda fictícia.
-- Não permitir cotas negativas.
+- Não permitir tokens negativos.
 - Toda operação financeira deve ocorrer em transação atômica.
 - Toda ação administrativa deve gerar log.
 - Admin não pode alterar saldo sem justificativa registrada.
@@ -110,8 +110,8 @@ Regras operacionais da simulação:
 - Estratégia **mobile-first**.
 - Tela pública limitada a login/cadastro.
 - Home logada simples e objetiva.
-- Mercado apresentado em cards.
-- Tela da empresa focada na cota (sem excesso de distrações).
+- Mercados apresentados em cards com pares TICKER/RPC.
+- Tela do ativo/projeto focada no token (sem excesso de distrações).
 - Gráfico em destaque.
 - Botões **Comprar**/**Vender** grandes e claros.
 - Livro, ordens e histórico em abas.

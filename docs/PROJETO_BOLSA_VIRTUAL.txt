@@ -1,10 +1,10 @@
-# PROJETO: BOLSA VIRTUAL DE EMPRESAS FICTÍCIAS
+# PROJETO: UZUMAKI EXCHANGE (SIMULAÇÃO ECONÔMICA)
 
 ## 1. Visão geral
 
-Criar um site de simulação econômica onde jogadores podem criar empresas fictícias, emitir cotas virtuais e negociar essas cotas dentro de uma bolsa virtual usando uma moeda interna fictícia.
+Criar um site de simulação econômica onde jogadores podem criar projetos, emitir tokens e negociar esses tokens dentro de uma exchange usando uma moeda base RPC.
 
-O sistema deve funcionar como um jogo de economia, com login, carteira, moeda virtual, empresas criadas por jogadores, compra e venda de cotas, gráfico de preço, livro de ofertas, painel administrativo, corretores virtuais e auditoria completa.
+O sistema deve funcionar como um jogo de economia, com login, carteira, RPC, projetos criados por jogadores, compra e venda de tokens, gráfico de preço, livro de ofertas, painel administrativo, corretores virtuais e auditoria completa.
 
 Não deve existir dinheiro real, saque real, promessa de lucro real ou investimento real.
 
@@ -15,10 +15,10 @@ O objetivo é criar uma experiência parecida com uma bolsa de valores fictícia
 Os usuários devem poder:
 
 - criar conta;
-- receber moedas virtuais;
-- comprar cotas virtuais de empresas fictícias;
-- vender cotas virtuais;
-- criar empresas fictícias;
+- receber RPC;
+- comprar tokens de projetos;
+- vender tokens;
+- criar projetos;
 - acompanhar gráficos;
 - abrir ofertas de compra;
 - abrir ofertas de venda;
@@ -27,11 +27,11 @@ Os usuários devem poder:
 
 A administração deve poder:
 
-- criar moeda virtual;
-- distribuir moeda para corretores;
+- criar RPC;
+- distribuir RPC para corretores;
 - controlar a tesouraria central;
-- aprovar empresas;
-- suspender empresas;
+- aprovar projetos;
+- suspender projetos;
 - bloquear usuários;
 - auditar transações;
 - ver logs completos;
@@ -80,42 +80,42 @@ Pode:
 
 - acessar painel pessoal;
 - ver saldo;
-- comprar cotas virtuais;
-- vender cotas virtuais;
+- comprar tokens;
+- vender tokens;
 - abrir ordens de compra;
 - abrir ordens de venda;
 - cancelar ordens próprias;
-- ver empresas listadas;
-- criar solicitação de empresa fictícia;
+- ver projetos listados;
+- criar solicitação de projeto;
 - ver histórico da própria carteira.
 
 ### 4.2 Empresário
 
-É um usuário que possui empresa aprovada.
+É um usuário que possui projeto aprovado.
 
 Pode:
 
-- editar descrição da própria empresa;
-- publicar comunicados oficiais da empresa;
-- solicitar nova emissão de cotas;
-- acompanhar investidores da empresa;
-- acompanhar gráfico da empresa.
+- editar descrição da próprio projeto;
+- publicar comunicados oficiais do projeto;
+- solicitar nova emissão de tokens;
+- acompanhar investidores do projeto;
+- acompanhar gráfico do projeto.
 
 Não pode:
 
 - alterar preço manualmente;
-- criar cotas infinitas;
+- criar tokens infinitos;
 - apagar histórico;
 - mexer em saldo de usuários.
 
 ### 4.3 Corretor virtual
 
-É um membro autorizado pela administração para distribuir moeda virtual aos usuários.
+É um membro autorizado pela administração para distribuir RPC aos usuários.
 
 Pode:
 
 - receber moeda da Tesouraria Central;
-- repassar moeda virtual para usuários;
+- repassar RPC para usuários;
 - ver histórico dos repasses que ele fez;
 - justificar cada repasse;
 - consultar usuários atendidos por ele.
@@ -125,8 +125,8 @@ Não pode:
 - criar moeda;
 - apagar registros;
 - alterar saldo manualmente sem registro;
-- alterar preço das cotas;
-- aprovar empresas;
+- alterar preço dos tokens;
+- aprovar projetos;
 - manipular mercado.
 
 Todo repasse feito por corretor deve gerar log permanente.
@@ -146,7 +146,7 @@ Não pode:
 
 - alterar saldo;
 - criar moeda;
-- aprovar empresas;
+- aprovar projetos;
 - bloquear usuários;
 - apagar dados.
 
@@ -154,13 +154,13 @@ Não pode:
 
 Pode:
 
-- aprovar empresas;
-- suspender empresas;
+- aprovar projetos;
+- suspender projetos;
 - bloquear usuários;
 - desbloquear usuários;
 - ver painel geral;
 - gerenciar usuários;
-- gerenciar empresas;
+- gerenciar projetos;
 - gerenciar ordens;
 - investigar denúncias.
 
@@ -172,7 +172,7 @@ Não pode criar moeda se não for ADM Chefe da Moeda.
 
 Pode:
 
-- criar moeda virtual;
+- criar RPC;
 - enviar moeda para a Tesouraria Central;
 - enviar moeda para corretores;
 - definir limites de emissão;
@@ -199,7 +199,7 @@ Pode:
 
 Mesmo o Super Admin não deve apagar logs financeiros. Correções devem ser feitas por estorno registrado.
 
-## 5. Fluxo da moeda virtual
+## 5. Fluxo da RPC
 
 A moeda deve seguir este fluxo:
 
@@ -211,7 +211,7 @@ Corretores virtuais
 ↓
 Usuários
 ↓
-Compra e venda de cotas virtuais
+Compra e venda de tokens
 
 A moeda nunca deve aparecer sem registro.
 
@@ -243,9 +243,9 @@ Todo repasse para usuário precisa registrar:
 - saldo anterior;
 - saldo posterior.
 
-Regra econômica adicional da bolsa fictícia:
-- toda taxa de compra/venda deve ser dividida em 50% para a plataforma e 50% para a empresa negociada;
-- receita da empresa acumula primeiro na carteira da própria empresa (não vai direto para o dono);
+Regra econômica adicional da simulação:
+- toda taxa de compra/venda deve ser dividida em 50% para a plataforma e 50% para o projeto negociada;
+- receita do projeto acumula primeiro na carteira da próprio projeto (não vai direto para o dono);
 - sem retirada real, sem saque real, sem blockchain, sem cripto.
 
 ## 6. Tesouraria Central
@@ -270,7 +270,7 @@ Cada usuário deve ter uma carteira com:
 - saldo disponível;
 - saldo bloqueado em ordens abertas;
 - valor investido;
-- cotas possuídas;
+- tokens possuídas;
 - patrimônio total fictício;
 - lucro/prejuízo fictício;
 - histórico de transações;
@@ -280,14 +280,14 @@ Exemplo:
 
 Saldo disponível: 5.000 moedas
 Saldo bloqueado: 2.000 moedas
-Valor em cotas: 8.500 moedas
+Valor em tokens: 8.500 moedas
 Patrimônio total: 13.500 moedas
 
 ## 8. Empresas fictícias
 
-Usuários podem solicitar criação de empresas fictícias.
+Usuários podem solicitar criação de projetos.
 
-Cada empresa deve ter:
+Cado projeto deve ter:
 
 - nome;
 - sigla/ticker;
@@ -295,15 +295,15 @@ Cada empresa deve ter:
 - setor;
 - dono/fundador;
 - status;
-- total de cotas;
-- cotas em circulação;
+- total de tokens;
+- tokens em circulação;
 - preço inicial;
 - valor de mercado fictício;
 - data de criação;
 - data de aprovação;
 - logo opcional;
 - comunicados oficiais;
-- histórico de negociações.
+- histórico de negocitokens.
 
 Status possíveis:
 
@@ -316,21 +316,21 @@ Status possíveis:
 
 Empresas só podem ser negociadas depois de aprovação administrativa.
 
-## 9. Emissão de cotas virtuais
+## 9. Emissão de tokens
 
-Cada empresa deve ter uma quantidade inicial de cotas.
+Cado projeto deve ter uma quantidade inicial de tokens.
 
 Exemplo:
 
 Empresa: SamTech
 Ticker: SAMT
-Total de cotas: 100.000
+Total de tokens: 100.000
 Preço inicial: 1 moeda
 Valor inicial de mercado: 100.000 moedas
 
 Regras:
 
-- empresa não pode criar cotas infinitas;
+- projeto não pode criar tokens infinitos;
 - nova emissão precisa de solicitação;
 - nova emissão precisa de aprovação administrativa;
 - toda emissão deve gerar log;
@@ -340,7 +340,7 @@ Regras:
 
 Criar uma página principal da bolsa com:
 
-- lista de empresas;
+- lista de projetos;
 - preço atual;
 - variação percentual;
 - volume negociado;
@@ -352,9 +352,9 @@ Criar uma página principal da bolsa com:
 - ranking das mais negociadas;
 - ranking das maiores quedas.
 
-## 11. Página da empresa
+## 11. Página do projeto
 
-Cada empresa deve ter uma página própria com:
+Cado projeto deve ter uma página própria com:
 
 - nome;
 - ticker;
@@ -365,11 +365,11 @@ Cada empresa deve ter uma página própria com:
 - variação;
 - gráfico;
 - livro de ofertas;
-- últimas negociações;
+- últimas negocitokens;
 - botão comprar;
 - botão vender;
 - comunicados oficiais;
-- histórico da empresa.
+- histórico do projeto.
 
 ## 12. Livro de ofertas
 
@@ -380,7 +380,7 @@ Criar sistema de ordens com:
 - preço;
 - quantidade;
 - usuário;
-- empresa;
+- projeto;
 - status;
 - data;
 - execução parcial;
@@ -406,10 +406,10 @@ Regras:
 - ordens mais antigas têm prioridade quando o preço é igual;
 - permitir execução parcial;
 - bloquear saldo quando usuário abre ordem de compra;
-- bloquear cotas quando usuário abre ordem de venda;
-- liberar saldo/cotas quando ordem for cancelada;
+- bloquear tokens quando usuário abre ordem de venda;
+- liberar saldo/tokens quando ordem for cancelada;
 - gerar trade quando compra e venda forem executadas;
-- atualizar preço atual da empresa com base no último trade;
+- atualizar preço atual do projeto com base no último trade;
 - atualizar gráfico com base nos trades.
 
 ## 14. Tipos de ordem
@@ -426,11 +426,11 @@ Usuário escolhe preço máximo de compra ou preço mínimo de venda.
 
 Exemplo de compra limitada:
 
-Quero comprar 100 cotas da SAMT pagando no máximo 5 moedas cada.
+Quero comprar 100 tokens da SAMT pagando no máximo 5 moedas cada.
 
 Exemplo de venda limitada:
 
-Quero vender 100 cotas da SAMT recebendo no mínimo 8 moedas cada.
+Quero vender 100 tokens da SAMT recebendo no mínimo 8 moedas cada.
 
 ## 15. Gráficos
 
@@ -457,13 +457,13 @@ Criar sistema de taxas para controlar inflação.
 
 Taxas possíveis:
 
-- taxa para criar empresa;
+- taxa para criar projeto;
 - taxa de listagem;
 - taxa por compra;
 - taxa por venda;
-- taxa para destacar empresa;
+- taxa para destacar projeto;
 - imposto fictício sobre lucro;
-- multa para empresa inativa.
+- multa paro projeto inativa.
 
 As taxas devem ir para uma conta do sistema ou ser queimadas.
 
@@ -489,8 +489,8 @@ Criar alertas para:
 - usuário negociando muito com a mesma pessoa;
 - alta variação de preço em pouco tempo;
 - corretor repassando moeda demais;
-- admin fazendo muitas alterações;
-- empresa recebendo pump artificial;
+- admin fazendo muitas altertokens;
+- projeto recebendo pump artificial;
 - múltiplas contas suspeitas;
 - ordens anormais;
 - movimentação muito acima da média.
@@ -506,10 +506,10 @@ Eventos que precisam de log:
 
 - login;
 - criação de conta;
-- criação de empresa;
-- aprovação de empresa;
-- suspensão de empresa;
-- emissão de cotas;
+- criação de projeto;
+- aprovação de projeto;
+- suspensão de projeto;
+- emissão de tokens;
 - compra;
 - venda;
 - criação de ordem;
@@ -545,7 +545,7 @@ Criar painel com abas:
 
 - visão geral;
 - usuários;
-- empresas;
+- projetos;
 - ordens;
 - trades;
 - carteiras;
@@ -577,10 +577,10 @@ Criar dashboard do usuário com:
 - saldo disponível;
 - saldo bloqueado;
 - patrimônio fictício;
-- cotas em carteira;
+- tokens em carteira;
 - ordens abertas;
 - últimas transações;
-- empresas favoritas;
+- projetos favoritas;
 - botão comprar;
 - botão vender;
 - histórico completo.
@@ -594,11 +594,11 @@ Implementar:
 - controle de permissão no backend;
 - validação de dados;
 - proteção contra saldo negativo;
-- proteção contra cotas negativas;
+- proteção contra tokens negativas;
 - proteção contra ordem duplicada;
-- logs de alterações sensíveis;
+- logs de altertokens sensíveis;
 - bloqueio de usuário;
-- bloqueio de empresa;
+- bloqueio de projeto;
 - tratamento de erros.
 
 Nunca confiar apenas no frontend para validar permissões.
@@ -633,9 +633,9 @@ Criar tabelas Prisma para:
 O sistema nunca pode permitir:
 
 - saldo negativo;
-- cotas negativas;
+- tokens negativas;
 - ordem de compra sem saldo suficiente;
-- ordem de venda sem cotas suficientes;
+- ordem de venda sem tokens suficientes;
 - moeda criada sem log;
 - corretor repassar mais moeda do que possui;
 - usuário comprar ativo suspenso;
@@ -653,9 +653,9 @@ Implementar primeiro:
 5. ADM Chefe criando moeda;
 6. repasse da Tesouraria para corretor;
 7. repasse do corretor para usuário;
-8. criação de empresa;
-9. aprovação de empresa;
-10. compra e venda simples de cotas;
+8. criação de projeto;
+9. aprovação de projeto;
+10. compra e venda simples de tokens;
 11. histórico de transações;
 12. logs administrativos;
 13. painel básico do usuário;
@@ -672,7 +672,7 @@ Depois implementar:
 5. execução parcial;
 6. gráfico de preço;
 7. volume de negociação;
-8. ranking de empresas;
+8. ranking de projetos;
 9. painel do corretor;
 10. alertas antifraude.
 
@@ -688,7 +688,7 @@ Depois implementar:
 6. imposto fictício;
 7. queima de moeda;
 8. relatórios exportáveis;
-9. reputação de empresas;
+9. reputação de projetos;
 10. ranking de jogadores.
 
 ## 29. Interface
@@ -715,8 +715,8 @@ Toda página deve exibir aviso discreto:
 O sistema deve deixar claro:
 
 - a moeda é fictícia;
-- as cotas são fictícias;
-- empresas são fictícias;
+- as tokens são fictícias;
+- projetos são fictícias;
 - não existe investimento real;
 - não existe saque real;
 - não existe promessa de lucro;
@@ -746,7 +746,7 @@ Não remover funcionalidades, painéis ou fluxos sem confirmação.
 - Usar TypeScript.
 - Usar nomes claros.
 - Separar frontend e backend.
-- Criar validações no backend.
+- Criar validtokens no backend.
 - Criar migrations Prisma.
 - Criar seed inicial com cargos.
 - Criar usuário admin inicial apenas via seed/configuração segura.
@@ -809,9 +809,9 @@ Não representa dinheiro real, criptoativo real, investimento real, saque real, 
 
 Status implementado no código:
 
-- Solicitação de empresa fictícia com validação de:
+- Solicitação de projeto fictícia com validação de:
   - nome, ticker, setor, descrição;
-  - total de cotas > 0;
+  - total de tokens > 0;
   - preço inicial > 0;
   - dono% + oferta% = 100%;
   - taxa de compra e venda não negativas;
@@ -827,8 +827,8 @@ Status implementado no código:
   - rejeitar;
   - suspender.
 - Na aprovação:
-  - empresa vira ACTIVE;
-  - cria posição de cotas do fundador;
+  - projeto vira ACTIVE;
+  - cria posição de tokens do fundador;
   - cria estoque inicial da oferta;
   - gera CompanyOperation + AdminLog (auditoria).
 - Compra da oferta inicial:
@@ -836,7 +836,7 @@ Status implementado no código:
   - impede saldo negativo;
   - impede compra acima do estoque disponível;
   - debita carteira;
-  - credita cotas na holding;
+  - credita tokens na holding;
   - reduz oferta disponível;
   - registra Transaction + CompanyOperation + AdminLog.
 - Preparação para próxima fase de ordens:
@@ -855,19 +855,19 @@ A Fase 4A adiciona negociação entre usuários no mercado secundário com regra
 ### 20.1 Tipos de ordem
 
 - Ordem limitada de compra: bloqueia saldo e entra no livro de compras.
-- Ordem limitada de venda: bloqueia cotas e entra no livro de vendas.
+- Ordem limitada de venda: bloqueia tokens e entra no livro de vendas.
 - Compra a mercado: consome as menores ofertas de venda, permite parcial e respeita slippage.
 - Venda a mercado: consome as maiores ofertas de compra, permite parcial e respeita slippage.
 
 ### 20.2 Regras econômicas aplicadas
 
-- Nunca permite saldo negativo ou cotas negativas.
+- Nunca permite saldo negativo ou tokens negativas.
 - Empresa inexistente ou suspensa não pode ser negociada.
 - Ordem parcialmente executada permanece com quantidade restante.
 - Ordem totalmente executada vira FILLED.
-- Cancelamento libera saldo/cotas bloqueadas.
+- Cancelamento libera saldo/tokens bloqueados.
 - Cada execução gera Trade + Transaction + CompanyOperation + AdminLog.
-- Preço atual da empresa é atualizado pelo último trade.
+- Preço atual do projeto é atualizado pelo último trade.
 - Taxa de compra é aplicada ao comprador e taxa de venda ao vendedor.
 
 ### 20.3 Banco de dados

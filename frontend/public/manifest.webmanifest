@@ -1,7 +1,7 @@
 {
-  "name": "Bolsa Virtual RP",
-  "short_name": "Bolsa RP",
-  "description": "Simulação econômica fictícia com empresas, cotas e mercado virtual.",
+  "name": "Uzumaki Exchange",
+  "short_name": "Uzumaki",
+  "description": "Plataforma de simulação econômica com mercados e tokens.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

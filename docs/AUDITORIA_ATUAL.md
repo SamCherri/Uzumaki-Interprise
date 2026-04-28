@@ -1,89 +1,25 @@
 # AUDITORIA_ATUAL
 
-Auditoria consolidada do estado atual da **Bolsa Virtual RP**, mantendo o projeto existente (sem recriação do zero).
+Auditoria consolidada do estado atual da **Uzumaki Exchange**, mantendo o projeto existente (sem recriação do zero).
 
-## 1) O que já está implementado
+## 1) Implementado
 
-- ✅ autenticação
-- ✅ usuários
-- ✅ roles
-- ✅ carteira
-- ✅ tesouraria
-- ✅ corretor
-- ✅ empresas
-- ✅ cotas
-- ✅ oferta inicial
-- ✅ ordens
-- ✅ livro de ofertas
-- ✅ matching engine
-- ✅ trades
-- ✅ histórico
-- ✅ painel admin
-- ✅ painel corretor
-- ✅ frontend mobile
-- ✅ fluxo de login/cadastro separado
-- ✅ controle visual de Admin/Corretor por perfil
+- ✅ fluxo mobile;
+- ✅ PWA (manifest + service worker), quando habilitado no frontend;
+- ✅ interface moderna nas telas principais já entregues;
+- ✅ controle visual por perfil (Admin/Corretor/Usuário);
+- ✅ autenticação, carteira, ordens, livro de ofertas, matching engine e histórico;
+- ✅ carteiras de taxa (`PlatformAccount` e `CompanyRevenueAccount`) com distribuição 50/50 registrada em `FeeDistribution`.
 
-## 2) O que está parcial
+## 2) Parcial
 
-- ⚠️ gráficos simples
-- ⚠️ UX mobile
-- ⚠️ PWA/app instalável
-- ⚠️ ranking
-- ⚠️ auditoria avançada
-- ✅ carteira da empresa (CompanyRevenueAccount)
-- ✅ carteira da plataforma (PlatformAccount)
-- ✅ distribuição de taxas (FeeDistribution, regra 50/50)
-- ⚠️ dashboard admin completo
+- ⚠️ conversão completa da linguagem para padrão exchange;
+- ⚠️ gráficos avançados (períodos, volume e leitura mais rica);
+- ⚠️ ranking;
+- ⚠️ carteira da plataforma (visão administrativa expandida);
+- ⚠️ carteira da empresa (visão administrativa expandida);
+- ⚠️ distribuição de taxas com painel/configuração avançada.
 
-## 3) O que ainda falta
+## 3) Próxima PR recomendada
 
-- ❌ PWA completo
-- ❌ gráfico por período 1h/24h/7d/30d
-- ❌ volume negociado
-- ❌ ranking de empresas
-- ⚠️ retirada/reinvestimento da receita da empresa
-- ✅ histórico detalhado de taxas (FeeDistribution)
-- ❌ retirada/reinvestimento da receita da empresa
-- ❌ painel admin avançado de usuários/ordens/trades/logs
-- ❌ testes automatizados mais robustos
-
-## 4) Riscos atuais
-
-- frontend ainda pode parecer protótipo técnico se não melhorar visual;
-- gráfico pode ficar pobre sem trades;
-- regra de taxa é fixa em código (50/50), ainda sem painel de configuração administrativa;
-- usuário comum pode se confundir com termos técnicos se eles reaparecerem;
-- PWA ainda não implementado;
-- fluxo multiusuário precisa ser testado manualmente.
-
-## 5) Próximas PRs recomendadas (prioridade)
-
-### PR A — Visual/PWA
-- modernizar frontend;
-- melhorar gráfico;
-- adicionar botão Instalar aplicativo;
-- manifest;
-- service worker;
-- PWA.
-
-### PR B — Economia de taxas
-- PlatformAccount;
-- CompanyRevenueAccount;
-- FeeDistribution;
-- dividir taxas entre plataforma e empresa.
-
-### PR C — Admin avançado
-- ver usuários;
-- bloquear/desbloquear;
-- ver ordens;
-- ver trades;
-- ver logs;
-- ajustar saldo com justificativa.
-
-### PR D — Gráficos avançados
-- períodos 1h/24h/7d/30d;
-- volume;
-- variação percentual;
-- ranking.
-
+- `ui: converter interface para Uzumaki Exchange com pares RPC`.
