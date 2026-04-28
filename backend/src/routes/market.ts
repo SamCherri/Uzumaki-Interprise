@@ -39,8 +39,8 @@ function statusFromRemaining(order: Pick<MarketOrder, 'quantity' | 'remainingQua
 
 async function getCompanyOrThrow(tx: Tx, companyId: string) {
   const company = await tx.company.findUnique({ where: { id: companyId } });
-  if (!company) throw new Error('Empresa inexistente.');
-  if (company.status !== 'ACTIVE') throw new Error('Empresa suspensa ou indisponível para negociação.');
+  if (!company) throw new Error('Projeto/token inexistente.');
+  if (company.status !== 'ACTIVE') throw new Error('Mercado suspenso ou indisponível para negociação.');
   return company;
 }
 
@@ -86,7 +86,7 @@ async function addSharesToBuyer(
 async function subtractSharesFromSeller(tx: Tx, input: { userId: string; companyId: string; quantity: number; currentPrice: Decimal }) {
   const holding = await getHolding(tx, input.userId, input.companyId);
   if (!holding || holding.shares < input.quantity) {
-    throw new Error('Usuário vendedor não possui cotas suficientes.');
+    throw new Error('Usuário vendedor não possui tokens suficientes.');
   }
 
   const nextShares = holding.shares - input.quantity;
@@ -219,7 +219,7 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
       });
     } else {
       if (maker.lockedShares < tradeQuantity) {
-        throw new Error('Cotas bloqueadas da ordem limite estão inconsistentes.');
+        throw new Error('Tokens bloqueados da ordem limite estão inconsistentes.');
       }
     }
 
@@ -297,7 +297,7 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
         walletId: buyerWallet.id,
         type: 'MARKET_TRADE_BUY',
         amount: buyerTotalPay,
-        description: `Compra de ${tradeQuantity} cota(s) de ${company.ticker} a ${unitPrice.toString()} por cota`,
+        description: `Compra de ${tradeQuantity} token(s) de ${company.ticker} a ${unitPrice.toString()} por token`,
       },
     });
 
@@ -306,7 +306,7 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
         walletId: sellerWallet.id,
         type: 'MARKET_TRADE_SELL',
         amount: sellerNetReceive,
-        description: `Venda de ${tradeQuantity} cota(s) de ${company.ticker} a ${unitPrice.toString()} por cota`,
+        description: `Venda de ${tradeQuantity} token(s) de ${company.ticker} a ${unitPrice.toString()} por token`,
       },
     });
 
@@ -399,7 +399,7 @@ export async function marketRoutes(app: FastifyInstance) {
         if (body.type === 'SELL') {
           const holding = await getHolding(tx, authRequest.user.sub, body.companyId);
           if (!holding || holding.shares < body.quantity) {
-            throw new Error('Você não possui cotas suficientes para criar ordem de venda.');
+            throw new Error('Você não possui tokens suficientes para criar ordem de venda.');
           }
 
           lockedShares = body.quantity;
@@ -626,7 +626,7 @@ export async function marketRoutes(app: FastifyInstance) {
 
         const holding = await getHolding(tx, authRequest.user.sub, companyId);
         if (!holding || holding.shares < body.quantity) {
-          throw new Error('Você não possui cotas suficientes para venda a mercado.');
+          throw new Error('Você não possui tokens suficientes para venda a mercado.');
         }
 
         const order = await tx.marketOrder.create({

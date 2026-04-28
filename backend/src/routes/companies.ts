@@ -32,11 +32,11 @@ function isAdmin(roles: string[]) {
 function assertCompanyRequestRules(input: z.infer<typeof companyRequestSchema>) {
   const sum = input.ownerSharePercent + input.publicOfferPercent;
   if (Math.abs(sum - 100) > 0.0001) {
-    throw new Error('Percentual do dono + oferta inicial deve ser exatamente 100%.');
+    throw new Error('Percentual do dono + lançamento inicial deve ser exatamente 100%.');
   }
 
   if (input.publicOfferPercent < COMPANY_RULES.minPublicOfferPercent) {
-    throw new Error(`Oferta inicial precisa ser de no mínimo ${COMPANY_RULES.minPublicOfferPercent}%.`);
+    throw new Error(`Lançamento inicial precisa ser de no mínimo ${COMPANY_RULES.minPublicOfferPercent}%.`);
   }
 
   if (input.ownerSharePercent > COMPANY_RULES.maxOwnerSharePercent) {
@@ -58,7 +58,7 @@ function splitShares(totalShares: number, ownerPercent: number, publicPercent: n
 
   const recalculatedPublicPercent = Number(((publicOfferShares / totalShares) * 100).toFixed(2));
   if (Math.abs(recalculatedPublicPercent - publicPercent) > 1) {
-    throw new Error('Não foi possível distribuir cotas com os percentuais informados.');
+    throw new Error('Não foi possível distribuir tokens com os percentuais informados.');
   }
 
   return { ownerShares, publicOfferShares };
@@ -108,7 +108,7 @@ export async function companyRoutes(app: FastifyInstance) {
           userId: authRequest.user.sub,
           action: 'COMPANY_REQUEST_CREATED',
           entity: 'Company',
-          reason: 'Solicitação de empresa fictícia',
+          reason: 'Solicitação de projeto/token',
           current: JSON.stringify({ companyId: company.id, ticker: company.ticker }),
           ip: request.ip,
           userAgent: request.headers['user-agent'] ?? null,
@@ -155,7 +155,7 @@ export async function companyRoutes(app: FastifyInstance) {
     });
 
     if (!company || company.status !== 'ACTIVE') {
-      return reply.code(404).send({ message: 'Empresa não encontrada ou indisponível para negociação.' });
+      return reply.code(404).send({ message: 'Projeto/token não encontrado ou indisponível para negociação.' });
     }
 
     return { company };
@@ -165,7 +165,7 @@ export async function companyRoutes(app: FastifyInstance) {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
     if (!isAdmin(roles)) {
-      return reply.code(403).send({ message: 'Sem permissão para listar empresas pendentes.' });
+      return reply.code(403).send({ message: 'Sem permissão para listar listagens pendentes.' });
     }
 
     const companies = await prisma.company.findMany({
@@ -181,7 +181,7 @@ export async function companyRoutes(app: FastifyInstance) {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
     if (!isAdmin(roles)) {
-      return reply.code(403).send({ message: 'Sem permissão para aprovar empresa.' });
+      return reply.code(403).send({ message: 'Sem permissão para aprovar listagem.' });
     }
 
     const params = z.object({ id: z.string().min(1) }).parse(request.params);
@@ -189,8 +189,8 @@ export async function companyRoutes(app: FastifyInstance) {
     try {
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const company = await tx.company.findUnique({ where: { id: params.id } });
-        if (!company) throw new Error('Empresa não encontrada.');
-        if (company.status !== 'PENDING') throw new Error('Somente empresas pendentes podem ser aprovadas.');
+        if (!company) throw new Error('Projeto/token não encontrado.');
+        if (company.status !== 'PENDING') throw new Error('Somente listagens pendentes podem ser aprovadas.');
 
         const updated = await tx.company.update({
           where: { id: company.id },
@@ -230,7 +230,7 @@ export async function companyRoutes(app: FastifyInstance) {
             companyId: company.id,
             userId: authRequest.user.sub,
             type: 'ADMIN_APPROVE',
-            description: 'Empresa aprovada e oferta inicial habilitada.',
+            description: 'Listagem aprovada e lançamento inicial habilitado.',
           },
         });
 
@@ -239,7 +239,7 @@ export async function companyRoutes(app: FastifyInstance) {
             userId: authRequest.user.sub,
             action: 'COMPANY_APPROVED',
             entity: 'Company',
-            reason: 'Aprovação administrativa de empresa',
+            reason: 'Aprovação administrativa de listagem',
             previous: JSON.stringify({ status: company.status }),
             current: JSON.stringify({ status: 'ACTIVE', companyId: company.id, ownerShares: company.ownerShares, publicOfferShares: company.publicOfferShares }),
             ip: request.ip,
@@ -260,15 +260,15 @@ export async function companyRoutes(app: FastifyInstance) {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
     if (!isAdmin(roles)) {
-      return reply.code(403).send({ message: 'Sem permissão para rejeitar empresa.' });
+      return reply.code(403).send({ message: 'Sem permissão para rejeitar listagem.' });
     }
 
     const params = z.object({ id: z.string().min(1) }).parse(request.params);
 
     try {
       const company = await prisma.company.findUnique({ where: { id: params.id } });
-      if (!company) return reply.code(404).send({ message: 'Empresa não encontrada.' });
-      if (company.status !== 'PENDING') return reply.code(400).send({ message: 'Somente empresas pendentes podem ser rejeitadas.' });
+      if (!company) return reply.code(404).send({ message: 'Projeto/token não encontrado.' });
+      if (company.status !== 'PENDING') return reply.code(400).send({ message: 'Somente listagens pendentes podem ser rejeitadas.' });
 
       const updated = await prisma.company.update({ where: { id: company.id }, data: { status: 'REJECTED', rejectedAt: new Date() } });
 
@@ -277,7 +277,7 @@ export async function companyRoutes(app: FastifyInstance) {
           companyId: company.id,
           userId: authRequest.user.sub,
           type: 'ADMIN_REJECT',
-          description: 'Empresa rejeitada pelo administrador.',
+          description: 'Listagem rejeitada pelo administrador.',
         },
       });
 
@@ -303,14 +303,14 @@ export async function companyRoutes(app: FastifyInstance) {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
     if (!isAdmin(roles)) {
-      return reply.code(403).send({ message: 'Sem permissão para suspender empresa.' });
+      return reply.code(403).send({ message: 'Sem permissão para suspender mercado.' });
     }
 
     const params = z.object({ id: z.string().min(1) }).parse(request.params);
 
     const company = await prisma.company.findUnique({ where: { id: params.id } });
-    if (!company) return reply.code(404).send({ message: 'Empresa não encontrada.' });
-    if (company.status !== 'ACTIVE') return reply.code(400).send({ message: 'Somente empresa ativa pode ser suspensa.' });
+    if (!company) return reply.code(404).send({ message: 'Projeto/token não encontrado.' });
+    if (company.status !== 'ACTIVE') return reply.code(400).send({ message: 'Somente mercado ativo pode ser suspenso.' });
 
     const updated = await prisma.company.update({ where: { id: company.id }, data: { status: 'SUSPENDED', suspendedAt: new Date() } });
 
@@ -319,7 +319,7 @@ export async function companyRoutes(app: FastifyInstance) {
         companyId: company.id,
         userId: authRequest.user.sub,
         type: 'ADMIN_SUSPEND',
-        description: 'Empresa suspensa pelo administrador.',
+        description: 'Mercado suspenso pelo administrador.',
       },
     });
 
@@ -348,7 +348,7 @@ export async function companyRoutes(app: FastifyInstance) {
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const company = await tx.company.findUnique({ where: { id: params.id } });
         if (!company || company.status !== 'ACTIVE') {
-          throw new Error('Empresa não está ativa para compra de oferta inicial.');
+          throw new Error('Mercado não está ativo para compra de lançamento inicial.');
         }
 
         const wallet = await tx.wallet.upsert({
@@ -359,11 +359,11 @@ export async function companyRoutes(app: FastifyInstance) {
 
         const offer = await tx.companyInitialOffer.findUnique({ where: { companyId: company.id } });
         if (!offer || offer.availableShares <= 0) {
-          throw new Error('Oferta inicial indisponível.');
+          throw new Error('Lançamento inicial indisponível.');
         }
 
         if (body.quantity > offer.availableShares) {
-          throw new Error('Quantidade solicitada maior que cotas disponíveis na oferta inicial.');
+          throw new Error('Quantidade solicitada maior que tokens disponíveis no lançamento inicial.');
         }
 
         const quantity = new Decimal(body.quantity);
@@ -416,7 +416,7 @@ export async function companyRoutes(app: FastifyInstance) {
             walletId: wallet.id,
             type: 'COMPANY_INITIAL_OFFER_BUY',
             amount: totalAmount,
-            description: `Compra de ${body.quantity} cotas na oferta inicial de ${company.ticker}`,
+            description: `Compra de ${body.quantity} tokens no lançamento inicial de ${company.ticker}`,
           },
         });
 
@@ -430,7 +430,7 @@ export async function companyRoutes(app: FastifyInstance) {
             grossAmount,
             feeAmount,
             totalAmount,
-            description: `Compra de oferta inicial (${company.ticker}).`,
+            description: `Compra no lançamento inicial (${company.ticker}).`,
           },
         });
 
@@ -447,7 +447,7 @@ export async function companyRoutes(app: FastifyInstance) {
             userId: authRequest.user.sub,
             action: 'COMPANY_INITIAL_OFFER_BUY',
             entity: 'CompanyOperation',
-            reason: `Compra de ${body.quantity} cotas (${company.ticker})`,
+            reason: `Compra de ${body.quantity} tokens (${company.ticker})`,
             previous: JSON.stringify({ wallet: wallet.availableBalance.toString(), availableOfferShares: offer.availableShares }),
             current: JSON.stringify({ wallet: walletNext.toString(), availableOfferShares: offer.availableShares - body.quantity, totalAmount: totalAmount.toString() }),
             ip: request.ip,

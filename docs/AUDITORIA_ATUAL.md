@@ -13,17 +13,19 @@ Auditoria consolidada do estado atual da **RPC Exchange**, mantendo o projeto ex
 
 ## 2) Parcial
 
-- ⚠️ conversão completa da linguagem para padrão exchange;
+- ✅ revisão final de nomenclatura pública para RPC Exchange;
+- ⚠️ módulo Ponte RP para depósito/resgate manual;
+- ⚠️ painel admin avançado;
 - ⚠️ gráficos avançados (períodos, volume e leitura mais rica);
-- ⚠️ ranking;
+- ⚠️ ranking de mercados;
 - ⚠️ carteira da plataforma (visão administrativa expandida);
-- ⚠️ carteira da empresa (visão administrativa expandida);
-- ⚠️ distribuição de taxas com painel/configuração avançada.
+- ⚠️ uso/retirada da receita dos projetos;
+- ⚠️ possível renomeação interna futura de Company/Shares para Project/Token.
 
 ## 3) Próximos passos recomendados
 
-- revisar frontend para remover nomenclaturas antigas e fixar o nome **RPC Exchange**;
+- ✅ limpeza de termos antigos no frontend;
 - revisar tela de criação para usar "Criar token" e "Solicitar listagem";
 - revisar mercados para reforçar pares dinâmicos `TICKER/RPC` e evitar pares fixos/oficiais;
-- revisar painel admin para linguagem de moderação ("aprovar listagem", "rejeitar listagem", "suspender mercado");
+- ✅ linguagem admin como moderação de listagens;
 - validar que admin não aparece como criador de token/projeto.

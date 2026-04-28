@@ -42,14 +42,17 @@ async function main() {
   const coinChiefRole = await prisma.role.findUniqueOrThrow({ where: { key: 'COIN_CHIEF_ADMIN' } });
   const brokerRole = await prisma.role.findUniqueOrThrow({ where: { key: 'VIRTUAL_BROKER' } });
 
-  const adminEmail = 'admin@bolsavirtual.local';
+  const adminEmailLegacy = 'admin@bolsavirtual.local';
+  const adminEmail = 'admin@rpc.exchange.local';
   const passwordHash = await bcrypt.hash('Admin1234!', 10);
+
+  const adminLegacy = await prisma.user.findUnique({ where: { email: adminEmailLegacy } });
 
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },
     update: {},
     create: {
-      name: 'Super Admin Inicial',
+      name: adminLegacy?.name ?? 'Super Admin Inicial',
       email: adminEmail,
       passwordHash,
       wallet: { create: {} },
@@ -71,16 +74,37 @@ async function main() {
     await prisma.treasuryAccount.create({ data: {} });
   }
 
-  // usuário base de demonstração
-  const userDemo = await prisma.user.upsert({
-    where: { email: 'jogador@bolsavirtual.local' },
+  const demoEmailLegacy = 'jogador@bolsavirtual.local';
+  const demoEmail = 'jogador@rpc.exchange.local';
+  const demoRpc = await prisma.user.findUnique({ where: { email: demoEmail } });
+  const demoLegacy = await prisma.user.findUnique({ where: { email: demoEmailLegacy } });
+
+  // usuário demo base (RPC Exchange), reaproveitando conta legada quando existir
+  const userDemo = demoRpc
+    ? demoRpc
+    : demoLegacy
+      ? await prisma.user.update({
+          where: { id: demoLegacy.id },
+          data: {
+            email: demoEmail,
+            name: demoLegacy.name || 'Jogador Demo',
+          },
+        })
+      : await prisma.user.upsert({
+        where: { email: demoEmail },
+        update: {},
+        create: {
+          name: 'Jogador Demo',
+          email: demoEmail,
+          passwordHash: await bcrypt.hash('Jogador123!', 10),
+          wallet: { create: {} },
+        },
+      });
+
+  await prisma.wallet.upsert({
+    where: { userId: userDemo.id },
     update: {},
-    create: {
-      name: 'Jogador Demo',
-      email: 'jogador@bolsavirtual.local',
-      passwordHash: await bcrypt.hash('Jogador123!', 10),
-      wallet: { create: {} },
-    },
+    create: { userId: userDemo.id },
   });
 
   await prisma.userRole.upsert({
@@ -94,9 +118,9 @@ async function main() {
     where: { ticker: 'DEMO3' },
     update: {},
     create: {
-      name: 'Empresa Demo Fase 3',
+      name: 'Token Demo',
       ticker: 'DEMO3',
-      description: 'Empresa fictícia para validar oferta inicial de cotas.',
+      description: 'Projeto demo para validar lançamento inicial de tokens.',
       sector: 'Tecnologia',
       founderUserId: userDemo.id,
       status: 'ACTIVE',
@@ -145,11 +169,11 @@ async function main() {
   });
 
   const brokerDemo = await prisma.user.upsert({
-    where: { email: 'corretor@bolsavirtual.local' },
+    where: { email: 'corretor@rpc.exchange.local' },
     update: {},
     create: {
       name: 'Corretor Demo',
-      email: 'corretor@bolsavirtual.local',
+      email: 'corretor@rpc.exchange.local',
       passwordHash: await bcrypt.hash('Corretor123!', 10),
       wallet: { create: {} },
     },

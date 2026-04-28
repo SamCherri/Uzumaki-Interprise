@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bolsa-rp-shell-v1';
+const CACHE_NAME = 'rpc-exchange-shell-v1';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {

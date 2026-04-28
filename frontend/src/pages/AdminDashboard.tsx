@@ -63,7 +63,7 @@ export function AdminDashboard() {
     await load();
   }
 
-  async function moderateCompany(id: string, action: 'approve' | 'reject' | 'suspend') {
+  async function moderateCompany(id: string, action: 'approve' | 'reject') {
     await api(`/admin/companies/${id}/${action}`, { method: 'POST' });
     await load();
   }
@@ -78,7 +78,7 @@ export function AdminDashboard() {
           <div className="summary-item"><span className="summary-label">Usuários</span><strong className="summary-value">{data.users}</strong></div>
           <div className="summary-item"><span className="summary-label">Mercados listados</span><strong className="summary-value">{data.companies}</strong></div>
           <div className="summary-item"><span className="summary-label">Logs</span><strong className="summary-value">{data.logs}</strong></div>
-          <div className="summary-item"><span className="summary-label">Tesouraria</span><strong className="summary-value">{data.treasuryBalance}</strong></div>
+          <div className="summary-item"><span className="summary-label">Tesouraria RPC</span><strong className="summary-value">{data.treasuryBalance}</strong></div>
         </div>
       )}
 
@@ -117,25 +117,24 @@ export function AdminDashboard() {
             <div className="action-grid">
               <button className="button-success" onClick={() => moderateCompany(company.id, 'approve')}>Aprovar listagem</button>
               <button className="button-danger" onClick={() => moderateCompany(company.id, 'reject')}>Rejeitar listagem</button>
-              <button onClick={() => moderateCompany(company.id, 'suspend')}>Suspender mercado</button>
             </div>
           </article>
         ))}
       </div>
 
-      <h3 className="nested-card">Emitir moeda fictícia</h3>
+      <h3 className="nested-card">Emitir RPC</h3>
       <form onSubmit={submitIssuance} className="form-grid">
         <input value={issuanceAmount} onChange={(e) => setIssuanceAmount(e.target.value)} placeholder="Quantidade" required />
         <input value={issuanceReason} onChange={(e) => setIssuanceReason(e.target.value)} placeholder="Motivo" required />
-        <button className="button-primary" type="submit">Criar moeda</button>
+        <button className="button-primary" type="submit">Emitir RPC</button>
       </form>
 
-      <h3 className="nested-card">Enviar moeda para corretor</h3>
+      <h3 className="nested-card">Enviar RPC para corretor</h3>
       <form onSubmit={submitBrokerTransfer} className="form-grid">
         <input value={brokerEmail} onChange={(e) => setBrokerEmail(e.target.value)} placeholder="E-mail do corretor" type="email" required />
         <input value={brokerAmount} onChange={(e) => setBrokerAmount(e.target.value)} placeholder="Quantidade" required />
         <input value={brokerReason} onChange={(e) => setBrokerReason(e.target.value)} placeholder="Motivo" required />
-        <button className="button-primary" type="submit">Enviar ao corretor</button>
+        <button className="button-primary" type="submit">Enviar RPC ao corretor</button>
       </form>
     </section>
   );
