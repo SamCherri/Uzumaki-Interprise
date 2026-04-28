@@ -51,11 +51,12 @@ export function BrokerDashboard() {
       )}
 
       <h3 className="nested-card">Enviar RPC para usuário</h3>
+      <p className="info-text">Use após vender RPC ao jogador dentro do RP.</p>
       <form onSubmit={submitTransfer} className="form-grid">
         <input value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="E-mail do usuário" type="email" required />
-        <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Quantidade" required />
-        <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo" required />
-        <button className="button-primary" type="submit">Enviar RPC</button>
+        <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Quantidade RPC" required />
+        <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Observação" required />
+        <button className="button-primary" type="submit">Enviar RPC ao usuário</button>
       </form>
 
       <h3 className="nested-card">Histórico de envios</h3>

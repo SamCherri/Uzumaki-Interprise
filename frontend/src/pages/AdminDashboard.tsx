@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../services/api';
+import { AdminWithdrawalsPanel } from './AdminWithdrawalsPanel';
 
 type Overview = { users: number; companies: number; logs: number; treasuryBalance: string | number };
 type PendingCompany = { id: string; name: string; ticker: string; ownerSharePercent: string; publicOfferPercent: string; buyFeePercent: string; sellFeePercent: string; ownerShares: number; publicOfferShares: number };
@@ -130,12 +131,15 @@ export function AdminDashboard() {
       </form>
 
       <h3 className="nested-card">Enviar RPC para corretor</h3>
+      <p className="info-text">Use após vender RPC ao corretor dentro do RP.</p>
       <form onSubmit={submitBrokerTransfer} className="form-grid">
         <input value={brokerEmail} onChange={(e) => setBrokerEmail(e.target.value)} placeholder="E-mail do corretor" type="email" required />
-        <input value={brokerAmount} onChange={(e) => setBrokerAmount(e.target.value)} placeholder="Quantidade" required />
-        <input value={brokerReason} onChange={(e) => setBrokerReason(e.target.value)} placeholder="Motivo" required />
+        <input value={brokerAmount} onChange={(e) => setBrokerAmount(e.target.value)} placeholder="Quantidade RPC" required />
+        <input value={brokerReason} onChange={(e) => setBrokerReason(e.target.value)} placeholder="Observação" required />
         <button className="button-primary" type="submit">Enviar RPC ao corretor</button>
       </form>
+
+      <AdminWithdrawalsPanel />
     </section>
   );
 }

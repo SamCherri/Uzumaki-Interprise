@@ -25,6 +25,14 @@ enum TransferType {
   ADJUSTMENT
 }
 
+enum WithdrawalStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  REJECTED
+  CANCELED
+}
+
 enum CompanyOperationType {
   INITIAL_OFFER_BUY
   ADMIN_APPROVE
@@ -80,6 +88,8 @@ model User {
   buyTrades    Trade[]            @relation("trade_buyer")
   sellTrades   Trade[]            @relation("trade_seller")
   paidFeeDistributions FeeDistribution[] @relation("fee_distribution_payer")
+  withdrawalRequests WithdrawalRequest[] @relation("withdrawal_request_user")
+  reviewedWithdrawalRequests WithdrawalRequest[] @relation("withdrawal_request_reviewer")
 }
 
 model Role {
@@ -119,6 +129,7 @@ model Wallet {
   userId           String   @unique
   availableBalance Decimal  @default(0) @db.Decimal(18, 2)
   lockedBalance    Decimal  @default(0) @db.Decimal(18, 2)
+  pendingWithdrawalBalance Decimal @default(0) @db.Decimal(18, 2)
   investedValue    Decimal  @default(0) @db.Decimal(18, 2)
   fictitiousProfit Decimal  @default(0) @db.Decimal(18, 2)
   user             User     @relation(fields: [userId], references: [id])
@@ -315,6 +326,31 @@ model CoinIssuance {
   previousValue Decimal  @db.Decimal(18, 2)
   newValue      Decimal  @db.Decimal(18, 2)
   createdAt     DateTime @default(now())
+}
+
+model WithdrawalRequest {
+  id           String           @id @default(cuid())
+  code         String           @unique
+  userId       String
+  user         User             @relation("withdrawal_request_user", fields: [userId], references: [id])
+  amount       Decimal          @db.Decimal(18, 2)
+  status       WithdrawalStatus @default(PENDING)
+  userNote     String?
+  adminNote    String?
+  requestedAt  DateTime         @default(now())
+  processingAt DateTime?
+  completedAt  DateTime?
+  rejectedAt   DateTime?
+  canceledAt   DateTime?
+  reviewedById String?
+  reviewedBy   User?            @relation("withdrawal_request_reviewer", fields: [reviewedById], references: [id])
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([code])
+  @@index([createdAt])
 }
 
 model CoinTransfer {

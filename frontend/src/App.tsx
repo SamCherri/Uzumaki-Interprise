@@ -6,9 +6,10 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { BrokerDashboard } from './pages/BrokerDashboard';
 import { CompanyRequestPage } from './pages/CompanyRequestPage';
 import { CompaniesPage } from './pages/CompaniesPage';
+import { WithdrawalsPage } from './pages/WithdrawalsPage';
 
 type PublicTab = 'login' | 'register';
-type PrivateScreen = 'home' | 'markets' | 'wallet' | 'company-request' | 'admin' | 'broker';
+type PrivateScreen = 'home' | 'markets' | 'wallet' | 'withdrawals' | 'company-request' | 'admin' | 'broker';
 
 type ViewerRoles = {
   canSeeAdmin: boolean;
@@ -138,9 +139,9 @@ export function App() {
         <section className="card public-entry-card">
           <header className="public-entry-header">
             <h1>RPC Exchange</h1>
-            <p className="subtitle">Plataforma de simulação econômica</p>
-            <p className="warning">Sem dinheiro real, sem cripto real e sem blockchain.</p>
-            <p className="info-text">Uso exclusivo para roleplay/simulação.</p>
+            <p className="subtitle">Ferramenta de interpretação de exchange para RP.</p>
+            <p className="warning">Esta é uma ferramenta de simulação/interpretação de uma exchange. Nenhum valor possui conversão para dinheiro real.</p>
+            <p className="info-text">Sem cripto real, sem blockchain, sem Pix, sem cartão e sem gateway de pagamento.</p>
           </header>
 
           <article className="card install-card nested-card">
@@ -224,6 +225,7 @@ export function App() {
           <div className="home-grid home-grid-actions nested-card">
             <button className="home-tile" onClick={() => setScreen('markets')}><span>🪙</span><strong>Mercados</strong><small>Veja ativos disponíveis para negociar.</small></button>
             <button className="home-tile" onClick={() => setScreen('wallet')}><span>💼</span><strong>Carteira</strong><small>Acompanhe seu saldo e seus ativos.</small></button>
+            <button className="home-tile" onClick={() => setScreen('withdrawals')}><span>🏧</span><strong>Saque</strong><small>Solicite a retirada de RPC para receber dentro do RP.</small></button>
             <button className="home-tile" onClick={() => setScreen('company-request')}><span>🚀</span><strong>Criar token</strong><small>Crie seu projeto e solicite listagem no mercado.</small></button>
             {roles.canSeeAdmin && <button className="home-tile" onClick={() => setScreen('admin')}><span>🛠️</span><strong>Admin</strong><small>Painel administrativo</small></button>}
             {roles.canSeeBroker && <button className="home-tile" onClick={() => setScreen('broker')}><span>🤝</span><strong>Corretor</strong><small>Painel corretor</small></button>}
@@ -234,6 +236,7 @@ export function App() {
 
       {screen === 'markets' && <CompaniesPage />}
       {screen === 'wallet' && <UserDashboard />}
+      {screen === 'withdrawals' && <WithdrawalsPage />}
       {screen === 'company-request' && <CompanyRequestPage />}
       {screen === 'admin' && roles.canSeeAdmin && <AdminDashboard />}
       {screen === 'broker' && roles.canSeeBroker && <BrokerDashboard />}

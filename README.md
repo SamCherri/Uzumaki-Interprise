@@ -1,8 +1,8 @@
 # RPC Exchange
 
-Projeto de **simulação econômica** com mercados e tokens virtuais em uma experiência de exchange.
+Projeto de **interpretação/simulação** com mercados e tokens virtuais em uma experiência de exchange.
 
-> Plataforma de simulação econômica. Sem dinheiro real, sem cripto real e sem blockchain.
+> Ferramenta de interpretação de exchange para RP. Sem dinheiro real, sem cripto real, sem blockchain, sem Pix, sem cartão e sem gateway de pagamento.
 
 
 
@@ -87,7 +87,7 @@ npm run build               # build backend + frontend
 npm run start:backend       # sobe backend em produção
 ```
 
-## Fase atual (MVP - bloco 4B: distribuição de taxas e carteiras de receita)
+## Fase atual (MVP - bloco 5: saque manual de RPC)
 
 Implementado nesta fase:
 
@@ -132,6 +132,16 @@ Implementado nesta fase:
 16. Carteira de receita do projeto criada automaticamente na aprovação do projeto.
 17. Registro detalhado de distribuição em `FeeDistribution` para oferta inicial e trades de mercado.
 18. Endpoints admin para consulta da receita da plataforma e dos projetos.
+19. Saque manual de RPC com fluxo de pendência:
+   - usuário solicita saque;
+   - saldo sai de `availableBalance` e vai para `pendingWithdrawalBalance`;
+   - admin marca processamento/conclui/rejeita;
+   - conclusão remove RPC pendente definitivamente;
+   - rejeição ou cancelamento devolve RPC para saldo disponível.
+20. Nova tabela `WithdrawalRequest` com status:
+   - `PENDING`, `PROCESSING`, `COMPLETED`, `REJECTED`, `CANCELED`.
+21. Novo campo em carteira:
+   - `pendingWithdrawalBalance`.
 
 ## Endpoints principais da Fase 4A
 
@@ -147,6 +157,9 @@ Mercados/Projetos:
 Tokens e carteira:
 - `POST /api/companies/:id/buy-initial-offer`
 - `GET /api/me/holdings`
+- `GET /api/withdrawals/me`
+- `POST /api/withdrawals`
+- `POST /api/withdrawals/:id/cancel`
 
 Mercado secundário:
 - `POST /api/market/orders` (ordem limitada BUY/SELL)
@@ -160,11 +173,15 @@ Mercado secundário:
 Admin (taxas):
 - `GET /api/admin/platform-account`
 - `GET /api/admin/company-revenue-accounts`
+- `GET /api/admin/withdrawals`
+- `POST /api/admin/withdrawals/:id/mark-processing`
+- `POST /api/admin/withdrawals/:id/complete`
+- `POST /api/admin/withdrawals/:id/reject`
 
 ## Observações importantes da simulação
 
-- Este projeto é exclusivamente uma simulação fictícia.
-- Não há dinheiro real, saque real, criptoativo real, investimento real ou promessa de lucro real.
+- Este projeto é exclusivamente uma simulação/interpretação fictícia para RP.
+- Não há dinheiro real, criptoativo real, blockchain, Pix, cartão, gateway de pagamento, investimento real ou promessa de lucro real.
 - Não foi implementado nesta fase:
   - retirada de receita do projeto;
   - dividendos/reinvestimento;

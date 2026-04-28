@@ -10,11 +10,12 @@ Auditoria consolidada do estado atual da **RPC Exchange**, mantendo o projeto ex
 - ✅ controle visual por perfil (Admin/Corretor/Usuário);
 - ✅ autenticação, carteira, ordens, livro de ofertas, matching engine e histórico;
 - ✅ carteiras de taxa (`PlatformAccount` e `CompanyRevenueAccount`) com distribuição 50/50 registrada em `FeeDistribution`.
+- ✅ módulo de saque manual (`WithdrawalRequest`) com saldo pendente em carteira e decisão administrativa (processar/concluir/rejeitar).
 
 ## 2) Parcial
 
 - ✅ revisão final de nomenclatura pública para RPC Exchange;
-- ⚠️ módulo Ponte RP para depósito/resgate manual;
+- ⚠️ depósito por solicitação direta de usuário ainda não implementado (entrada segue por Admin/Corretor);
 - ⚠️ painel admin avançado;
 - ⚠️ gráficos avançados (períodos, volume e leitura mais rica);
 - ⚠️ ranking de mercados;

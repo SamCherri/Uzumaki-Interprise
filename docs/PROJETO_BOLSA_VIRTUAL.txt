@@ -917,3 +917,29 @@ Se o livro exigir preço acima da tolerância, a execução é bloqueada.
 - gráfico candlestick;
 - motor avançado de candles;
 - qualquer operação com dinheiro real, saque real ou cripto real.
+
+==================================================
+ATUALIZAÇÃO - SAQUE MANUAL RPC (FASE ATUAL)
+==================================================
+
+- RPC Exchange permanece como ferramenta de interpretação/simulação para RP.
+- Aviso de simulação concentrado na tela pública de login/cadastro.
+- Sem dinheiro real, sem cripto real, sem blockchain, sem Pix, sem cartão e sem gateway de pagamento.
+
+Fluxo oficial:
+1) ADM emite RPC na tesouraria.
+2) ADM vende RPC ao corretor dentro do RP.
+3) No site, ADM envia RPC ao corretor.
+4) Corretor vende RPC ao jogador dentro do RP.
+5) No site, corretor envia RPC ao usuário.
+6) Usuário negocia tokens.
+7) Usuário solicita saque no site.
+8) Valor vai para pendente de saque.
+9) ADM paga no RP.
+10) ADM conclui saque no site.
+11) RPC pendente é removido definitivamente do sistema.
+
+Modelo novo:
+- Wallet.pendingWithdrawalBalance
+- WithdrawalRequest (status: PENDING, PROCESSING, COMPLETED, REJECTED, CANCELED)
+

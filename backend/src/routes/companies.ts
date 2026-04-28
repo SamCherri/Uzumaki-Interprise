@@ -504,6 +504,8 @@ export async function companyRoutes(app: FastifyInstance) {
     return {
       wallet: {
         availableBalance: wallet?.availableBalance ?? new Decimal(0),
+        lockedBalance: wallet?.lockedBalance ?? new Decimal(0),
+        pendingWithdrawalBalance: wallet?.pendingWithdrawalBalance ?? new Decimal(0),
       },
       holdings: data,
       totalCompanies: data.length,
