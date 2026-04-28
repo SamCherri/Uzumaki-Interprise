@@ -1,8 +1,18 @@
-# Bolsa Virtual RP
+# Uzumaki Exchange
 
-Projeto de **simulação econômica fictícia** com moeda virtual, cotas virtuais e empresas fictícias em uma bolsa simulada.
+Projeto de **simulação econômica** com mercados e tokens virtuais em uma experiência de exchange.
 
-> Ambiente fictício de simulação econômica. Nenhum valor possui conversão para dinheiro real.
+> Plataforma de simulação econômica. Sem dinheiro real, sem cripto real e sem blockchain.
+
+
+
+## Direção atual do produto
+
+- O app agora usa linguagem visual de **exchange de tokens** (Uzumaki Exchange).
+- A moeda base visual da plataforma é **RPC**.
+- Os ativos são exibidos como pares de mercado, por exemplo **UZBK/RPC**.
+- O sistema continua sendo simulação econômica, sem dinheiro real, sem cripto real e sem blockchain.
+- Diretriz oficial: [Diretrizes de Produto — Uzumaki Exchange](docs/DIRETRIZES_DE_PRODUTO.md).
 
 ## Banco oficial do projeto
 
@@ -20,7 +30,7 @@ O banco oficial é **PostgreSQL/Postgres** com **Prisma ORM** usando `DATABASE_U
 
 ## Documentação técnica
 
-- [Arquitetura da Bolsa RP](docs/ARQUITETURA_BOLSA_RP.md)
+- [Arquitetura da Uzumaki Exchange](docs/ARQUITETURA_BOLSA_RP.md)
 - [Auditoria do estado atual](docs/AUDITORIA_ATUAL.md)
 
 ## Requisitos
@@ -72,28 +82,28 @@ npm run start:backend       # sobe backend em produção
 
 Implementado nesta fase:
 
-1. Solicitação de empresas fictícias por usuários autenticados, com validações de percentuais, taxas e ticker único.
+1. Solicitação de projetos por usuários autenticados, com validações de percentuais, taxas e ticker único.
 2. Limites administrativos fixos no backend (documentados para virar configuração dinâmica futuramente):
    - taxa máxima de compra: 5%;
    - taxa máxima de venda: 5%;
    - oferta pública mínima: 10%;
    - percentual máximo do dono: 90%.
-3. Fluxo administrativo de empresas:
+3. Fluxo administrativo de projetos:
    - listar pendentes;
    - aprovar;
    - rejeitar;
    - suspender.
-4. Aprovação de empresa gera automaticamente:
-   - posição inicial de cotas do dono;
+4. Aprovação de projeto gera automaticamente:
+   - posição inicial de tokens do dono;
    - estoque da oferta inicial;
    - logs administrativos e operação de auditoria.
-5. Compra de cotas da oferta inicial:
+5. Compra de tokens do lançamento inicial:
    - cálculo de custo bruto, taxa e custo total;
    - bloqueio por saldo insuficiente;
-   - bloqueio por falta de cotas na oferta;
+   - bloqueio por falta de tokens na oferta;
    - atualização de carteira e holdings;
    - registro em `Transaction`, `CompanyOperation` e `AdminLog`.
-6. Dashboard do usuário atualizado com holdings e empresas investidas.
+6. Dashboard do usuário atualizado com holdings e projetos investidos.
 7. Livro de ofertas com ordens limitadas de compra e venda entre usuários.
 8. Ordens a mercado (compra e venda) com execução parcial e proteção de slippage.
 9. Matching engine simples:
@@ -102,21 +112,21 @@ Implementado nesta fase:
    - ordens a mercado consomem livro respeitando tolerância.
 10. Bloqueio de recursos:
    - compra limitada bloqueia saldo em carteira (`availableBalance -> lockedBalance`);
-   - venda limitada bloqueia cotas (retiradas da holding até execução/cancelamento).
-11. Cancelamento de ordem limitada liberando saldo/cotas bloqueadas.
+   - venda limitada bloqueia tokens (retiradas da holding até execução/cancelamento).
+11. Cancelamento de ordem limitada liberando saldo/tokens bloqueados.
 12. Registro de trades na tabela `Trade`.
-13. Atualização de preço atual da empresa pelo último trade executado.
+13. Atualização de preço atual do projeto pelo último trade executado.
 14. Registro de auditoria (`Transaction`, `CompanyOperation`, `AdminLog`) no fluxo de negociação.
 15. Distribuição de taxas implementada com regra fixa 50/50:
    - 50% da taxa para carteira da plataforma (`PlatformAccount`);
-   - 50% da taxa para carteira de receita da empresa (`CompanyRevenueAccount`).
-16. Carteira de receita da empresa criada automaticamente na aprovação da empresa.
+   - 50% da taxa para carteira de receita do projeto (`CompanyRevenueAccount`).
+16. Carteira de receita do projeto criada automaticamente na aprovação do projeto.
 17. Registro detalhado de distribuição em `FeeDistribution` para oferta inicial e trades de mercado.
-18. Endpoints admin para consulta da receita da plataforma e das empresas.
+18. Endpoints admin para consulta da receita da plataforma e dos projetos.
 
 ## Endpoints principais da Fase 4A
 
-Empresas:
+Mercados/Projetos:
 - `POST /api/companies/request`
 - `GET /api/companies`
 - `GET /api/companies/:id`
@@ -125,7 +135,7 @@ Empresas:
 - `POST /api/admin/companies/:id/reject`
 - `POST /api/admin/companies/:id/suspend`
 
-Cotas e carteira:
+Tokens e carteira:
 - `POST /api/companies/:id/buy-initial-offer`
 - `GET /api/me/holdings`
 
@@ -147,14 +157,14 @@ Admin (taxas):
 - Este projeto é exclusivamente uma simulação fictícia.
 - Não há dinheiro real, saque real, criptoativo real, investimento real ou promessa de lucro real.
 - Não foi implementado nesta fase:
-  - retirada de receita da empresa;
+  - retirada de receita do projeto;
   - dividendos/reinvestimento;
   - configuração dinâmica de percentual de taxa;
   - gráfico candlestick.
 
-- Taxas de compra e venda são sempre fictícias e divididas em 50% plataforma / 50% empresa.
-- A carteira da empresa nasce apenas na aprovação administrativa da empresa.
-- Retirada da receita da empresa ainda não foi implementada nesta fase.
+- Taxas de compra e venda são sempre fictícias e divididas em 50% plataforma / 50% projeto.
+- A carteira do projeto nasce apenas na aprovação administrativa do projeto.
+- Retirada da receita do projeto ainda não foi implementada nesta fase.
 
 ## Deploy no Railway
 
@@ -223,7 +233,7 @@ npm run prisma:seed
 1. Abrir frontend.
 2. Cadastrar usuário.
 3. Fazer login.
-4. Solicitar empresa fictícia ou comprar cotas da empresa demo.
+4. Solicitar projeto ou comprar tokens do projeto demo.
 5. Confirmar que backend responde em `/health`.
 
 ## Observações finais
