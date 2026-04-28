@@ -3,6 +3,8 @@ import { api } from '../services/api';
 import { AdminWithdrawalsPanel } from './AdminWithdrawalsPanel';
 import { AdminUsersPanel } from './AdminUsersPanel';
 import { AdminTokensPanel } from './AdminTokensPanel';
+import { AdminAuditPanel } from './AdminAuditPanel';
+import { AdminReportsPanel } from './AdminReportsPanel';
 
 type Overview = { users: number; companies: number; logs: number; treasuryBalance: string | number };
 type PlatformAccount = { balance: string | number; totalReceivedFees: string | number };
@@ -14,7 +16,7 @@ type CompanyRevenueAccount = {
   totalReceivedFees: string | number;
   totalWithdrawn: string | number;
 };
-type ActiveTab = 'overview' | 'users' | 'brokers' | 'tokens' | 'withdrawals' | 'treasury' | 'revenues' | 'logs';
+type ActiveTab = 'overview' | 'users' | 'brokers' | 'tokens' | 'withdrawals' | 'treasury' | 'revenues' | 'audit' | 'reports';
 
 export function AdminDashboard() {
   const [tab, setTab] = useState<ActiveTab>('overview');
@@ -77,7 +79,8 @@ export function AdminDashboard() {
         <button className={tab === 'withdrawals' ? 'pill active' : 'pill'} onClick={() => setTab('withdrawals')}>Saques</button>
         <button className={tab === 'treasury' ? 'pill active' : 'pill'} onClick={() => setTab('treasury')}>Tesouraria</button>
         <button className={tab === 'revenues' ? 'pill active' : 'pill'} onClick={() => setTab('revenues')}>Receitas</button>
-        <button className={tab === 'logs' ? 'pill active' : 'pill'} onClick={() => setTab('logs')}>Logs</button>
+        <button className={tab === 'audit' ? 'pill active' : 'pill'} onClick={() => setTab('audit')}>Auditoria</button>
+        <button className={tab === 'reports' ? 'pill active' : 'pill'} onClick={() => setTab('reports')}>Relatórios</button>
       </nav>
 
       {tab === 'overview' && data && (
@@ -136,9 +139,8 @@ export function AdminDashboard() {
         </>
       )}
 
-      {tab === 'logs' && (
-        <p className="empty-state nested-card">Logs administrativos detalhados permanecem no backend e serão expandidos em filtros avançados.</p>
-      )}
+      {tab === 'audit' && <AdminAuditPanel />}
+      {tab === 'reports' && <AdminReportsPanel />}
     </section>
   );
 }

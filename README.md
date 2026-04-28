@@ -275,3 +275,27 @@ npm run prisma:seed
 - Encerramento é o fluxo recomendado para mercados com histórico econômico.
 - Exclusão definitiva só é permitida sem histórico econômico.
 - Todas as ações administrativas geram AdminLog.
+
+## Auditoria e Relatórios Administrativos
+- Implementado painel de Auditoria avançada (logs, transações, transferências, saques, ordens e trades) somente leitura.
+- Implementado painel de Relatórios com visão geral financeira, conta da plataforma e receitas por projeto/token.
+- Filtros básicos: busca, status/tipo (quando aplicável), período e paginação (padrão 20, máximo 100).
+- Segurança: acesso restrito a ADMIN, SUPER_ADMIN e COIN_CHIEF_ADMIN.
+
+### Implementado
+- Auditoria avançada.
+- Relatórios administrativos.
+- Histórico de transferências.
+- Histórico de transações.
+- Histórico de saques.
+- Histórico de ordens.
+- Histórico de trades.
+
+### Pendente
+- Exportação CSV/PDF.
+- Filtros avançados por intervalo com calendário.
+- Gráficos administrativos.
+- Relatório por corretor.
+- Relatório por usuário.
+- Notificações.
+
