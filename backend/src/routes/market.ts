@@ -3,6 +3,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { distributeFee } from '../services/fee-distribution-service.js';
 
 type AuthRequest = FastifyRequest & { user: { sub: string; roles?: string[] } };
 
@@ -274,6 +275,13 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
         buyFeeAmount,
         sellFeeAmount,
       },
+    });
+
+    await distributeFee(tx, {
+      companyId: company.id,
+      tradeId: trade.id,
+      sourceType: 'MARKET_TRADE_TOTAL_FEE',
+      totalFeeAmount: buyFeeAmount.add(sellFeeAmount),
     });
 
     await tx.company.update({

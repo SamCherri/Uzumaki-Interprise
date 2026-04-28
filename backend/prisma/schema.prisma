@@ -53,6 +53,13 @@ enum MarketOrderStatus {
   REJECTED
 }
 
+enum FeeSourceType {
+  INITIAL_OFFER_BUY
+  MARKET_TRADE_BUY_FEE
+  MARKET_TRADE_SELL_FEE
+  MARKET_TRADE_TOTAL_FEE
+}
+
 model User {
   id           String           @id @default(cuid())
   name         String
@@ -72,6 +79,7 @@ model User {
   marketOrders MarketOrder[]
   buyTrades    Trade[]            @relation("trade_buyer")
   sellTrades   Trade[]            @relation("trade_seller")
+  paidFeeDistributions FeeDistribution[] @relation("fee_distribution_payer")
 }
 
 model Role {
@@ -164,6 +172,8 @@ model Company {
   initialOffer        CompanyInitialOffer?
   marketOrders        MarketOrder[]
   trades              Trade[]
+  revenueAccount      CompanyRevenueAccount?
+  feeDistributions    FeeDistribution[]
 }
 
 model CompanyHolding {
@@ -205,6 +215,7 @@ model CompanyOperation {
   createdAt     DateTime             @default(now())
   company       Company              @relation(fields: [companyId], references: [id])
   user          User?                @relation(fields: [userId], references: [id])
+  feeDistributions FeeDistribution[]
 }
 
 model MarketOrder {
@@ -248,6 +259,51 @@ model Trade {
   seller        User        @relation("trade_seller", fields: [sellerId], references: [id])
   buyOrder      MarketOrder? @relation("trade_buy_order", fields: [buyOrderId], references: [id])
   sellOrder     MarketOrder? @relation("trade_sell_order", fields: [sellOrderId], references: [id])
+  feeDistributions FeeDistribution[]
+}
+
+
+model PlatformAccount {
+  id                String   @id @default(cuid())
+  balance           Decimal  @default(0) @db.Decimal(18, 2)
+  totalReceivedFees Decimal  @default(0) @db.Decimal(18, 2)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model CompanyRevenueAccount {
+  id                String   @id @default(cuid())
+  companyId         String   @unique
+  balance           Decimal  @default(0) @db.Decimal(18, 2)
+  totalReceivedFees Decimal  @default(0) @db.Decimal(18, 2)
+  totalWithdrawn    Decimal  @default(0) @db.Decimal(18, 2)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  company           Company  @relation(fields: [companyId], references: [id])
+}
+
+model FeeDistribution {
+  id                   String        @id @default(cuid())
+  companyId            String
+  tradeId              String?
+  operationId          String?
+  payerUserId          String?
+  sourceType           FeeSourceType
+  totalFeeAmount       Decimal       @db.Decimal(18, 2)
+  platformAmount       Decimal       @db.Decimal(18, 2)
+  companyAmount        Decimal       @db.Decimal(18, 2)
+  platformSharePercent Decimal       @db.Decimal(5, 2)
+  companySharePercent  Decimal       @db.Decimal(5, 2)
+  createdAt            DateTime      @default(now())
+  company              Company       @relation(fields: [companyId], references: [id])
+  trade                Trade?        @relation(fields: [tradeId], references: [id])
+  operation            CompanyOperation? @relation(fields: [operationId], references: [id])
+  payerUser            User?         @relation("fee_distribution_payer", fields: [payerUserId], references: [id])
+
+  @@index([companyId, createdAt])
+  @@index([tradeId])
+  @@index([operationId])
+  @@index([payerUserId])
 }
 
 model CoinIssuance {

@@ -243,6 +243,11 @@ Todo repasse para usuário precisa registrar:
 - saldo anterior;
 - saldo posterior.
 
+Regra econômica adicional da bolsa fictícia:
+- toda taxa de compra/venda deve ser dividida em 50% para a plataforma e 50% para a empresa negociada;
+- receita da empresa acumula primeiro na carteira da própria empresa (não vai direto para o dono);
+- sem retirada real, sem saque real, sem blockchain, sem cripto.
+
 ## 6. Tesouraria Central
 
 Criar uma conta especial do sistema chamada Tesouraria Central.
