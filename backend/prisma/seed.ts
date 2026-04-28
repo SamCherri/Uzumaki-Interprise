@@ -74,16 +74,37 @@ async function main() {
     await prisma.treasuryAccount.create({ data: {} });
   }
 
-  // usuário demo base (RPC Exchange)
-  const userDemo = await prisma.user.upsert({
-    where: { email: 'jogador@rpc.exchange.local' },
+  const demoEmailLegacy = 'jogador@bolsavirtual.local';
+  const demoEmail = 'jogador@rpc.exchange.local';
+  const demoRpc = await prisma.user.findUnique({ where: { email: demoEmail } });
+  const demoLegacy = await prisma.user.findUnique({ where: { email: demoEmailLegacy } });
+
+  // usuário demo base (RPC Exchange), reaproveitando conta legada quando existir
+  const userDemo = demoRpc
+    ? demoRpc
+    : demoLegacy
+      ? await prisma.user.update({
+          where: { id: demoLegacy.id },
+          data: {
+            email: demoEmail,
+            name: demoLegacy.name || 'Jogador Demo',
+          },
+        })
+      : await prisma.user.upsert({
+        where: { email: demoEmail },
+        update: {},
+        create: {
+          name: 'Jogador Demo',
+          email: demoEmail,
+          passwordHash: await bcrypt.hash('Jogador123!', 10),
+          wallet: { create: {} },
+        },
+      });
+
+  await prisma.wallet.upsert({
+    where: { userId: userDemo.id },
     update: {},
-    create: {
-      name: 'Jogador Demo',
-      email: 'jogador@rpc.exchange.local',
-      passwordHash: await bcrypt.hash('Jogador123!', 10),
-      wallet: { create: {} },
-    },
+    create: { userId: userDemo.id },
   });
 
   await prisma.userRole.upsert({
