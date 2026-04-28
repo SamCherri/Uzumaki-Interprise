@@ -56,20 +56,27 @@ Todo o funcionamento é interno à plataforma e serve apenas para experiência d
 
 ---
 
-## 4) Fluxo econômico atual
+## 4) Fluxo econômico oficial
 
 1. Admin cria moeda de simulação (RPC) na tesouraria.
-2. Admin envia moeda para corretor.
-3. Corretor envia moeda para usuário.
-4. Usuário cria projeto/token e solicita listagem.
-5. Admin aprova, rejeita, pausa ou suspende listagens (moderação).
-6. Aprovado, o sistema cria mercado no formato **TICKER/RPC**.
-7. Usuários negociam tokens no mercado (oferta inicial e mercado secundário).
-8. Usuário cria ordens de compra/venda (com taxas de trade).
-9. Matching engine executa ordens/trades compatíveis.
-10. Toda taxa cobrada é distribuída em 50% plataforma e 50% projeto.
-11. Carteiras/holdings são atualizadas.
-12. Logs e registros operacionais são armazenados (`Transaction`, `CompanyOperation`, `AdminLog`, `FeeDistribution`).
+2. Admin vende RPC para corretor dentro do RP.
+3. No site, admin envia RPC para corretor.
+4. Corretor vende RPC para jogador dentro do RP.
+5. No site, corretor envia RPC para usuário.
+6. Usuário cria projeto/token e solicita listagem.
+7. Admin aprova, rejeita, pausa ou suspende listagens (moderação).
+8. Aprovado, o sistema cria mercado no formato **TICKER/RPC**.
+9. Usuários negociam tokens no mercado (oferta inicial e mercado secundário).
+10. Usuário cria ordens de compra/venda (com taxas de trade).
+11. Matching engine executa ordens/trades compatíveis.
+12. Toda taxa cobrada é distribuída em 50% plataforma e 50% projeto.
+13. Usuário solicita saque no site.
+14. Valor é bloqueado em `pendingWithdrawalBalance`.
+15. Admin paga o usuário dentro do RP.
+16. Admin conclui saque no site (ou rejeita, quando necessário).
+17. Na conclusão, o RPC pendente é removido definitivamente do sistema; na rejeição/cancelamento, o valor retorna ao saldo disponível.
+18. Carteiras/holdings são atualizadas.
+19. Logs e registros operacionais são armazenados (`Transaction`, `CompanyOperation`, `AdminLog`, `FeeDistribution`, `WithdrawalRequest`).
 
 Regra estrutural:
 - A plataforma não cria tokens/projetos próprios negociáveis.

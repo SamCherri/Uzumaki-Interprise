@@ -3,18 +3,22 @@
 ## 1. Posicionamento
 - O produto deve parecer uma exchange moderna de tokens.
 - A experiência após login deve ser realista e imersiva.
-- O sistema continua sendo apenas uma simulação econômica.
+- O sistema continua sendo apenas uma ferramenta de interpretação/simulação para RP.
 
 ## 2. Aviso de simulação
 - O aviso principal deve aparecer na tela pública de login/cadastro.
 - Texto sugerido:
-  - "Plataforma de simulação econômica. Sem dinheiro real, sem cripto real e sem blockchain."
+  - "Esta é uma ferramenta de simulação/interpretação de uma exchange. Nenhum valor possui conversão para dinheiro real."
+  - "Sem cripto real, sem blockchain, sem Pix, sem cartão e sem gateway de pagamento."
 - Após login, evitar repetir avisos grandes em todas as telas.
 - Pode haver aviso discreto em rodapé ou área institucional, mas sem poluir a experiência.
 
 ## 3. Linguagem do app
 Usar:
 - RPC Exchange
+- Depósito (quando for operação administrativa)
+- Saque
+- Corretor
 - Mercados
 - Tokens
 - Ativos
@@ -60,6 +64,7 @@ A tela logada deve parecer uma exchange:
 - livro de ofertas;
 - ordens;
 - histórico.
+- Para saque manual, exibir orientação curta: "Após solicitar o saque, aguarde o ADM concluir a entrega dentro do RP."
 
 ## 7. Restrições permanentes
 Nunca implementar:

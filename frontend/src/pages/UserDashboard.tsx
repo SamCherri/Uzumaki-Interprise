@@ -12,7 +12,7 @@ type Holding = {
 };
 
 type HoldingsResponse = {
-  wallet: { availableBalance: string };
+  wallet: { availableBalance: string; lockedBalance: string; pendingWithdrawalBalance: string };
   holdings: Holding[];
   totalCompanies: number;
 };
@@ -45,11 +45,19 @@ export function UserDashboard() {
         <>
           <div className="summary-grid nested-card">
             <div className="summary-item">
-              <span className="summary-label">Saldo disponível</span>
+              <span className="summary-label">Saldo disponível RPC</span>
               <strong className="summary-value">{moeda(Number(data.wallet.availableBalance))} RPC</strong>
             </div>
             <div className="summary-item">
-              <span className="summary-label">Valor estimado</span>
+              <span className="summary-label">Bloqueado em ordens RPC</span>
+              <strong className="summary-value">{moeda(Number(data.wallet.lockedBalance))} RPC</strong>
+            </div>
+            <div className="summary-item">
+              <span className="summary-label">Pendente de saque RPC</span>
+              <strong className="summary-value">{moeda(Number(data.wallet.pendingWithdrawalBalance))} RPC</strong>
+            </div>
+            <div className="summary-item">
+              <span className="summary-label">Valor estimado em tokens</span>
               <strong className="summary-value">{moeda(totalEstimado)} RPC</strong>
             </div>
             <div className="summary-item">
