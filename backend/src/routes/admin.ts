@@ -60,7 +60,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
 
-    if (!requireRole(reply, roles, ['COIN_CHIEF_ADMIN', 'SUPER_ADMIN'], 'Somente ADM Chefe da Moeda pode emitir moeda.')) {
+    if (!requireRole(reply, roles, ['COIN_CHIEF_ADMIN', 'SUPER_ADMIN'], 'Somente ADM Chefe da Moeda pode emitir RPC.')) {
       return;
     }
 
@@ -119,7 +119,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
 
-    if (!requireRole(reply, roles, ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN'], 'Sem permissão para enviar moeda a corretor.')) {
+    if (!requireRole(reply, roles, ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN'], 'Sem permissão para enviar RPC a corretor.')) {
       return;
     }
 
@@ -244,7 +244,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
 
-    if (!requireRole(reply, roles, ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN', 'AUDITOR'], 'Sem permissão para consultar receitas das empresas.')) {
+    if (!requireRole(reply, roles, ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN', 'AUDITOR'], 'Sem permissão para consultar receitas dos projetos/tokens.')) {
       return;
     }
 
@@ -277,7 +277,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
 
-    if (!requireRole(reply, roles, ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN', 'AUDITOR'], 'Sem permissão para histórico da moeda.')) {
+    if (!requireRole(reply, roles, ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN', 'AUDITOR'], 'Sem permissão para histórico de RPC.')) {
       return;
     }
 

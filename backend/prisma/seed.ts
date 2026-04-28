@@ -42,14 +42,17 @@ async function main() {
   const coinChiefRole = await prisma.role.findUniqueOrThrow({ where: { key: 'COIN_CHIEF_ADMIN' } });
   const brokerRole = await prisma.role.findUniqueOrThrow({ where: { key: 'VIRTUAL_BROKER' } });
 
-  const adminEmail = 'admin@bolsavirtual.local';
+  const adminEmailLegacy = 'admin@bolsavirtual.local';
+  const adminEmail = 'admin@rpc.exchange.local';
   const passwordHash = await bcrypt.hash('Admin1234!', 10);
+
+  const adminLegacy = await prisma.user.findUnique({ where: { email: adminEmailLegacy } });
 
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },
     update: {},
     create: {
-      name: 'Super Admin Inicial',
+      name: adminLegacy?.name ?? 'Super Admin Inicial',
       email: adminEmail,
       passwordHash,
       wallet: { create: {} },
@@ -71,13 +74,13 @@ async function main() {
     await prisma.treasuryAccount.create({ data: {} });
   }
 
-  // usuário base de demonstração
+  // usuário demo base (RPC Exchange)
   const userDemo = await prisma.user.upsert({
-    where: { email: 'jogador@bolsavirtual.local' },
+    where: { email: 'jogador@rpc.exchange.local' },
     update: {},
     create: {
       name: 'Jogador Demo',
-      email: 'jogador@bolsavirtual.local',
+      email: 'jogador@rpc.exchange.local',
       passwordHash: await bcrypt.hash('Jogador123!', 10),
       wallet: { create: {} },
     },
@@ -94,9 +97,9 @@ async function main() {
     where: { ticker: 'DEMO3' },
     update: {},
     create: {
-      name: 'Empresa Demo Fase 3',
+      name: 'Token Demo',
       ticker: 'DEMO3',
-      description: 'Empresa fictícia para validar oferta inicial de cotas.',
+      description: 'Projeto demo para validar lançamento inicial de tokens.',
       sector: 'Tecnologia',
       founderUserId: userDemo.id,
       status: 'ACTIVE',
@@ -145,11 +148,11 @@ async function main() {
   });
 
   const brokerDemo = await prisma.user.upsert({
-    where: { email: 'corretor@bolsavirtual.local' },
+    where: { email: 'corretor@rpc.exchange.local' },
     update: {},
     create: {
       name: 'Corretor Demo',
-      email: 'corretor@bolsavirtual.local',
+      email: 'corretor@rpc.exchange.local',
       passwordHash: await bcrypt.hash('Corretor123!', 10),
       wallet: { create: {} },
     },
