@@ -142,3 +142,8 @@ Objetivo da fase de PWA:
 - incluir `service worker`;
 - adicionar botão **"Instalar aplicativo"**;
 - manter escopo sem APK e sem publicação em Play Store nesta fase.
+
+## Atualização 2026-04-28 — Ferramentas administrativas avançadas
+- Rotas `/api/admin/users*` para gerenciamento de usuários, roles e bloqueio.
+- Rotas `/api/admin/tokens*` para criação manual de mercado, pausa, reativação, encerramento e exclusão segura.
+- Mercado CLOSED cancela ordens abertas com liberação de saldo/tokens bloqueados e bloqueia novas ordens.

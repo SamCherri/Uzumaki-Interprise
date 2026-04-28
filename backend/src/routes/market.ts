@@ -40,7 +40,12 @@ function statusFromRemaining(order: Pick<MarketOrder, 'quantity' | 'remainingQua
 async function getCompanyOrThrow(tx: Tx, companyId: string) {
   const company = await tx.company.findUnique({ where: { id: companyId } });
   if (!company) throw new Error('Projeto/token inexistente.');
-  if (company.status !== 'ACTIVE') throw new Error('Mercado suspenso ou indisponível para negociação.');
+  if (company.status !== 'ACTIVE') {
+    if (company.status === 'CLOSED') {
+      throw new Error('Este mercado foi encerrado e não aceita novas ordens.');
+    }
+    throw new Error('Mercado indisponível para negociação.');
+  }
   return company;
 }
 
@@ -54,6 +59,87 @@ async function ensureWallet(tx: Tx, userId: string) {
 
 async function getHolding(tx: Tx, userId: string, companyId: string) {
   return tx.companyHolding.findUnique({ where: { userId_companyId: { userId, companyId } } });
+}
+
+export async function cancelOrderWithRelease(
+  tx: Tx,
+  input: {
+    orderId: string;
+    canceledByUserId: string;
+    reason?: string;
+    ip?: string | null;
+    userAgent?: string | null;
+  },
+) {
+  const order = await tx.marketOrder.findUnique({ where: { id: input.orderId } });
+  if (!order) throw new Error('Ordem não encontrada.');
+  if (!['OPEN', 'PARTIALLY_FILLED'].includes(order.status)) return order;
+
+  if (order.type === 'BUY' && order.lockedCash.greaterThan(0)) {
+    const wallet = await ensureWallet(tx, order.userId);
+    await tx.wallet.update({
+      where: { id: wallet.id },
+      data: {
+        lockedBalance: wallet.lockedBalance.sub(order.lockedCash),
+        availableBalance: wallet.availableBalance.add(order.lockedCash),
+      },
+    });
+  }
+
+  if (order.type === 'SELL' && order.lockedShares > 0) {
+    const holding = await getHolding(tx, order.userId, order.companyId);
+    if (holding) {
+      await tx.companyHolding.update({
+        where: { id: holding.id },
+        data: { shares: holding.shares + order.lockedShares },
+      });
+    } else {
+      await tx.companyHolding.create({
+        data: {
+          userId: order.userId,
+          companyId: order.companyId,
+          shares: order.lockedShares,
+          averageBuyPrice: ZERO,
+          estimatedValue: ZERO,
+        },
+      });
+    }
+  }
+
+  const updated = await tx.marketOrder.update({
+    where: { id: order.id },
+    data: {
+      status: 'CANCELED',
+      canceledAt: new Date(),
+      lockedCash: ZERO,
+      lockedShares: 0,
+    },
+  });
+
+  await tx.companyOperation.create({
+    data: {
+      companyId: order.companyId,
+      userId: input.canceledByUserId,
+      type: 'MARKET_ORDER_CANCEL',
+      quantity: order.remainingQuantity,
+      unitPrice: order.limitPrice,
+      description: `Ordem ${order.id} cancelada`,
+    },
+  });
+
+  await tx.adminLog.create({
+    data: {
+      userId: input.canceledByUserId,
+      action: 'MARKET_ORDER_CANCEL',
+      entity: 'MarketOrder',
+      reason: input.reason ?? `Cancelamento da ordem ${order.id}`,
+      current: JSON.stringify({ orderId: order.id }),
+      ip: input.ip ?? null,
+      userAgent: input.userAgent ?? null,
+    },
+  });
+
+  return updated;
 }
 
 async function addSharesToBuyer(
@@ -507,72 +593,13 @@ export async function marketRoutes(app: FastifyInstance) {
         if (!order) throw new Error('Ordem não encontrada.');
         if (order.userId !== authRequest.user.sub) throw new Error('Sem permissão para cancelar esta ordem.');
         if (!['OPEN', 'PARTIALLY_FILLED'].includes(order.status)) throw new Error('Somente ordens abertas podem ser canceladas.');
-
-        if (order.type === 'BUY' && order.lockedCash.greaterThan(0)) {
-          const wallet = await ensureWallet(tx, authRequest.user.sub);
-          await tx.wallet.update({
-            where: { id: wallet.id },
-            data: {
-              lockedBalance: wallet.lockedBalance.sub(order.lockedCash),
-              availableBalance: wallet.availableBalance.add(order.lockedCash),
-            },
-          });
-        }
-
-        if (order.type === 'SELL' && order.lockedShares > 0) {
-          const holding = await getHolding(tx, authRequest.user.sub, order.companyId);
-          if (holding) {
-            await tx.companyHolding.update({
-              where: { id: holding.id },
-              data: { shares: holding.shares + order.lockedShares },
-            });
-          } else {
-            await tx.companyHolding.create({
-              data: {
-                userId: authRequest.user.sub,
-                companyId: order.companyId,
-                shares: order.lockedShares,
-                averageBuyPrice: ZERO,
-                estimatedValue: ZERO,
-              },
-            });
-          }
-        }
-
-        const updated = await tx.marketOrder.update({
-          where: { id: order.id },
-          data: {
-            status: 'CANCELED',
-            canceledAt: new Date(),
-            lockedCash: ZERO,
-            lockedShares: 0,
-          },
+        return cancelOrderWithRelease(tx, {
+          orderId: order.id,
+          canceledByUserId: authRequest.user.sub,
+          reason: `Cancelamento da ordem ${order.id}`,
+          ip: request.ip,
+          userAgent: request.headers['user-agent'] ?? null,
         });
-
-        await tx.companyOperation.create({
-          data: {
-            companyId: order.companyId,
-            userId: authRequest.user.sub,
-            type: 'MARKET_ORDER_CANCEL',
-            quantity: order.remainingQuantity,
-            unitPrice: order.limitPrice,
-            description: `Ordem ${order.id} cancelada`,
-          },
-        });
-
-        await tx.adminLog.create({
-          data: {
-            userId: authRequest.user.sub,
-            action: 'MARKET_ORDER_CANCEL',
-            entity: 'MarketOrder',
-            reason: `Cancelamento da ordem ${order.id}`,
-            current: JSON.stringify({ orderId: order.id }),
-            ip: request.ip,
-            userAgent: request.headers['user-agent'] ?? null,
-          },
-        });
-
-        return updated;
       });
 
       return { order: canceled };

@@ -95,3 +95,8 @@ Toda PR visual deve respeitar:
 - A plataforma hospeda o mercado e controla negociações, sem criar tokens próprios negociáveis.
 - Cada listagem aprovada gera mercado no formato **TICKER/RPC**.
 - Evitar pares fixos/oficiais no texto (não usar UZBK/RPC, SAMU/RPC ou POLI/RPC como padrão do produto).
+
+## Diretriz complementar — administração avançada
+- Priorizar encerramento de mercado (CLOSED) ao invés de hard delete quando houver histórico econômico.
+- Permitir criação manual de token pelo admin para eventos/correções/testes RP.
+- Garantir que toda ação administrativa gere trilha de auditoria em `AdminLog`.

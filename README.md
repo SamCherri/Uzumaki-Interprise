@@ -267,3 +267,11 @@ npm run prisma:seed
 - Não commitar `.env` real com segredos.
 - Em produção, preferir variáveis no painel do Railway.
 - Se `npm install` falhar por bloqueio externo (ex.: erro 403 de registry), registrar o incidente na PR.
+
+## Admin avançado (RPC Exchange)
+- Novo painel admin em abas: Visão geral, Usuários, Corretores, Tokens/Mercados, Saques, Tesouraria, Receitas e Logs.
+- Gestão de usuários: busca, bloqueio/desbloqueio e edição de roles (USER, VIRTUAL_BROKER, BUSINESS_OWNER, ADMIN e SUPER_ADMIN com proteção).
+- Gestão de mercados: criação manual de token, troca de responsável, pausar, reativar, encerrar e exclusão definitiva segura.
+- Encerramento é o fluxo recomendado para mercados com histórico econômico.
+- Exclusão definitiva só é permitida sem histórico econômico.
+- Todas as ações administrativas geram AdminLog.
