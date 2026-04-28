@@ -80,11 +80,19 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
           throw new Error('Saldo disponível insuficiente para saque.');
         }
 
-        const nextAvailable = wallet.availableBalance.sub(amount);
-        const nextPending = wallet.pendingWithdrawalBalance.add(amount);
+        const walletMutation = await tx.wallet.updateMany({
+          where: {
+            id: wallet.id,
+            availableBalance: { gte: amount },
+          },
+          data: {
+            availableBalance: { decrement: amount },
+            pendingWithdrawalBalance: { increment: amount },
+          },
+        });
 
-        if (nextAvailable.lessThan(0) || nextPending.lessThan(0)) {
-          throw new Error('Operação inválida de saldo para saque.');
+        if (walletMutation.count !== 1) {
+          throw new Error('Saldo disponível insuficiente para saque.');
         }
 
         const code = await generateWithdrawalCode(tx);
@@ -99,13 +107,7 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
           },
         });
 
-        await tx.wallet.update({
-          where: { id: wallet.id },
-          data: {
-            availableBalance: nextAvailable,
-            pendingWithdrawalBalance: nextPending,
-          },
-        });
+        const updatedWallet = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
 
         await createWalletTransaction(tx, wallet.id, 'WITHDRAWAL_LOCK', amount, 'RPC bloqueado para saque');
 
@@ -121,8 +123,8 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
             }),
             current: JSON.stringify({
               code,
-              availableBalance: nextAvailable.toString(),
-              pendingWithdrawalBalance: nextPending.toString(),
+              availableBalance: updatedWallet.availableBalance.toString(),
+              pendingWithdrawalBalance: updatedWallet.pendingWithdrawalBalance.toString(),
               amount: amount.toString(),
             }),
             ip: request.ip,
@@ -310,23 +312,13 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
       const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const withdrawal = await tx.withdrawalRequest.findUnique({ where: { id: params.id } });
         if (!withdrawal) throw new Error('Saque não encontrado.');
-        if (!['PENDING', 'PROCESSING'].includes(withdrawal.status)) {
-          throw new Error('Somente saque pendente ou em processamento pode ser concluído.');
-        }
 
         const wallet = await tx.wallet.findUniqueOrThrow({ where: { userId: withdrawal.userId } });
-        const nextPending = wallet.pendingWithdrawalBalance.sub(withdrawal.amount);
-        if (nextPending.lessThan(0)) {
-          throw new Error('Saldo pendente insuficiente para concluir saque.');
-        }
-
-        await tx.wallet.update({
-          where: { id: wallet.id },
-          data: { pendingWithdrawalBalance: nextPending },
-        });
-
-        const next = await tx.withdrawalRequest.update({
-          where: { id: withdrawal.id },
+        const transition = await tx.withdrawalRequest.updateMany({
+          where: {
+            id: withdrawal.id,
+            status: { in: ['PENDING', 'PROCESSING'] },
+          },
           data: {
             status: 'COMPLETED',
             completedAt: new Date(),
@@ -334,6 +326,25 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
             adminNote: body.adminNote?.trim() || null,
           },
         });
+
+        if (transition.count !== 1) {
+          throw new Error('Somente saque pendente ou em processamento pode ser concluído.');
+        }
+
+        const walletMutation = await tx.wallet.updateMany({
+          where: {
+            id: wallet.id,
+            pendingWithdrawalBalance: { gte: withdrawal.amount },
+          },
+          data: { pendingWithdrawalBalance: { decrement: withdrawal.amount } },
+        });
+
+        if (walletMutation.count !== 1) {
+          throw new Error('Saldo pendente insuficiente para concluir saque.');
+        }
+
+        const updatedWallet = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+        const next = await tx.withdrawalRequest.findUniqueOrThrow({ where: { id: withdrawal.id } });
 
         await createWalletTransaction(tx, wallet.id, 'WITHDRAWAL_COMPLETED', withdrawal.amount, 'Saque concluído');
 
@@ -344,7 +355,7 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
             entity: 'WithdrawalRequest',
             reason: body.adminNote ?? 'Saque concluído no painel administrativo.',
             previous: JSON.stringify({ status: withdrawal.status, pendingWithdrawalBalance: wallet.pendingWithdrawalBalance.toString() }),
-            current: JSON.stringify({ status: next.status, pendingWithdrawalBalance: nextPending.toString() }),
+            current: JSON.stringify({ status: next.status, pendingWithdrawalBalance: updatedWallet.pendingWithdrawalBalance.toString() }),
             ip: request.ip,
             userAgent: request.headers['user-agent'] ?? null,
           },
@@ -374,28 +385,13 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
       const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const withdrawal = await tx.withdrawalRequest.findUnique({ where: { id: params.id } });
         if (!withdrawal) throw new Error('Saque não encontrado.');
-        if (!['PENDING', 'PROCESSING'].includes(withdrawal.status)) {
-          throw new Error('Somente saque pendente ou em processamento pode ser rejeitado.');
-        }
 
         const wallet = await tx.wallet.findUniqueOrThrow({ where: { userId: withdrawal.userId } });
-        const nextPending = wallet.pendingWithdrawalBalance.sub(withdrawal.amount);
-        const nextAvailable = wallet.availableBalance.add(withdrawal.amount);
-
-        if (nextPending.lessThan(0) || nextAvailable.lessThan(0)) {
-          throw new Error('Operação inválida de saldo ao rejeitar saque.');
-        }
-
-        await tx.wallet.update({
-          where: { id: wallet.id },
-          data: {
-            pendingWithdrawalBalance: nextPending,
-            availableBalance: nextAvailable,
+        const transition = await tx.withdrawalRequest.updateMany({
+          where: {
+            id: withdrawal.id,
+            status: { in: ['PENDING', 'PROCESSING'] },
           },
-        });
-
-        const next = await tx.withdrawalRequest.update({
-          where: { id: withdrawal.id },
           data: {
             status: 'REJECTED',
             rejectedAt: new Date(),
@@ -403,6 +399,28 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
             adminNote: body.adminNote?.trim() || null,
           },
         });
+
+        if (transition.count !== 1) {
+          throw new Error('Somente saque pendente ou em processamento pode ser rejeitado.');
+        }
+
+        const walletMutation = await tx.wallet.updateMany({
+          where: {
+            id: wallet.id,
+            pendingWithdrawalBalance: { gte: withdrawal.amount },
+          },
+          data: {
+            pendingWithdrawalBalance: { decrement: withdrawal.amount },
+            availableBalance: { increment: withdrawal.amount },
+          },
+        });
+
+        if (walletMutation.count !== 1) {
+          throw new Error('Operação inválida de saldo ao rejeitar saque.');
+        }
+
+        const updatedWallet = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+        const next = await tx.withdrawalRequest.findUniqueOrThrow({ where: { id: withdrawal.id } });
 
         await createWalletTransaction(tx, wallet.id, 'WITHDRAWAL_REJECTED', withdrawal.amount, 'Saque rejeitado');
 
@@ -419,8 +437,8 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
             }),
             current: JSON.stringify({
               status: next.status,
-              availableBalance: nextAvailable.toString(),
-              pendingWithdrawalBalance: nextPending.toString(),
+              availableBalance: updatedWallet.availableBalance.toString(),
+              pendingWithdrawalBalance: updatedWallet.pendingWithdrawalBalance.toString(),
             }),
             ip: request.ip,
             userAgent: request.headers['user-agent'] ?? null,
