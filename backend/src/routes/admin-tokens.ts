@@ -98,7 +98,8 @@ export async function adminTokensRoutes(app: FastifyInstance) {
 
     try {
       const body = z.object({
-        founderUserId: z.string().min(1),
+        founderEmail: z.string().email().optional(),
+        founderUserId: z.string().min(1).optional(),
         name: z.string().min(3),
         ticker: z.string().min(2).max(10),
         description: z.string().min(5),
@@ -116,14 +117,19 @@ export async function adminTokensRoutes(app: FastifyInstance) {
         throw new Error('Percentuais do criador e lançamento devem somar 100%.');
       }
 
-      const [tickerExists, founder, ownerRole] = await Promise.all([
+      const normalizedFounderEmail = body.founderEmail?.trim().toLowerCase();
+      const founder = normalizedFounderEmail
+        ? await prisma.user.findUnique({ where: { email: normalizedFounderEmail } })
+        : (body.founderUserId ? await prisma.user.findUnique({ where: { id: body.founderUserId } }) : null);
+      const founderUserId = founder?.id ?? body.founderUserId;
+
+      const [tickerExists, ownerRole] = await Promise.all([
         prisma.company.findUnique({ where: { ticker } }),
-        prisma.user.findUnique({ where: { id: body.founderUserId } }),
         prisma.role.findUnique({ where: { key: 'BUSINESS_OWNER' } }),
       ]);
 
       if (tickerExists) return reply.code(409).send({ message: 'Ticker já está em uso.' });
-      if (!founder) return reply.code(404).send({ message: 'Usuário dono do projeto não encontrado.' });
+      if (!founder || !founderUserId) return reply.code(404).send({ message: 'Usuário dono do projeto não encontrado pelo e-mail informado.' });
       if (!ownerRole) return reply.code(400).send({ message: 'Role BUSINESS_OWNER não encontrada.' });
 
       const initialPrice = new Decimal(body.initialPrice);
@@ -136,7 +142,7 @@ export async function adminTokensRoutes(app: FastifyInstance) {
             ticker,
             description: body.description.trim(),
             sector: body.sector.trim(),
-            founderUserId: body.founderUserId,
+            founderUserId,
             status: 'ACTIVE',
             totalShares: body.totalTokens,
             circulatingShares: 0,
@@ -155,14 +161,14 @@ export async function adminTokensRoutes(app: FastifyInstance) {
         });
 
         await tx.companyHolding.upsert({
-          where: { userId_companyId: { userId: body.founderUserId, companyId: created.id } },
+          where: { userId_companyId: { userId: founderUserId, companyId: created.id } },
           update: {
             shares: ownerShares,
             averageBuyPrice: initialPrice,
             estimatedValue: initialPrice.mul(ownerShares),
           },
           create: {
-            userId: body.founderUserId,
+            userId: founderUserId,
             companyId: created.id,
             shares: ownerShares,
             averageBuyPrice: initialPrice,
@@ -181,9 +187,9 @@ export async function adminTokensRoutes(app: FastifyInstance) {
         await tx.companyRevenueAccount.create({ data: { companyId: created.id } });
 
         await tx.userRole.upsert({
-          where: { userId_roleId: { userId: body.founderUserId, roleId: ownerRole.id } },
+          where: { userId_roleId: { userId: founderUserId, roleId: ownerRole.id } },
           update: {},
-          create: { userId: body.founderUserId, roleId: ownerRole.id },
+          create: { userId: founderUserId, roleId: ownerRole.id },
         });
 
         await tx.companyOperation.create({
@@ -204,6 +210,7 @@ export async function adminTokensRoutes(app: FastifyInstance) {
             current: JSON.stringify({
               ticker: created.ticker,
               founderUserId: created.founderUserId,
+              founderEmail: founder.email,
               totalTokens: created.totalShares,
             }),
             ip: request.ip,
@@ -227,24 +234,28 @@ export async function adminTokensRoutes(app: FastifyInstance) {
 
     try {
       const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
-      const body = z.object({ founderUserId: z.string().min(1), reason: z.string().min(2) }).parse(request.body);
+      const body = z.object({ founderEmail: z.string().email().optional(), founderUserId: z.string().min(1).optional(), reason: z.string().min(2) }).parse(request.body);
 
-      const [company, ownerRole, nextOwner] = await Promise.all([
+      const normalizedFounderEmail = body.founderEmail?.trim().toLowerCase();
+      const nextOwner = normalizedFounderEmail
+        ? await prisma.user.findUnique({ where: { email: normalizedFounderEmail } })
+        : (body.founderUserId ? await prisma.user.findUnique({ where: { id: body.founderUserId } }) : null);
+
+      const [company, ownerRole] = await Promise.all([
         prisma.company.findUnique({ where: { id } }),
         prisma.role.findUnique({ where: { key: 'BUSINESS_OWNER' } }),
-        prisma.user.findUnique({ where: { id: body.founderUserId } }),
       ]);
 
       if (!company) return reply.code(404).send({ message: 'Mercado não encontrado.' });
       if (!ownerRole) return reply.code(400).send({ message: 'Role BUSINESS_OWNER não encontrada.' });
-      if (!nextOwner) return reply.code(404).send({ message: 'Novo dono não encontrado.' });
+      if (!nextOwner) return reply.code(404).send({ message: 'Novo dono não encontrado pelo e-mail informado.' });
 
       await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-        await tx.company.update({ where: { id }, data: { founderUserId: body.founderUserId } });
+        await tx.company.update({ where: { id }, data: { founderUserId: nextOwner.id } });
         await tx.userRole.upsert({
-          where: { userId_roleId: { userId: body.founderUserId, roleId: ownerRole.id } },
+          where: { userId_roleId: { userId: nextOwner.id, roleId: ownerRole.id } },
           update: {},
-          create: { userId: body.founderUserId, roleId: ownerRole.id },
+          create: { userId: nextOwner.id, roleId: ownerRole.id },
         });
 
         await tx.adminLog.create({
@@ -254,7 +265,7 @@ export async function adminTokensRoutes(app: FastifyInstance) {
             entity: `Company:${company.id}`,
             reason: body.reason,
             previous: JSON.stringify({ founderUserId: company.founderUserId }),
-            current: JSON.stringify({ founderUserId: body.founderUserId }),
+            current: JSON.stringify({ founderUserId: nextOwner.id, founderEmail: nextOwner.email }),
             ip: request.ip,
             userAgent: request.headers['user-agent'] ?? null,
           },

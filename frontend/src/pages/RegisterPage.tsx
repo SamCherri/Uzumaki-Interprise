@@ -18,10 +18,11 @@ export function RegisterPage({ onSwitchLogin }: RegisterPageProps) {
         method: 'POST',
         body: JSON.stringify({ name, email, password }),
       });
-      setMessage('Conta criada com sucesso. Faça login para continuar.');
+      setMessage('Conta criada com sucesso. Entre com o e-mail cadastrado.');
       setName('');
       setEmail('');
       setPassword('');
+      if (onSwitchLogin) onSwitchLogin();
     } catch (error) {
       setMessage((error as Error).message);
     }
