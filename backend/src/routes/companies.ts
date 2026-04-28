@@ -123,7 +123,7 @@ export async function companyRoutes(app: FastifyInstance) {
 
   app.get('/companies', { preHandler: [app.authenticate] }, async () => {
     const companies = await prisma.company.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: { in: ['ACTIVE', 'SUSPENDED'] } },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -131,6 +131,8 @@ export async function companyRoutes(app: FastifyInstance) {
         ticker: true,
         sector: true,
         initialPrice: true,
+        currentPrice: true,
+        status: true,
         availableOfferShares: true,
         totalShares: true,
         ownerSharePercent: true,
@@ -154,8 +156,8 @@ export async function companyRoutes(app: FastifyInstance) {
       },
     });
 
-    if (!company || company.status !== 'ACTIVE') {
-      return reply.code(404).send({ message: 'Projeto/token não encontrado ou indisponível para negociação.' });
+    if (!company || !['ACTIVE', 'SUSPENDED'].includes(company.status)) {
+      return reply.code(404).send({ message: 'Projeto/token não encontrado na lista pública.' });
     }
 
     return { company };

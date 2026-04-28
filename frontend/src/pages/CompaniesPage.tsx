@@ -15,6 +15,7 @@ type Company = {
   publicOfferPercent: string;
   buyFeePercent: string;
   sellFeePercent: string;
+  status: 'ACTIVE' | 'SUSPENDED';
 };
 
 type Holding = { companyId: string; quantity: number };
@@ -104,8 +105,8 @@ export function CompaniesPage() {
   const [message, setMessage] = useState('');
 
   async function loadCompanies() {
-    const response = await api<{ companies: Omit<Company, 'description' | 'currentPrice'>[] }>('/companies');
-    setCompanies(response.companies.map((item) => ({ ...item, description: '', currentPrice: item.initialPrice })));
+    const response = await api<{ companies: Omit<Company, 'description'>[] }>('/companies');
+    setCompanies(response.companies.map((item) => ({ ...item, description: '' })));
   }
 
   async function loadWalletAndHolding(companyId?: string) {
@@ -130,9 +131,14 @@ export function CompaniesPage() {
     setTrades(lastTrades.trades);
   }
 
+  async function loadTradesOnly(companyId: string) {
+    const lastTrades = await api<{ trades: Trade[] }>(`/market/companies/${companyId}/trades`);
+    setTrades(lastTrades.trades);
+  }
+
   async function refreshSelected(companyId?: string) {
     if (!companyId) return;
-    await Promise.all([loadCompanyDetails(companyId), loadWalletAndHolding(companyId), loadMarket(companyId)]);
+    await Promise.all([loadCompanyDetails(companyId), loadWalletAndHolding(companyId)]);
   }
 
   useEffect(() => {
@@ -145,6 +151,19 @@ export function CompaniesPage() {
       }
     })();
   }, []);
+
+
+  useEffect(() => {
+    if (!selected) return;
+    if (selected.status === 'SUSPENDED') {
+      setBook({ buyOrders: [], sellOrders: [] });
+      setMyOrders([]);
+      loadTradesOnly(selected.id).catch((err) => setError((err as Error).message));
+      return;
+    }
+
+    loadMarket(selected.id).catch((err) => setError((err as Error).message));
+  }, [selected?.id, selected?.status]);
 
   async function selectCompany(id: string) {
     try {
@@ -162,6 +181,7 @@ export function CompaniesPage() {
     event.preventDefault();
     if (!selected) return;
     try {
+      if (selected.status !== 'ACTIVE') throw new Error('Mercado pausado. Não é possível comprar no lançamento inicial.');
       await api(`/companies/${selected.id}/buy-initial-offer`, { method: 'POST', body: JSON.stringify({ quantity: Number(initialQty) }) });
       setInitialQty('');
       setMessage('Compra de tokens concluída com sucesso.');
@@ -176,6 +196,7 @@ export function CompaniesPage() {
     event.preventDefault();
     if (!selected) return;
     try {
+      if (selected.status !== 'ACTIVE') throw new Error('Mercado pausado. Não é possível criar ordens.');
       await api('/market/orders', {
         method: 'POST',
         body: JSON.stringify({ companyId: selected.id, type, mode: 'LIMIT', quantity: Number(limitQty), limitPrice: Number(limitPrice) }),
@@ -195,6 +216,7 @@ export function CompaniesPage() {
     const quantity = Number(type === 'BUY' ? marketBuyQty : marketSellQty);
     const slippagePercent = Number(type === 'BUY' ? marketBuySlip : marketSellSlip);
     try {
+      if (selected.status !== 'ACTIVE') throw new Error('Mercado pausado. Não é possível negociar agora.');
       await api(`/market/companies/${selected.id}/${type === 'BUY' ? 'buy-market' : 'sell-market'}`, {
         method: 'POST',
         body: JSON.stringify({ quantity, slippagePercent }),
@@ -246,7 +268,8 @@ export function CompaniesPage() {
                 <p className="info-text">Projeto/token criado por usuário • Categoria: {company.sector}</p>
                 <p className="price-highlight">Preço atual em RPC: {moeda(Number(company.currentPrice || company.initialPrice))} RPC</p>
                 <p className="info-text">Tokens disponíveis: {company.availableOfferShares.toLocaleString('pt-BR')}</p>
-                <button className="button-primary" onClick={() => selectCompany(company.id)}>Negociar</button>
+                {company.status === 'SUSPENDED' && <p className="warning">Pausado</p>}
+                <button className="button-primary" onClick={() => selectCompany(company.id)}>{company.status === 'ACTIVE' ? 'Negociar' : 'Ver mercado'}</button>
               </li>
             ))}
           </ul>
@@ -266,9 +289,10 @@ export function CompaniesPage() {
               <div className="summary-item"><span className="summary-label">Meus tokens</span><strong className="summary-value">{holdingQty}</strong></div>
               <div className="summary-item"><span className="summary-label">Saldo disponível</span><strong className="summary-value">{moeda(walletBalance)} RPC</strong></div>
             </div>
+            {selected.status === 'SUSPENDED' && <p className="status-message error">Mercado pausado. Negociação temporariamente indisponível.</p>}
             <div className="trade-main-actions">
-              <button className="button-success" onClick={() => { setTradeFlow('buy'); setBuyMode('initial'); }}>Comprar</button>
-              <button className="button-danger" onClick={() => { setTradeFlow('sell'); setSellMode('limit'); }}>Vender</button>
+              <button className="button-success" disabled={selected.status !== 'ACTIVE'} onClick={() => { setTradeFlow('buy'); setBuyMode('initial'); }}>Comprar</button>
+              <button className="button-danger" disabled={selected.status !== 'ACTIVE'} onClick={() => { setTradeFlow('sell'); setSellMode('limit'); }}>Vender</button>
             </div>
           </header>
 
