@@ -131,6 +131,11 @@ export function CompaniesPage() {
     setTrades(lastTrades.trades);
   }
 
+  async function loadTradesOnly(companyId: string) {
+    const lastTrades = await api<{ trades: Trade[] }>(`/market/companies/${companyId}/trades`);
+    setTrades(lastTrades.trades);
+  }
+
   async function refreshSelected(companyId?: string) {
     if (!companyId) return;
     await Promise.all([loadCompanyDetails(companyId), loadWalletAndHolding(companyId)]);
@@ -153,7 +158,7 @@ export function CompaniesPage() {
     if (selected.status === 'SUSPENDED') {
       setBook({ buyOrders: [], sellOrders: [] });
       setMyOrders([]);
-      setTrades([]);
+      loadTradesOnly(selected.id).catch((err) => setError((err as Error).message));
       return;
     }
 
