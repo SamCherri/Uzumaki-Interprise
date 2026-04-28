@@ -1,6 +1,6 @@
 # AUDITORIA_ATUAL
 
-Auditoria consolidada do estado atual da **Uzumaki Exchange**, mantendo o projeto existente (sem recriação do zero).
+Auditoria consolidada do estado atual da **RPC Exchange**, mantendo o projeto existente (sem recriação do zero).
 
 ## 1) Implementado
 
@@ -20,6 +20,10 @@ Auditoria consolidada do estado atual da **Uzumaki Exchange**, mantendo o projet
 - ⚠️ carteira da empresa (visão administrativa expandida);
 - ⚠️ distribuição de taxas com painel/configuração avançada.
 
-## 3) Próxima PR recomendada
+## 3) Próximos passos recomendados
 
-- `ui: converter interface para Uzumaki Exchange com pares RPC`.
+- revisar frontend para remover nomenclaturas antigas e fixar o nome **RPC Exchange**;
+- revisar tela de criação para usar "Criar token" e "Solicitar listagem";
+- revisar mercados para reforçar pares dinâmicos `TICKER/RPC` e evitar pares fixos/oficiais;
+- revisar painel admin para linguagem de moderação ("aprovar listagem", "rejeitar listagem", "suspender mercado");
+- validar que admin não aparece como criador de token/projeto.

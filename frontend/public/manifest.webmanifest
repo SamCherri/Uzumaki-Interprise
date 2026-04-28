@@ -1,7 +1,7 @@
 {
-  "name": "Uzumaki Exchange",
-  "short_name": "Uzumaki",
-  "description": "Plataforma de simulação econômica com mercados e tokens.",
+  "name": "RPC Exchange",
+  "short_name": "RPCX",
+  "description": "Plataforma de simulação econômica com tokens criados por usuários e mercados em RPC.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

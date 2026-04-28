@@ -1,4 +1,4 @@
-# PROJETO: UZUMAKI EXCHANGE (SIMULAÇÃO ECONÔMICA)
+# PROJETO: RPC EXCHANGE (SIMULAÇÃO ECONÔMICA)
 
 ## 1. Visão geral
 
@@ -7,6 +7,13 @@ Criar um site de simulação econômica onde jogadores podem criar projetos, emi
 O sistema deve funcionar como um jogo de economia, com login, carteira, RPC, projetos criados por jogadores, compra e venda de tokens, gráfico de preço, livro de ofertas, painel administrativo, corretores virtuais e auditoria completa.
 
 Não deve existir dinheiro real, saque real, promessa de lucro real ou investimento real.
+
+Regra permanente:
+- a plataforma não cria tokens/projetos próprios negociáveis;
+- usuários criam tokens/projetos e solicitam listagem;
+- admin apenas modera listagens (aprovar, rejeitar, pausar/suspender);
+- cada listagem aprovada gera mercado no formato TICKER/RPC;
+- RPC é a moeda base operacional da plataforma (não é token criado por usuário).
 
 ## 2. Objetivo do sistema
 
@@ -767,13 +774,11 @@ Antes de codar funcionalidades complexas:
 7. Criar carteira.
 8. Criar painel inicial.
 
-## 34. Nome provisório do projeto
+## 34. Nome do projeto
 
-Nome provisório:
+Nome oficial:
 
-Bolsa Virtual RP
-
-Pode ser alterado depois.
+RPC Exchange
 
 ## 16. Status da Fase 2 (implementada)
 

@@ -1,4 +1,4 @@
-# Diretrizes de Produto — Uzumaki Exchange
+# Diretrizes de Produto — RPC Exchange
 
 ## 1. Posicionamento
 - O produto deve parecer uma exchange moderna de tokens.
@@ -14,7 +14,7 @@
 
 ## 3. Linguagem do app
 Usar:
-- Uzumaki Exchange
+- RPC Exchange
 - Mercados
 - Tokens
 - Ativos
@@ -25,7 +25,7 @@ Usar:
 - Histórico
 - Livro de ofertas
 - RPC
-- Pares como UZBK/RPC
+- Pares como TOKEN/RPC, ABC/RPC e XYZ/RPC (dinâmicos)
 
 Evitar na interface principal logada:
 - fictício em todo card;
@@ -40,7 +40,8 @@ Evitar na interface principal logada:
 - Exemplo:
   - Saldo: 10.000 RPC
   - Preço: 1,25 RPC
-  - Par: UZBK/RPC
+  - Total: 500 RPC
+  - Par: TOKEN/RPC
 
 ## 5. Tela pública
 A tela pública deve deixar claro:
@@ -80,3 +81,12 @@ Toda PR visual deve respeitar:
 - linguagem simples;
 - tela de ativo focada;
 - menos informação por tela.
+
+## 9. Regra permanente — Tokens/projetos são criados por usuários
+
+- Usuários criam projetos/tokens e solicitam listagem.
+- O token só entra no mercado depois da aprovação.
+- O admin não cria tokens: admin apenas aprova, rejeita, pausa ou suspende listagens.
+- A plataforma hospeda o mercado e controla negociações, sem criar tokens próprios negociáveis.
+- Cada listagem aprovada gera mercado no formato **TICKER/RPC**.
+- Evitar pares fixos/oficiais no texto (não usar UZBK/RPC, SAMU/RPC ou POLI/RPC como padrão do produto).

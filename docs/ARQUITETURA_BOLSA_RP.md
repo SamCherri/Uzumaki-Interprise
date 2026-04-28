@@ -1,8 +1,8 @@
-# ARQUITETURA_UZUMAKI_EXCHANGE
+# ARQUITETURA_RPC_EXCHANGE
 
 ## 1) Visão geral
 
-A **Uzumaki Exchange** é uma plataforma de **simulação econômica** com experiência visual de exchange de tokens entre usuários, mantendo escopo totalmente fictício/simulado.
+A **RPC Exchange** é uma plataforma de **simulação econômica** com experiência visual de exchange de tokens entre usuários, mantendo escopo totalmente fictício/simulado.
 
 Escopo obrigatório da simulação:
 - sem dinheiro real;
@@ -61,12 +61,19 @@ Todo o funcionamento é interno à plataforma e serve apenas para experiência d
 1. Admin cria moeda de simulação (RPC) na tesouraria.
 2. Admin envia moeda para corretor.
 3. Corretor envia moeda para usuário.
-4. Usuário compra tokens (com taxa de compra).
-5. Usuário cria ordens de compra/venda (com taxas de trade).
-6. Matching engine executa ordens/trades compatíveis.
-7. Toda taxa cobrada é distribuída em 50% plataforma e 50% empresa.
-8. Carteiras/holdings são atualizadas.
-9. Logs e registros operacionais são armazenados (`Transaction`, `CompanyOperation`, `AdminLog`, `FeeDistribution`).
+4. Usuário cria projeto/token e solicita listagem.
+5. Admin aprova, rejeita, pausa ou suspende listagens (moderação).
+6. Aprovado, o sistema cria mercado no formato **TICKER/RPC**.
+7. Usuários negociam tokens no mercado (oferta inicial e mercado secundário).
+8. Usuário cria ordens de compra/venda (com taxas de trade).
+9. Matching engine executa ordens/trades compatíveis.
+10. Toda taxa cobrada é distribuída em 50% plataforma e 50% projeto.
+11. Carteiras/holdings são atualizadas.
+12. Logs e registros operacionais são armazenados (`Transaction`, `CompanyOperation`, `AdminLog`, `FeeDistribution`).
+
+Regra estrutural:
+- A plataforma não cria tokens/projetos próprios negociáveis.
+- RPC é moeda base operacional e não token criado por usuário.
 
 ---
 
@@ -128,4 +135,3 @@ Objetivo da fase de PWA:
 - incluir `service worker`;
 - adicionar botão **"Instalar aplicativo"**;
 - manter escopo sem APK e sem publicação em Play Store nesta fase.
-
