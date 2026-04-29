@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../services/api';
-import { formatCurrency, formatPrice } from '../utils/formatters';
+import { formatCurrency, formatPercent, formatPrice, formatSignedPrice } from '../utils/formatters';
 
 type Company = {
   id: string;
@@ -43,38 +43,51 @@ type ChartData = {
   points: Array<{ x: number; y: number; price: number }>;
   minPrice: number;
   maxPrice: number;
+  initialPrice: number;
+  currentPrice: number;
+  variationAbsolute: number;
+  variationPercent: number;
   lastPrice: number;
   note: string;
 };
 
-function normalizeChartData(trades: Trade[], fallbackPrice: number): ChartData {
+function normalizeChartData(trades: Trade[], initialPrice: number, currentPrice: number): ChartData {
   const ordered = [...trades].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   const prices = ordered.map((trade) => Number(trade.unitPrice)).filter((price) => Number.isFinite(price) && price > 0);
 
-  let note = '';
-  let series: number[];
+  const safeInitialPrice = Number.isFinite(initialPrice) && initialPrice > 0 ? initialPrice : 1;
+  const safeCurrentPrice = Number.isFinite(currentPrice) && currentPrice > 0 ? currentPrice : safeInitialPrice;
+  const series: number[] = [safeInitialPrice, ...prices];
+  const lastSeriesPrice = series[series.length - 1];
 
-  if (prices.length === 0) {
-    series = [fallbackPrice, fallbackPrice];
-    note = 'Ainda sem negociações. Exibindo preço inicial como referência.';
-  } else if (prices.length === 1) {
-    series = [prices[0], prices[0]];
-    note = 'Ainda há poucas negociações para formar histórico completo.';
-  } else {
-    series = prices;
+  if (lastSeriesPrice !== safeCurrentPrice) {
+    series.push(safeCurrentPrice);
   }
+
+  const note =
+    trades.length === 0
+      ? 'Ainda sem trades. O gráfico usa preço inicial e preço atual como referência.'
+      : 'Compras no lançamento, trades executados e impulsões podem alterar o preço atual.';
 
   const minPrice = Math.min(...series);
   const maxPrice = Math.max(...series);
-  const allSame = minPrice === maxPrice;
+  const range = maxPrice - minPrice;
+  const hasRange = range !== 0;
+  const padding = hasRange ? range * 0.15 : 0;
+  const chartMin = minPrice - padding;
+  const chartMax = maxPrice + padding;
+  const chartRange = chartMax - chartMin;
+
+  const variationAbsolute = safeCurrentPrice - safeInitialPrice;
+  const variationPercent = safeInitialPrice === 0 ? 0 : (variationAbsolute / safeInitialPrice) * 100;
 
   const points = series.map((price, index) => ({
     x: series.length === 1 ? 0 : (index / (series.length - 1)) * 100,
-    y: allSame ? 50 : 100 - ((price - minPrice) / (maxPrice - minPrice)) * 100,
+    y: !hasRange || chartRange === 0 ? 50 : 100 - ((price - chartMin) / chartRange) * 100,
     price,
   }));
 
-  return { points, minPrice, maxPrice, lastPrice: series[series.length - 1], note };
+  return { points, minPrice, maxPrice, initialPrice: safeInitialPrice, currentPrice: safeCurrentPrice, variationAbsolute, variationPercent, lastPrice: series[series.length - 1], note };
 }
 
 export function CompaniesPage() {
@@ -237,7 +250,10 @@ export function CompaniesPage() {
 
   const bestAsk = useMemo(() => (book.sellOrders.length > 0 ? Number(book.sellOrders[0].limitPrice ?? 0) : Number(selected?.currentPrice ?? 0)), [book.sellOrders, selected?.currentPrice]);
   const bestBid = useMemo(() => (book.buyOrders.length > 0 ? Number(book.buyOrders[0].limitPrice ?? 0) : Number(selected?.currentPrice ?? 0)), [book.buyOrders, selected?.currentPrice]);
-  const chartData = useMemo(() => normalizeChartData(trades, Number(selected?.currentPrice ?? selected?.initialPrice ?? 1)), [trades, selected?.currentPrice, selected?.initialPrice]);
+  const chartData = useMemo(
+    () => normalizeChartData(trades, Number(selected?.initialPrice ?? 1), Number(selected?.currentPrice ?? selected?.initialPrice ?? 1)),
+    [trades, selected?.currentPrice, selected?.initialPrice]
+  );
 
   return (
     <section className="card market-page">
@@ -336,6 +352,12 @@ export function CompaniesPage() {
                 </svg>
               </div>
               <div className="chart-meta"><div><span>Último</span><strong>{formatPrice(chartData.lastPrice)}</strong></div><div><span>Maior</span><strong>{formatPrice(chartData.maxPrice)}</strong></div><div><span>Menor</span><strong>{formatPrice(chartData.minPrice)}</strong></div></div>
+              <div className="summary-item">
+                <p><strong>Preço inicial:</strong> {formatPrice(chartData.initialPrice)} RPC</p>
+                <p><strong>Preço atual:</strong> {formatPrice(chartData.currentPrice)} RPC</p>
+                <p><strong>Variação:</strong> {formatSignedPrice(chartData.variationAbsolute)} RPC</p>
+                <p><strong>Variação percentual:</strong> {chartData.variationPercent >= 0 ? '+' : '-'}{formatPercent(Math.abs(chartData.variationPercent))}%</p>
+              </div>
               {chartData.note && <p className="info-text">{chartData.note}</p>}
             </section>
           )}
