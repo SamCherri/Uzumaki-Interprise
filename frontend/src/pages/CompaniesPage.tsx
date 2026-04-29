@@ -146,14 +146,28 @@ export function CompaniesPage() {
   }
 
   async function loadMarket(companyId: string) {
-    const [orderBook, my, lastTrades] = await Promise.all([
-      api<{ buyOrders: MarketOrder[]; sellOrders: MarketOrder[] }>(`/market/companies/${companyId}/order-book`),
-      api<{ orders: MarketOrder[] }>('/market/orders/me'),
-      api<{ trades: Trade[] }>(`/market/companies/${companyId}/trades`),
-    ]);
-    setBook(orderBook);
-    setMyOrders(my.orders.filter((order) => order.companyId === companyId));
-    setTrades(lastTrades.trades);
+    try {
+      const [orderBook, my, lastTrades] = await Promise.all([
+        api<{ buyOrders: MarketOrder[]; sellOrders: MarketOrder[] }>(`/market/companies/${companyId}/order-book`),
+        api<{ orders: MarketOrder[] }>('/market/orders/me'),
+        api<{ trades: Trade[] }>(`/market/companies/${companyId}/trades`),
+      ]);
+      setBook(orderBook);
+      setMyOrders(my.orders.filter((order) => order.companyId === companyId));
+      setTrades(lastTrades.trades);
+    } catch (err) {
+      const message = (err as Error).message;
+      if (message.includes('Mercado não disponível')) {
+        setSelected(null);
+        setBook({ buyOrders: [], sellOrders: [] });
+        setTrades([]);
+        setMyOrders([]);
+        setTradeFlow(null);
+        setError('Este mercado não está mais disponível.');
+        return;
+      }
+      throw err;
+    }
   }
 
 

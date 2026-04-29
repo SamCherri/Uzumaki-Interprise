@@ -44,7 +44,7 @@ async function getCompanyOrThrow(tx: Tx, companyId: string) {
     if (company.status === 'CLOSED') {
       throw new Error('Este mercado foi encerrado e não aceita novas ordens.');
     }
-    throw new Error('Mercado indisponível para negociação.');
+    throw new Error('Mercado não disponível para negociação.');
   }
   return company;
 }
@@ -586,8 +586,8 @@ export async function marketRoutes(app: FastifyInstance) {
     try {
       const { companyId } = companyParams.parse(request.params);
       const company = await prisma.company.findUnique({ where: { id: companyId }, select: { status: true } });
-      if (!company || !['ACTIVE', 'SUSPENDED'].includes(company.status)) {
-        throw new Error('Mercado indisponível na lista pública.');
+      if (!company || company.status !== 'ACTIVE') {
+        throw new Error('Mercado não disponível.');
       }
 
       const [buyOrders, sellOrders] = await Promise.all([
@@ -706,6 +706,11 @@ export async function marketRoutes(app: FastifyInstance) {
   app.get('/market/companies/:companyId/trades', { preHandler: [app.authenticate] }, async (request, reply) => {
     try {
       const { companyId } = companyParams.parse(request.params);
+      const company = await prisma.company.findUnique({ where: { id: companyId }, select: { status: true } });
+      if (!company || company.status !== 'ACTIVE') {
+        throw new Error('Mercado não disponível.');
+      }
+
       const trades = await prisma.trade.findMany({
         where: { companyId },
         orderBy: { createdAt: 'desc' },
