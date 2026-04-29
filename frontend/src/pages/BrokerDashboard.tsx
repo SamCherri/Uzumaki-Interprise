@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../services/api';
+import { translateTransferType } from '../utils/labels';
 
 type BrokerBalance = { available: string; receivedTotal: string };
 type BrokerHistory = { transfers: Array<{ id: string; type: string; amount: string; reason: string; createdAt: string }> };
@@ -75,7 +76,7 @@ export function BrokerDashboard() {
       <div className="mobile-card-list">
         {history?.transfers.slice(0, 8).map((item) => (
           <article key={item.id} className="summary-item compact-card">
-            <p><strong>{item.type}</strong></p>
+            <p><strong>{translateTransferType(item.type)}</strong></p>
             <p>RPC: {item.amount}</p>
             <p>Motivo: {item.reason}</p>
             <p>{new Date(item.createdAt).toLocaleString('pt-BR')}</p>

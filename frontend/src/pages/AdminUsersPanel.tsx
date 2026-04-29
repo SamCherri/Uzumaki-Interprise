@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../services/api';
+import { translateRole } from '../utils/labels';
 
 type UserRow = {
   id: string;
@@ -117,7 +118,7 @@ export function AdminUsersPanel() {
             <strong>{user.name}</strong>
             <p>{user.email}</p>
             <p>Status: {user.isBlocked ? 'Bloqueado' : 'Ativo'}</p>
-            <p>Roles: {user.roles.join(', ')}</p>
+            <p>Cargos: {user.roles.map((role) => translateRole(role)).join(', ')}</p>
             <p>Disponível: {user.wallet.availableBalance}</p>
             <p>Bloqueado: {user.wallet.lockedBalance}</p>
             <p>Pendente saque: {user.wallet.pendingWithdrawalBalance}</p>
@@ -140,7 +141,7 @@ export function AdminUsersPanel() {
                       disabled={role === 'USER'}
                       onChange={() => toggleRole(role)}
                     />
-                    {role}
+                    {translateRole(role)}
                   </label>
                 ))}
                 <button className="button-primary" type="submit">Salvar permissões</button>

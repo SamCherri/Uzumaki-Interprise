@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../services/api';
+import { translateWithdrawalStatus } from '../utils/labels';
 
 type Withdrawal = {
   id: string;
@@ -53,7 +54,7 @@ export function AdminWithdrawalsPanel() {
             <p><strong>Usuário:</strong> {item.user.name}</p>
             <p><strong>E-mail:</strong> {item.user.email}</p>
             <p><strong>Valor:</strong> {item.amount} RPC</p>
-            <p><strong>Status:</strong> {item.status}</p>
+            <p><strong>Status:</strong> {translateWithdrawalStatus(item.status)}</p>
             <p><strong>Observação do usuário:</strong> {item.userNote || 'Sem observação'}</p>
             <p><strong>Data:</strong> {new Date(item.createdAt).toLocaleString('pt-BR')}</p>
 
