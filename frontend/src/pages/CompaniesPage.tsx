@@ -102,7 +102,7 @@ function normalizeChartData(trades: Trade[], initialPrice: number, currentPrice:
     price,
   }));
 
-  return { points, microPoints, minPrice, maxPrice, initialPrice: safeInitialPrice, currentPrice: microCurrentPrice, variationAbsolute: microCurrentPrice - safeInitialPrice, variationPercent: safeInitialPrice === 0 ? 0 : ((microCurrentPrice - safeInitialPrice) / safeInitialPrice) * 100, lastPrice: microSeries[microSeries.length - 1], note };
+  return { points, microPoints, minPrice, maxPrice, initialPrice: safeInitialPrice, currentPrice: safeCurrentPrice, variationAbsolute, variationPercent, lastPrice: series[series.length - 1], note };
 }
 
 export function CompaniesPage() {
