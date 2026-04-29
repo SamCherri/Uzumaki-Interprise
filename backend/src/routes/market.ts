@@ -1,4 +1,4 @@
-import { MarketOrder, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -31,7 +31,7 @@ function toDecimal(value: number | string | Decimal) {
   return value instanceof Decimal ? value : new Decimal(value);
 }
 
-function statusFromRemaining(order: Pick<MarketOrder, 'quantity' | 'remainingQuantity'>) {
+function statusFromRemaining(order: { quantity: number; remainingQuantity: number }) {
   if (order.remainingQuantity <= 0) return 'FILLED' as const;
   if (order.remainingQuantity < order.quantity) return 'PARTIALLY_FILLED' as const;
   return 'OPEN' as const;
@@ -325,7 +325,7 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
     const takerRemaining = taker.remainingQuantity - tradeQuantity;
     const makerRemaining = maker.remainingQuantity - tradeQuantity;
 
-    const takerOrderUpdateData: Prisma.MarketOrderUpdateInput = {
+    const takerOrderUpdateData = {
       remainingQuantity: takerRemaining,
       status: statusFromRemaining({ quantity: taker.quantity, remainingQuantity: takerRemaining }),
       executedAt: takerRemaining === 0 ? new Date() : null,
@@ -333,7 +333,7 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
       lockedShares: taker.type === 'SELL' && taker.mode === 'LIMIT' ? taker.lockedShares - tradeQuantity : taker.lockedShares,
     };
 
-    const makerOrderUpdateData: Prisma.MarketOrderUpdateInput = {
+    const makerOrderUpdateData = {
       remainingQuantity: makerRemaining,
       status: statusFromRemaining({ quantity: maker.quantity, remainingQuantity: makerRemaining }),
       executedAt: makerRemaining === 0 ? new Date() : null,
@@ -455,7 +455,7 @@ export async function marketRoutes(app: FastifyInstance) {
     try {
       const body = createOrderSchema.parse(request.body);
 
-      const order = await prisma.$transaction(async (tx) => {
+      const order = await prisma.$transaction(async (tx: Tx) => {
         const company = await getCompanyOrThrow(tx, body.companyId);
         const wallet = await ensureWallet(tx, authRequest.user.sub);
 
@@ -591,7 +591,7 @@ export async function marketRoutes(app: FastifyInstance) {
 
     try {
       const { id } = cancelOrderParams.parse(request.params);
-      const canceled = await prisma.$transaction(async (tx) => {
+      const canceled = await prisma.$transaction(async (tx: Tx) => {
         const order = await tx.marketOrder.findUnique({ where: { id } });
         if (!order) throw new Error('Ordem não encontrada.');
         if (order.userId !== authRequest.user.sub) throw new Error('Sem permissão para cancelar esta ordem.');
@@ -618,7 +618,7 @@ export async function marketRoutes(app: FastifyInstance) {
       const { companyId } = companyParams.parse(request.params);
       const body = marketOrderSchema.parse(request.body);
 
-      const result = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx: Tx) => {
         await getCompanyOrThrow(tx, companyId);
 
         const order = await tx.marketOrder.create({
@@ -651,7 +651,7 @@ export async function marketRoutes(app: FastifyInstance) {
       const { companyId } = companyParams.parse(request.params);
       const body = marketOrderSchema.parse(request.body);
 
-      const result = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx: Tx) => {
         await getCompanyOrThrow(tx, companyId);
 
         const holding = await getHolding(tx, authRequest.user.sub, companyId);

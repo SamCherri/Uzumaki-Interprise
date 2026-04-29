@@ -22,5 +22,14 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(data.message ?? 'Erro inesperado na API.');
   }
 
-  return response.json() as Promise<T>;
+  if (response.status === 204 || response.status === 205) {
+    return undefined as T;
+  }
+
+  const raw = await response.text();
+  if (!raw.trim()) {
+    return undefined as T;
+  }
+
+  return JSON.parse(raw) as T;
 }
