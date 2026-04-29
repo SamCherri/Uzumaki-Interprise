@@ -227,6 +227,15 @@ export async function companyRoutes(app: FastifyInstance) {
 
         await ensureCompanyRevenueAccount(tx, company.id);
 
+        const businessOwnerRole = await tx.role.findUnique({ where: { key: 'BUSINESS_OWNER' } });
+        if (!businessOwnerRole) throw new Error('Role BUSINESS_OWNER não encontrada. Contate um administrador do sistema.');
+
+        await tx.userRole.upsert({
+          where: { userId_roleId: { userId: company.founderUserId, roleId: businessOwnerRole.id } },
+          update: {},
+          create: { userId: company.founderUserId, roleId: businessOwnerRole.id },
+        });
+
         await tx.companyOperation.create({
           data: {
             companyId: company.id,
@@ -243,7 +252,7 @@ export async function companyRoutes(app: FastifyInstance) {
             entity: 'Company',
             reason: 'Aprovação administrativa de listagem',
             previous: JSON.stringify({ status: company.status }),
-            current: JSON.stringify({ status: 'ACTIVE', companyId: company.id, ownerShares: company.ownerShares, publicOfferShares: company.publicOfferShares }),
+            current: JSON.stringify({ status: 'ACTIVE', companyId: company.id, ownerShares: company.ownerShares, publicOfferShares: company.publicOfferShares, founderGrantedRole: 'BUSINESS_OWNER' }),
             ip: request.ip,
             userAgent: request.headers['user-agent'] ?? null,
           },
