@@ -41,6 +41,7 @@ type SellMode = 'limit' | 'market';
 
 type ChartData = {
   points: Array<{ x: number; y: number; price: number }>;
+  microPoints: Array<{ x: number; y: number; price: number }>;
   minPrice: number;
   maxPrice: number;
   initialPrice: number;
@@ -51,18 +52,22 @@ type ChartData = {
   note: string;
 };
 
-function normalizeChartData(trades: Trade[], initialPrice: number, currentPrice: number): ChartData {
+function normalizeChartData(trades: Trade[], initialPrice: number, currentPrice: number, microOffsetPercent: number): ChartData {
   const ordered = [...trades].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   const prices = ordered.map((trade) => Number(trade.unitPrice)).filter((price) => Number.isFinite(price) && price > 0);
 
   const safeInitialPrice = Number.isFinite(initialPrice) && initialPrice > 0 ? initialPrice : 1;
   const safeCurrentPrice = Number.isFinite(currentPrice) && currentPrice > 0 ? currentPrice : safeInitialPrice;
+  const microFactor = 1 + microOffsetPercent / 100;
+  const microCurrentPrice = Math.max(0.0001, safeCurrentPrice * microFactor);
   const series: number[] = [safeInitialPrice, ...prices];
   const lastSeriesPrice = series[series.length - 1];
 
   if (lastSeriesPrice !== safeCurrentPrice) {
     series.push(safeCurrentPrice);
   }
+
+  const microSeries = [...series.slice(0, -1), microCurrentPrice];
 
   if (series.length === 1) {
     series.push(series[0]);
@@ -73,8 +78,8 @@ function normalizeChartData(trades: Trade[], initialPrice: number, currentPrice:
       ? 'Ainda sem trades. O gráfico usa preço inicial e preço atual como referência.'
       : 'Compras no lançamento, trades executados e impulsões podem alterar o preço atual.';
 
-  const minPrice = Math.min(...series);
-  const maxPrice = Math.max(...series);
+  const minPrice = Math.min(...series, ...microSeries);
+  const maxPrice = Math.max(...series, ...microSeries);
   const range = maxPrice - minPrice;
   const hasRange = range !== 0;
   const padding = hasRange ? range * 0.15 : 0;
@@ -91,7 +96,13 @@ function normalizeChartData(trades: Trade[], initialPrice: number, currentPrice:
     price,
   }));
 
-  return { points, minPrice, maxPrice, initialPrice: safeInitialPrice, currentPrice: safeCurrentPrice, variationAbsolute, variationPercent, lastPrice: series[series.length - 1], note };
+  const microPoints = microSeries.map((price, index) => ({
+    x: microSeries.length === 1 ? 0 : (index / (microSeries.length - 1)) * 100,
+    y: !hasRange || chartRange === 0 ? 50 : 100 - ((price - chartMin) / chartRange) * 100,
+    price,
+  }));
+
+  return { points, microPoints, minPrice, maxPrice, initialPrice: safeInitialPrice, currentPrice: microCurrentPrice, variationAbsolute: microCurrentPrice - safeInitialPrice, variationPercent: safeInitialPrice === 0 ? 0 : ((microCurrentPrice - safeInitialPrice) / safeInitialPrice) * 100, lastPrice: microSeries[microSeries.length - 1], note };
 }
 
 export function CompaniesPage() {
@@ -117,6 +128,7 @@ export function CompaniesPage() {
   const [marketSellSlip, setMarketSellSlip] = useState('5');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [microOffsetPercent, setMicroOffsetPercent] = useState(0);
 
   async function loadCompanies() {
     const response = await api<{ companies: Omit<Company, 'description'>[] }>('/companies');
@@ -168,6 +180,18 @@ export function CompaniesPage() {
     if (!selected) return;
     loadMarket(selected.id).catch((err) => setError((err as Error).message));
   }, [selected?.id]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setMicroOffsetPercent((previous) => {
+        const drift = (Math.random() - 0.5) * 0.18;
+        const next = previous + drift;
+        return Math.max(-0.6, Math.min(0.6, next));
+      });
+    }, 1800);
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   async function selectCompany(id: string) {
     try {
@@ -255,8 +279,8 @@ export function CompaniesPage() {
   const bestAsk = useMemo(() => (book.sellOrders.length > 0 ? Number(book.sellOrders[0].limitPrice ?? 0) : Number(selected?.currentPrice ?? 0)), [book.sellOrders, selected?.currentPrice]);
   const bestBid = useMemo(() => (book.buyOrders.length > 0 ? Number(book.buyOrders[0].limitPrice ?? 0) : Number(selected?.currentPrice ?? 0)), [book.buyOrders, selected?.currentPrice]);
   const chartData = useMemo(
-    () => normalizeChartData(trades, Number(selected?.initialPrice ?? 1), Number(selected?.currentPrice ?? selected?.initialPrice ?? 1)),
-    [trades, selected?.currentPrice, selected?.initialPrice]
+    () => normalizeChartData(trades, Number(selected?.initialPrice ?? 1), Number(selected?.currentPrice ?? selected?.initialPrice ?? 1), microOffsetPercent),
+    [trades, selected?.currentPrice, selected?.initialPrice, microOffsetPercent]
   );
 
   return (
@@ -295,6 +319,7 @@ export function CompaniesPage() {
               <div className="summary-item"><span className="summary-label">Meus tokens</span><strong className="summary-value">{holdingQty}</strong></div>
               <div className="summary-item"><span className="summary-label">Saldo disponível</span><strong className="summary-value">{formatCurrency(walletBalance)} RPC</strong></div>
             </div>
+            <div className="summary-grid market-balance-cards nested-card"><div className="summary-item"><span className="summary-label">Saldo RPC disponível</span><strong className="summary-value">{formatCurrency(walletBalance)} RPC</strong></div><div className="summary-item"><span className="summary-label">Tokens em carteira</span><strong className="summary-value">{holdingQty}</strong></div><div className="summary-item"><span className="summary-label">Microvariação (visual)</span><strong className="summary-value">{microOffsetPercent >= 0 ? '+' : ''}{formatPercent(microOffsetPercent)}%</strong></div></div>
             <div className="trade-main-actions">
               <button className="button-success" disabled={selected.status !== 'ACTIVE'} onClick={() => { setTradeFlow('buy'); setBuyMode('initial'); }}>Comprar</button>
               <button className="button-danger" disabled={selected.status !== 'ACTIVE'} onClick={() => { setTradeFlow('sell'); setSellMode('limit'); }}>Vender</button>
@@ -351,8 +376,9 @@ export function CompaniesPage() {
                     </pattern>
                   </defs>
                   <rect x="0" y="0" width="100" height="100" fill="url(#grid)" />
-                  <polyline points={chartData.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" stroke="#4f46e5" strokeWidth="3" vectorEffect="non-scaling-stroke" />
-                  {chartData.points.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="1.7" fill="#f59e0b" />)}
+                  <polyline points={chartData.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" stroke="#4f46e5" strokeWidth="2.6" vectorEffect="non-scaling-stroke" />
+                  <polyline points={chartData.microPoints.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" stroke="#22d3ee" strokeWidth="1.8" strokeDasharray="2.5 2.2" vectorEffect="non-scaling-stroke" />
+                  {chartData.microPoints.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="1.2" fill="#f59e0b" />)}
                 </svg>
               </div>
               <div className="chart-meta"><div><span>Último</span><strong>{formatPrice(chartData.lastPrice)}</strong></div><div><span>Maior</span><strong>{formatPrice(chartData.maxPrice)}</strong></div><div><span>Menor</span><strong>{formatPrice(chartData.minPrice)}</strong></div></div>
