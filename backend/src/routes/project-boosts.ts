@@ -16,7 +16,7 @@ const activeOnly = (status: string) => status === 'ACTIVE';
 export async function projectBoostRoutes(app: FastifyInstance) {
   app.get('/project-boosts/my-projects', { preHandler: [app.authenticate] }, async (request) => {
     const auth = request as AuthRequest;
-    const companies = await prisma.company.findMany({ where: { founderUserId: auth.user.sub }, include: { boostAccount: true, revenueAccount: true } });
+    const companies = await prisma.company.findMany({ where: { founderUserId: auth.user.sub, status: 'ACTIVE' }, include: { boostAccount: true, revenueAccount: true } });
     return { companies };
   });
 

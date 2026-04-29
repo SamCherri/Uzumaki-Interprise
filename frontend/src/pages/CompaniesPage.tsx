@@ -16,7 +16,7 @@ type Company = {
   publicOfferPercent: string;
   buyFeePercent: string;
   sellFeePercent: string;
-  status: 'ACTIVE' | 'SUSPENDED';
+  status: 'ACTIVE' | 'SUSPENDED' | 'CLOSED' | 'REJECTED' | 'BANKRUPT' | 'PENDING';
 };
 
 type Holding = { companyId: string; quantity: number };
@@ -103,7 +103,7 @@ export function CompaniesPage() {
 
   async function loadCompanies() {
     const response = await api<{ companies: Omit<Company, 'description'>[] }>('/companies');
-    setCompanies(response.companies.map((item) => ({ ...item, description: '' })));
+    setCompanies(response.companies.filter((company) => company.status === 'ACTIVE').map((item) => ({ ...item, description: '' })));
   }
 
   async function loadWalletAndHolding(companyId?: string) {
@@ -128,10 +128,7 @@ export function CompaniesPage() {
     setTrades(lastTrades.trades);
   }
 
-  async function loadTradesOnly(companyId: string) {
-    const lastTrades = await api<{ trades: Trade[] }>(`/market/companies/${companyId}/trades`);
-    setTrades(lastTrades.trades);
-  }
+
 
   async function refreshSelected(companyId?: string) {
     if (!companyId) return;
@@ -152,15 +149,8 @@ export function CompaniesPage() {
 
   useEffect(() => {
     if (!selected) return;
-    if (selected.status === 'SUSPENDED') {
-      setBook({ buyOrders: [], sellOrders: [] });
-      setMyOrders([]);
-      loadTradesOnly(selected.id).catch((err) => setError((err as Error).message));
-      return;
-    }
-
     loadMarket(selected.id).catch((err) => setError((err as Error).message));
-  }, [selected?.id, selected?.status]);
+  }, [selected?.id]);
 
   async function selectCompany(id: string) {
     try {
@@ -265,8 +255,7 @@ export function CompaniesPage() {
                 <p className="info-text">Projeto/token criado por usuário • Categoria: {company.sector}</p>
                 <p className="price-highlight">Preço atual em RPC: {formatPrice(Number(company.currentPrice || company.initialPrice))} RPC</p>
                 <p className="info-text">Tokens disponíveis: {company.availableOfferShares.toLocaleString('pt-BR')}</p>
-                {company.status === 'SUSPENDED' && <p className="warning">Pausado</p>}
-                <button className="button-primary" onClick={() => selectCompany(company.id)}>{company.status === 'ACTIVE' ? 'Negociar' : 'Ver mercado'}</button>
+                <button className="button-primary" onClick={() => selectCompany(company.id)}>Negociar</button>
               </li>
             ))}
           </ul>
@@ -286,7 +275,6 @@ export function CompaniesPage() {
               <div className="summary-item"><span className="summary-label">Meus tokens</span><strong className="summary-value">{holdingQty}</strong></div>
               <div className="summary-item"><span className="summary-label">Saldo disponível</span><strong className="summary-value">{formatCurrency(walletBalance)} RPC</strong></div>
             </div>
-            {selected.status === 'SUSPENDED' && <p className="status-message error">Mercado pausado. Negociação temporariamente indisponível.</p>}
             <div className="trade-main-actions">
               <button className="button-success" disabled={selected.status !== 'ACTIVE'} onClick={() => { setTradeFlow('buy'); setBuyMode('initial'); }}>Comprar</button>
               <button className="button-danger" disabled={selected.status !== 'ACTIVE'} onClick={() => { setTradeFlow('sell'); setSellMode('limit'); }}>Vender</button>
