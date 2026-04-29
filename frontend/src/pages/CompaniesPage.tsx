@@ -64,6 +64,10 @@ function normalizeChartData(trades: Trade[], initialPrice: number, currentPrice:
     series.push(safeCurrentPrice);
   }
 
+  if (series.length === 1) {
+    series.push(series[0]);
+  }
+
   const note =
     trades.length === 0
       ? 'Ainda sem trades. O gráfico usa preço inicial e preço atual como referência.'
