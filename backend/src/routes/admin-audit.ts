@@ -244,8 +244,13 @@ export async function adminAuditRoutes(app: FastifyInstance) {
       rows = [['user', 'id', user.id], ['user', 'name', user.name], ['user', 'email', user.email], ['wallet', 'availableBalance', wallet?.availableBalance ?? 0], ...transactions.map((t: any) => ['transaction', t.id, JSON.stringify({ type: t.type, amount: t.amount, createdAt: t.createdAt })]), ...transfers.map((t: any) => ['transfer', t.id, JSON.stringify({ type: t.type, amount: t.amount, createdAt: t.createdAt })]), ...withdrawals.map((w: any) => ['withdrawal', w.id, JSON.stringify({ status: w.status, amount: w.amount, createdAt: w.createdAt })]), ...orders.map((o: any) => ['order', o.id, JSON.stringify({ status: o.status, type: o.type, quantity: o.quantity, createdAt: o.createdAt })]), ...holdings.map((h: any) => ['holding', h.id, JSON.stringify({ ticker: h.company?.ticker, shares: h.shares })])];
     } else if (params.type === 'broker-report') {
       if (!query.userId) return reply.code(400).send({ message: 'Informe userId para exportar relatório de corretor.' });
-      const user = await prisma.user.findUnique({ where: { id: query.userId }, select: { id: true, name: true, email: true } });
+      const user = await prisma.user.findUnique({
+        where: { id: query.userId },
+        select: { id: true, name: true, email: true, roles: { select: { role: { select: { key: true } } } } },
+      });
       if (!user) return reply.code(404).send({ message: 'Corretor não encontrado.' });
+      const userRoles = user.roles.map((item: { role: { key: string } }) => item.role.key);
+      if (!userRoles.includes('VIRTUAL_BROKER')) return reply.code(400).send({ message: 'Usuário não é corretor.' });
       const brokerAccount = await prisma.brokerAccount.findUnique({ where: { userId: query.userId } });
       const transfers = await prisma.coinTransfer.findMany({ where: { OR: [{ senderId: query.userId }, { receiverId: query.userId }], ...(range ? { createdAt: range } : {}) }, orderBy: { createdAt: 'desc' }, take: 50 });
       headers = ['section', 'key', 'value'];

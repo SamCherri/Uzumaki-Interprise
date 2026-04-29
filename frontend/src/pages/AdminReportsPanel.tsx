@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3333';
 import { api } from '../services/api';
 import {
   translateCompanyStatus,
@@ -55,7 +55,7 @@ export function AdminReportsPanel() {
     const token = localStorage.getItem('token');
     if (!token) throw new Error('Sessão expirada. Faça login novamente.');
 
-    const response = await fetch(`${API_URL}${path}`, {
+    const response = await fetch(`${API_URL}/api${path}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
