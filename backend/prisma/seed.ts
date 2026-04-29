@@ -3,6 +3,129 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+async function seedDemoData(params: {
+  userRoleId: string;
+  brokerRoleId: string;
+}) {
+  const { userRoleId, brokerRoleId } = params;
+
+  const demoEmailLegacy = 'jogador@bolsavirtual.local';
+  const demoEmail = 'jogador@rpc.exchange.local';
+  const demoRpc = await prisma.user.findUnique({ where: { email: demoEmail } });
+  const demoLegacy = await prisma.user.findUnique({ where: { email: demoEmailLegacy } });
+
+  // usuário demo base (RPC Exchange), reaproveitando conta legada quando existir
+  const userDemo = demoRpc
+    ? demoRpc
+    : demoLegacy
+      ? await prisma.user.update({
+          where: { id: demoLegacy.id },
+          data: {
+            email: demoEmail,
+            name: demoLegacy.name || 'Jogador Demo',
+          },
+        })
+      : await prisma.user.upsert({
+          where: { email: demoEmail },
+          update: {},
+          create: {
+            name: 'Jogador Demo',
+            email: demoEmail,
+            passwordHash: await bcrypt.hash('Jogador123!', 10),
+            wallet: { create: {} },
+          },
+        });
+
+  await prisma.wallet.upsert({
+    where: { userId: userDemo.id },
+    update: {},
+    create: { userId: userDemo.id },
+  });
+
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: userDemo.id, roleId: userRoleId } },
+    update: {},
+    create: { userId: userDemo.id, roleId: userRoleId },
+  });
+
+  const companyDemo = await prisma.company.upsert({
+    where: { ticker: 'DEMO3' },
+    update: {},
+    create: {
+      name: 'Token Demo',
+      ticker: 'DEMO3',
+      description: 'Projeto demo para validar lançamento inicial de tokens.',
+      sector: 'Tecnologia',
+      founderUserId: userDemo.id,
+      status: 'ACTIVE',
+      totalShares: 100000,
+      circulatingShares: 0,
+      ownerSharePercent: 40,
+      publicOfferPercent: 60,
+      ownerShares: 40000,
+      publicOfferShares: 60000,
+      availableOfferShares: 60000,
+      initialPrice: 1,
+      currentPrice: 1,
+      buyFeePercent: 1,
+      sellFeePercent: 1,
+      fictitiousMarketCap: 100000,
+      approvedAt: new Date(),
+    },
+  });
+
+  await prisma.companyHolding.upsert({
+    where: { userId_companyId: { userId: userDemo.id, companyId: companyDemo.id } },
+    update: {},
+    create: {
+      userId: userDemo.id,
+      companyId: companyDemo.id,
+      shares: 40000,
+      averageBuyPrice: 1,
+      estimatedValue: 40000,
+    },
+  });
+
+  await prisma.companyInitialOffer.upsert({
+    where: { companyId: companyDemo.id },
+    update: {},
+    create: {
+      companyId: companyDemo.id,
+      totalShares: 60000,
+      availableShares: 60000,
+    },
+  });
+
+  await prisma.companyRevenueAccount.upsert({
+    where: { companyId: companyDemo.id },
+    update: {},
+    create: { companyId: companyDemo.id },
+  });
+
+  const brokerDemo = await prisma.user.upsert({
+    where: { email: 'corretor@rpc.exchange.local' },
+    update: {},
+    create: {
+      name: 'Corretor Demo',
+      email: 'corretor@rpc.exchange.local',
+      passwordHash: await bcrypt.hash('Corretor123!', 10),
+      wallet: { create: {} },
+    },
+  });
+
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: brokerDemo.id, roleId: brokerRoleId } },
+    update: {},
+    create: { userId: brokerDemo.id, roleId: brokerRoleId },
+  });
+
+  await prisma.brokerAccount.upsert({
+    where: { userId: brokerDemo.id },
+    update: {},
+    create: { userId: brokerDemo.id },
+  });
+}
+
 async function main() {
   const roleKeys = [
     ['USER', 'Usuário comum'],
@@ -74,124 +197,6 @@ async function main() {
     await prisma.treasuryAccount.create({ data: {} });
   }
 
-  const demoEmailLegacy = 'jogador@bolsavirtual.local';
-  const demoEmail = 'jogador@rpc.exchange.local';
-  const demoRpc = await prisma.user.findUnique({ where: { email: demoEmail } });
-  const demoLegacy = await prisma.user.findUnique({ where: { email: demoEmailLegacy } });
-
-  // usuário demo base (RPC Exchange), reaproveitando conta legada quando existir
-  const userDemo = demoRpc
-    ? demoRpc
-    : demoLegacy
-      ? await prisma.user.update({
-          where: { id: demoLegacy.id },
-          data: {
-            email: demoEmail,
-            name: demoLegacy.name || 'Jogador Demo',
-          },
-        })
-      : await prisma.user.upsert({
-        where: { email: demoEmail },
-        update: {},
-        create: {
-          name: 'Jogador Demo',
-          email: demoEmail,
-          passwordHash: await bcrypt.hash('Jogador123!', 10),
-          wallet: { create: {} },
-        },
-      });
-
-  await prisma.wallet.upsert({
-    where: { userId: userDemo.id },
-    update: {},
-    create: { userId: userDemo.id },
-  });
-
-  await prisma.userRole.upsert({
-    where: { userId_roleId: { userId: userDemo.id, roleId: userRole.id } },
-    update: {},
-    create: { userId: userDemo.id, roleId: userRole.id },
-  });
-
-
-  const companyDemo = await prisma.company.upsert({
-    where: { ticker: 'DEMO3' },
-    update: {},
-    create: {
-      name: 'Token Demo',
-      ticker: 'DEMO3',
-      description: 'Projeto demo para validar lançamento inicial de tokens.',
-      sector: 'Tecnologia',
-      founderUserId: userDemo.id,
-      status: 'ACTIVE',
-      totalShares: 100000,
-      circulatingShares: 0,
-      ownerSharePercent: 40,
-      publicOfferPercent: 60,
-      ownerShares: 40000,
-      publicOfferShares: 60000,
-      availableOfferShares: 60000,
-      initialPrice: 1,
-      currentPrice: 1,
-      buyFeePercent: 1,
-      sellFeePercent: 1,
-      fictitiousMarketCap: 100000,
-      approvedAt: new Date(),
-    },
-  });
-
-  await prisma.companyHolding.upsert({
-    where: { userId_companyId: { userId: userDemo.id, companyId: companyDemo.id } },
-    update: {},
-    create: {
-      userId: userDemo.id,
-      companyId: companyDemo.id,
-      shares: 40000,
-      averageBuyPrice: 1,
-      estimatedValue: 40000,
-    },
-  });
-
-  await prisma.companyInitialOffer.upsert({
-    where: { companyId: companyDemo.id },
-    update: {},
-    create: {
-      companyId: companyDemo.id,
-      totalShares: 60000,
-      availableShares: 60000,
-    },
-  });
-
-  await prisma.companyRevenueAccount.upsert({
-    where: { companyId: companyDemo.id },
-    update: {},
-    create: { companyId: companyDemo.id },
-  });
-
-  const brokerDemo = await prisma.user.upsert({
-    where: { email: 'corretor@rpc.exchange.local' },
-    update: {},
-    create: {
-      name: 'Corretor Demo',
-      email: 'corretor@rpc.exchange.local',
-      passwordHash: await bcrypt.hash('Corretor123!', 10),
-      wallet: { create: {} },
-    },
-  });
-
-  await prisma.userRole.upsert({
-    where: { userId_roleId: { userId: brokerDemo.id, roleId: brokerRole.id } },
-    update: {},
-    create: { userId: brokerDemo.id, roleId: brokerRole.id },
-  });
-
-  await prisma.brokerAccount.upsert({
-    where: { userId: brokerDemo.id },
-    update: {},
-    create: { userId: brokerDemo.id },
-  });
-
-
   const activeCompanies = await prisma.company.findMany({
     where: { status: 'ACTIVE' },
     select: { id: true },
@@ -205,6 +210,15 @@ async function main() {
     });
   }
 
+  if (process.env.SEED_DEMO_DATA === 'true') {
+    console.log('Seed demo habilitado: criando dados de demonstração.');
+    await seedDemoData({
+      userRoleId: userRole.id,
+      brokerRoleId: brokerRole.id,
+    });
+  } else {
+    console.log('Seed demo desabilitado: criando apenas dados essenciais.');
+  }
 }
 
 main()
