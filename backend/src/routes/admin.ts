@@ -255,10 +255,6 @@ export async function adminRoutes(app: FastifyInstance) {
         const treasury = await tx.treasuryAccount.findFirstOrThrow();
         const amount = new Decimal(parsed.amount);
 
-        if (treasury.balance.lessThan(amount)) {
-          throw new Error('Saldo insuficiente na tesouraria.');
-        }
-
         const targetUser = await tx.user.findFirst({
           where: userEmail ? { email: userEmail } : { id: parsed.userId },
         });
@@ -279,9 +275,7 @@ export async function adminRoutes(app: FastifyInstance) {
         });
 
         const treasuryPrevious = treasury.balance;
-        const treasuryNext = treasury.balance.sub(amount);
         const userPrevious = userWallet.availableBalance;
-        const userNext = userWallet.availableBalance.add(amount);
 
         const transfer = await tx.coinTransfer.create({
           data: {
@@ -291,18 +285,33 @@ export async function adminRoutes(app: FastifyInstance) {
             amount,
             reason: parsed.reason,
             previousValue: treasuryPrevious,
-            newValue: treasuryNext,
+            newValue: treasuryPrevious.sub(amount),
           },
         });
 
-        await tx.treasuryAccount.update({
+        const treasuryMutation = await tx.treasuryAccount.updateMany({
+          where: {
+            id: treasury.id,
+            balance: { gte: amount },
+          },
+          data: {
+            balance: { decrement: amount },
+          },
+        });
+
+        if (treasuryMutation.count !== 1) {
+          throw new Error('Saldo insuficiente na tesouraria.');
+        }
+
+        const updatedTreasury = await tx.treasuryAccount.findUniqueOrThrow({
           where: { id: treasury.id },
-          data: { balance: treasuryNext },
         });
 
         const updatedWallet = await tx.wallet.update({
           where: { id: userWallet.id },
-          data: { availableBalance: userNext },
+          data: {
+            availableBalance: { increment: amount },
+          },
         });
 
         await tx.transaction.create({
@@ -322,13 +331,15 @@ export async function adminRoutes(app: FastifyInstance) {
             reason: parsed.reason,
             previous: JSON.stringify({
               targetUserId: targetUser.id,
+              targetUserEmail: targetUser.email,
               treasuryBalance: treasuryPrevious.toString(),
               userAvailableBalance: userPrevious.toString(),
             }),
             current: JSON.stringify({
               targetUserId: targetUser.id,
-              treasuryBalance: treasuryNext.toString(),
-              userAvailableBalance: userNext.toString(),
+              targetUserEmail: targetUser.email,
+              treasuryBalance: updatedTreasury.balance.toString(),
+              userAvailableBalance: updatedWallet.availableBalance.toString(),
               amount: amount.toString(),
             }),
             ip: request.ip,
@@ -339,7 +350,7 @@ export async function adminRoutes(app: FastifyInstance) {
         return {
           message: 'RPC depositado na carteira do usuário com sucesso.',
           transfer,
-          treasuryBalance: treasuryNext,
+          treasuryBalance: updatedTreasury.balance,
           userBalance: updatedWallet.availableBalance,
         };
       });
@@ -389,7 +400,7 @@ export async function adminRoutes(app: FastifyInstance) {
     });
 
     return {
-      accounts: accounts.map((account) => ({
+      accounts: accounts.map((account: { companyId: string; company: { ticker: string; name: string }; balance: unknown; totalReceivedFees: unknown; totalWithdrawn: unknown }) => ({
         companyId: account.companyId,
         ticker: account.company.ticker,
         companyName: account.company.name,

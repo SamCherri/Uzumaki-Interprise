@@ -60,11 +60,11 @@ export async function adminUsersRoutes(app: FastifyInstance) {
     });
 
     return {
-      users: users.map((user) => ({
+      users: users.map((user: { id: string; name: string | null; email: string; roles: Array<{ role: { key: string } }>; isBlocked: boolean; wallet: { availableBalance: unknown; lockedBalance: unknown; pendingWithdrawalBalance: unknown } | null; createdAt: Date }) => ({
         id: user.id,
         name: user.name,
         email: user.email,
-        roles: user.roles.map((role) => role.role.key),
+        roles: user.roles.map((role: { role: { key: string } }) => role.role.key),
         isBlocked: user.isBlocked,
         wallet: {
           availableBalance: user.wallet?.availableBalance ?? 0,
@@ -127,7 +127,7 @@ export async function adminUsersRoutes(app: FastifyInstance) {
         isBlocked: user.isBlocked,
         createdAt: user.createdAt,
       },
-      roles: user.roles.map((role) => role.role.key),
+      roles: user.roles.map((role: { role: { key: string } }) => role.role.key),
       wallet: user.wallet,
       brokerAccount,
       projects: user.companies,
@@ -146,7 +146,7 @@ export async function adminUsersRoutes(app: FastifyInstance) {
     try {
       const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
       const body = z.object({ roles: z.array(z.string()).min(1) }).parse(request.body);
-      const normalizedRoles = Array.from(new Set(body.roles.map((role) => role.trim().toUpperCase())));
+      const normalizedRoles = Array.from(new Set(body.roles.map((role: string) => role.trim().toUpperCase())));
       if (!normalizedRoles.includes('USER')) normalizedRoles.push('USER');
 
       if (!ensureSuperAdminControl(reply, actorRoles, normalizedRoles)) return;
@@ -161,7 +161,7 @@ export async function adminUsersRoutes(app: FastifyInstance) {
         return reply.code(400).send({ message: 'Uma ou mais roles são inválidas.' });
       }
 
-      const currentRoleKeys = targetUser.roles.map((role) => role.role.key);
+      const currentRoleKeys = targetUser.roles.map((role: { role: { key: string } }) => role.role.key);
       const removingSuperAdmin = currentRoleKeys.includes('SUPER_ADMIN') && !normalizedRoles.includes('SUPER_ADMIN');
       if (removingSuperAdmin) {
         if (!actorRoles.includes('SUPER_ADMIN')) {
