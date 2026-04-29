@@ -33,3 +33,24 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
   return JSON.parse(raw) as T;
 }
+
+
+export type CurrentUserResponse = {
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    roles: string[];
+    isBlocked: boolean;
+    createdAt: string;
+  };
+  wallet: {
+    availableBalance: string | number;
+    lockedBalance: string | number;
+    pendingWithdrawalBalance: string | number;
+  };
+};
+
+export function getCurrentUser() {
+  return api<CurrentUserResponse>('/auth/me');
+}

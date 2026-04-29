@@ -18,7 +18,12 @@ type CompanyRevenueAccount = {
 };
 type ActiveTab = 'overview' | 'users' | 'brokers' | 'tokens' | 'withdrawals' | 'treasury' | 'revenues' | 'audit' | 'reports';
 
-export function AdminDashboard() {
+type AdminDashboardProps = {
+  currentUserRoles: string[];
+  onPermissionsUpdated: () => Promise<void>;
+};
+
+export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: AdminDashboardProps) {
   const [tab, setTab] = useState<ActiveTab>('overview');
   const [data, setData] = useState<Overview | null>(null);
   const [platformAccount, setPlatformAccount] = useState<PlatformAccount | null>(null);
@@ -59,31 +64,7 @@ export function AdminDashboard() {
 
   useEffect(() => { load(); }, []);
 
-  function decodeRolesFromToken(): string[] {
-    const token = localStorage.getItem('token');
-
-    if (!token) {
-      return [];
-    }
-
-    try {
-      const payload = token.split('.')[1] ?? '';
-      const padded = payload.padEnd(Math.ceil(payload.length / 4) * 4, '=');
-      const parsed = JSON.parse(atob(padded)) as { role?: unknown; roles?: unknown };
-      const extracted = [
-        ...(Array.isArray(parsed.roles) ? parsed.roles : []),
-        parsed.role,
-      ]
-        .filter((role): role is string => typeof role === 'string')
-        .map((role) => role.toUpperCase());
-
-      return Array.from(new Set(extracted));
-    } catch {
-      return [];
-    }
-  }
-
-  const roles = decodeRolesFromToken();
+  const roles = currentUserRoles.map((role) => role.toUpperCase());
   const canWithdrawPlatformProfit = roles.includes('SUPER_ADMIN') || roles.includes('COIN_CHIEF_ADMIN');
 
   async function submitIssuance(event: FormEvent) {
@@ -204,7 +185,7 @@ export function AdminDashboard() {
         </div>
       )}
 
-      {(tab === 'users' || tab === 'brokers') && <AdminUsersPanel />}
+      {(tab === 'users' || tab === 'brokers') && <AdminUsersPanel onPermissionsUpdated={onPermissionsUpdated} />}
       {tab === 'tokens' && <AdminTokensPanel />}
       {tab === 'withdrawals' && <AdminWithdrawalsPanel />}
 
