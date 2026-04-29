@@ -1,4 +1,4 @@
-import { FeeSourceType, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { COMPANY_FEE_SHARE_PERCENT, PLATFORM_FEE_SHARE_PERCENT } from '../constants/fee-rules.js';
 
@@ -9,7 +9,7 @@ type DistributeFeeInput = {
   tradeId?: string;
   operationId?: string;
   payerUserId?: string;
-  sourceType: FeeSourceType;
+  sourceType: 'INITIAL_OFFER_BUY' | 'MARKET_TRADE_BUY_FEE' | 'MARKET_TRADE_SELL_FEE' | 'MARKET_TRADE_TOTAL_FEE';
   totalFeeAmount: Decimal;
 };
 
