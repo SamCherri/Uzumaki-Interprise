@@ -122,3 +122,12 @@ Regras:
 - Interface exibe traduções em português.
 - Selects mantêm value técnico e label traduzido.
 - Valores desconhecidos aparecem como valor original para não quebrar tela.
+
+## Modais administrativos
+
+Regras:
+- Ações administrativas sensíveis não devem usar `window.prompt`.
+- Suspender, reativar, encerrar e trocar dono devem usar formulário controlado.
+- Motivo deve ser obrigatório quando a ação exigir auditoria.
+- Modais devem mostrar erro sem perder dados digitados.
+- A UX deve funcionar bem no mobile.
