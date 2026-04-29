@@ -40,6 +40,14 @@ type TradeFlow = 'buy' | 'sell' | null;
 type BuyMode = 'initial' | 'limit' | 'market';
 type SellMode = 'limit' | 'market';
 
+
+type InitialOfferBuyResponse = {
+  priceBefore?: string | number;
+  priceAfter?: string | number;
+  priceIncrease?: string | number;
+  currentPrice?: string | number;
+};
+
 type ChartData = {
   points: Array<{ x: number; y: number; price: number }>;
   minPrice: number;
@@ -211,11 +219,28 @@ export function CompaniesPage() {
     if (!selected) return;
     try {
       if (selected.status !== 'ACTIVE') throw new Error('Mercado pausado. Não é possível comprar no lançamento inicial.');
-      await api(`/companies/${selected.id}/buy-initial-offer`, { method: 'POST', body: JSON.stringify({ quantity: Number(initialQty) }) });
+      const response = await api<InitialOfferBuyResponse>(`/companies/${selected.id}/buy-initial-offer`, {
+        method: 'POST',
+        body: JSON.stringify({ quantity: Number(initialQty) }),
+      });
       setInitialQty('');
-      setMessage('Compra de tokens concluída com sucesso.');
+
+      const priceBefore = Number(response.priceBefore);
+      const priceAfter = Number(response.priceAfter);
+      const priceIncrease = Number(response.priceIncrease);
+
+      if (Number.isFinite(priceBefore) && Number.isFinite(priceAfter)) {
+        let successMessage = `Compra concluída. Preço: ${formatPrice(priceBefore)} RPC → ${formatPrice(priceAfter)} RPC.`;
+        if (Number.isFinite(priceIncrease) && priceIncrease > 0) {
+          successMessage += ` Variação: +${formatPrice(priceIncrease)} RPC.`;
+        }
+        setMessage(successMessage);
+      } else {
+        setMessage('Compra concluída. O preço atual foi atualizado.');
+      }
+
       setError('');
-      await Promise.all([refreshSelected(selected.id), loadCompanies()]);
+      await Promise.all([refreshSelected(selected.id), loadCompanies(), loadMarket(selected.id)]);
     } catch (err) {
       setError(`Não foi possível comprar tokens: ${(err as Error).message}`);
     }
@@ -350,7 +375,13 @@ export function CompaniesPage() {
                 <button className={buyMode === 'limit' ? 'quick-pill active' : 'quick-pill'} onClick={() => setBuyMode('limit')}>Definir preço</button>
                 <button className={buyMode === 'market' ? 'quick-pill active' : 'quick-pill'} onClick={() => setBuyMode('market')}>Comprar agora</button>
               </nav>
-              {buyMode === 'initial' && <form onSubmit={buyInitialOffer}><input type="number" min="1" value={initialQty} onChange={(e) => setInitialQty(e.target.value)} placeholder="Quantidade de tokens" required /><button className="button-success" type="submit">Comprar tokens</button></form>}
+              {buyMode === 'initial' && (
+                <form onSubmit={buyInitialOffer}>
+                  <p className="info-text">Comprar no lançamento altera o preço atual, mas não cria trade no histórico.</p>
+                  <input type="number" min="1" value={initialQty} onChange={(e) => setInitialQty(e.target.value)} placeholder="Quantidade de tokens" required />
+                  <button className="button-success" type="submit">Comprar tokens</button>
+                </form>
+              )}
               {buyMode === 'limit' && <form onSubmit={(event) => createLimitOrder('BUY', event)}><input type="number" min="1" value={limitQty} onChange={(e) => setLimitQty(e.target.value)} placeholder="Quantidade de tokens" required /><input type="number" min="0.01" step="0.01" value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço por token" required /><div className="summary-item"><p>Subtotal: {formatCurrency(limitSubtotal)}</p><p>Taxa: {buyFee}%</p><p>Total estimado: {formatCurrency(limitTotalBuy)}</p></div><button className="button-success" type="submit">Definir preço de compra</button></form>}
               {buyMode === 'market' && <div><input type="number" min="1" value={marketBuyQty} onChange={(e) => setMarketBuyQty(e.target.value)} placeholder="Quantidade de tokens" /><input type="number" min="0" max="100" value={marketBuySlip} onChange={(e) => setMarketBuySlip(e.target.value)} placeholder="Variação máxima (%)" /><button className="button-success" onClick={() => sendMarket('BUY')}>Comprar agora</button><p className="info-text">Preço agora: {formatPrice(bestAsk)}</p></div>}
             </section>

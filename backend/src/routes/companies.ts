@@ -479,6 +479,11 @@ export async function companyRoutes(app: FastifyInstance) {
           totalAmount,
           feeAmount,
           grossAmount,
+          priceBefore,
+          priceAfter,
+          priceIncrease,
+          currentPrice: priceAfter,
+          marketCapAfter: nextMarketCap,
         };
       });
 
