@@ -42,13 +42,60 @@ export async function adminAuditRoutes(app: FastifyInstance) {
   app.get('/audit/transactions', { preHandler: [app.authenticate] }, async (request, reply) => {
     if (!checkAdmin(reply, request)) return;
     const query = z.object({ userId: z.string().optional(), walletId: z.string().optional(), type: z.string().optional(), search: z.string().optional(), from: z.string().optional(), to: z.string().optional() }).merge(paginationSchema).parse(request.query);
-    const where = { ...(query.walletId ? { walletId: query.walletId } : {}), ...(query.type ? { type: query.type } : {}), ...(query.search ? { description: { contains: query.search, mode: 'insensitive' as const } } : {}), ...(dateRange(query.from, query.to) ? { createdAt: dateRange(query.from, query.to) } : {}) };
-    const [total, items] = await Promise.all([prisma.transaction.count({ where }), prisma.transaction.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (query.page - 1) * query.pageSize, take: query.pageSize })]);
+    const where: {
+      walletId?: string | { in: string[] };
+      type?: string;
+      description?: { contains: string; mode: 'insensitive' };
+      createdAt?: { gte?: Date; lte?: Date };
+    } = {
+      ...(query.walletId ? { walletId: query.walletId } : {}),
+      ...(query.type ? { type: query.type } : {}),
+      ...(query.search ? { description: { contains: query.search, mode: 'insensitive' as const } } : {}),
+      ...(dateRange(query.from, query.to) ? { createdAt: dateRange(query.from, query.to) } : {}),
+    };
+
+    if (query.userId) {
+      const walletsFromUser = await prisma.wallet.findMany({
+        where: { userId: query.userId },
+        select: { id: true },
+      });
+
+      const walletIdsFromUser = walletsFromUser.map((wallet: { id: string }) => wallet.id);
+
+      if (walletIdsFromUser.length === 0) {
+        return { items: [], pagination: { page: query.page, pageSize: query.pageSize, total: 0 } };
+      }
+
+      if (query.walletId) {
+        if (!walletIdsFromUser.includes(query.walletId)) {
+          return { items: [], pagination: { page: query.page, pageSize: query.pageSize, total: 0 } };
+        }
+      } else {
+        where.walletId = { in: walletIdsFromUser };
+      }
+    }
+
+    const [total, items] = await Promise.all([
+      prisma.transaction.count({ where }),
+      prisma.transaction.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+      }),
+    ]);
+
     const walletIds = [...new Set(items.map((item: { walletId: string }) => item.walletId))];
-    const wallets = await prisma.wallet.findMany({ where: { id: { in: walletIds }, ...(query.userId ? { userId: query.userId } : {}) }, include: { user: { select: { id: true, name: true, email: true } } } });
-    const walletMap = new Map(wallets.map((w: { id: string }) => [w.id, w] as const));
-    const filtered = query.userId ? items.filter((i: { walletId: string }) => walletMap.has(i.walletId)) : items;
-    return { items: filtered.map((item: { walletId: string }) => ({ ...item, wallet: walletMap.get(item.walletId) ?? null })), pagination: { page: query.page, pageSize: query.pageSize, total } };
+    const wallets = await prisma.wallet.findMany({
+      where: { id: { in: walletIds } },
+      include: { user: { select: { id: true, name: true, email: true } } },
+    });
+    const walletMap = new Map(wallets.map((wallet: { id: string }) => [wallet.id, wallet] as const));
+
+    return {
+      items: items.map((item: { walletId: string }) => ({ ...item, wallet: walletMap.get(item.walletId) ?? null })),
+      pagination: { page: query.page, pageSize: query.pageSize, total },
+    };
   });
 
   app.get('/audit/transfers', { preHandler: [app.authenticate] }, async (request, reply) => {
@@ -100,6 +147,6 @@ export async function adminAuditRoutes(app: FastifyInstance) {
   app.get('/reports/platform-account', { preHandler: [app.authenticate] }, async (request, reply) => {
     if (!checkAdmin(reply, request)) return;
     const item = await prisma.platformAccount.findFirst();
-    return { balance: item?.balance ?? 0, totalReceivedFees: item?.totalReceivedFees ?? 0, createdAt: item?.createdAt ?? null, updatedAt: item?.updatedAt ?? null };
+    return { balance: item?.balance ?? 0, totalReceivedFees: item?.totalReceivedFees ?? 0, totalWithdrawn: item?.totalWithdrawn ?? 0, createdAt: item?.createdAt ?? null, updatedAt: item?.updatedAt ?? null };
   });
 }

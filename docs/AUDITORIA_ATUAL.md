@@ -160,3 +160,13 @@ Regras:
 - O frontend deve usar `/auth/me` como fonte principal de permissões visuais.
 - JWT continua servindo para autenticação, mas roles antigas não devem ser a única fonte visual.
 - Alteração de cargos pode exigir recarregamento da tela se não houver atualização em tempo real.
+
+
+## Auditoria de transações por usuário
+
+Regras:
+- Filtros por userId devem ser aplicados antes da paginação.
+- A contagem total deve refletir os filtros reais.
+- A rota não deve filtrar items em memória depois da paginação.
+- Se userId e walletId forem enviados juntos, a wallet precisa pertencer ao usuário.
+- Relatórios da plataforma devem expor totalWithdrawn quando disponível.
