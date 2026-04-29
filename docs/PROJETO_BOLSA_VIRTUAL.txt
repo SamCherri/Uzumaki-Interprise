@@ -973,3 +973,6 @@ ATUALIZAÇÃO 2026-04-28:
 - Relatório por usuário.
 - Notificações.
 
+
+
+Atualização: impulsão de moeda definitiva implementada com fontes pessoais/projeto/admin e sem alterar taxa 50/50.

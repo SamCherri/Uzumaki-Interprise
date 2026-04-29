@@ -171,3 +171,10 @@ Objetivo da fase de PWA:
 - Relatório por usuário.
 - Notificações.
 
+
+
+### Carteiras econômicas separadas
+- Carteira pessoal
+- Receita do projeto
+- Reserva definitiva de boost
+- Conta da Exchange
