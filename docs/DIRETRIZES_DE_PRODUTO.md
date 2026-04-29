@@ -128,3 +128,7 @@ Toda PR visual deve respeitar:
 
 ### Impulsionar moeda
 A impulsão gasta RPC e aumenta o preço sem entregar tokens. É definitiva e somente dono/admin pode executar.
+
+
+## Regra permanente — visibilidade de projetos desligados
+- Projetos desligados ficam ocultos das telas comuns, inclusive para dono e investidores. Eles continuam preservados no banco e visíveis apenas para administração, auditoria e relatórios.

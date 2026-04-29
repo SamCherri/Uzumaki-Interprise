@@ -63,6 +63,12 @@ export function UserDashboard() {
             </div>
           </div>
 
+          {data.holdings.length > 0 && (
+            <p className="info-text">
+              Projetos desligados não aparecem na carteira comum. O histórico permanece registrado para auditoria.
+            </p>
+          )}
+
           <div className="mobile-card-list nested-card">
             {data.holdings.length === 0 && <p className="empty-state">Você ainda não possui tokens.</p>}
             {data.holdings.map((holding) => (

@@ -123,7 +123,7 @@ export async function companyRoutes(app: FastifyInstance) {
 
   app.get('/companies', { preHandler: [app.authenticate] }, async () => {
     const companies = await prisma.company.findMany({
-      where: { status: { in: ['ACTIVE', 'SUSPENDED'] } },
+      where: { status: 'ACTIVE' },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -156,8 +156,8 @@ export async function companyRoutes(app: FastifyInstance) {
       },
     });
 
-    if (!company || !['ACTIVE', 'SUSPENDED'].includes(company.status)) {
-      return reply.code(404).send({ message: 'Projeto/token não encontrado na lista pública.' });
+    if (!company || company.status !== 'ACTIVE') {
+      return reply.code(404).send({ message: 'Projeto/token não disponível.' });
     }
 
     return { company };
@@ -494,7 +494,7 @@ export async function companyRoutes(app: FastifyInstance) {
     const [wallet, holdings] = await Promise.all([
       prisma.wallet.findUnique({ where: { userId: authRequest.user.sub } }),
       prisma.companyHolding.findMany({
-        where: { userId: authRequest.user.sub, shares: { gt: 0 } },
+        where: { userId: authRequest.user.sub, shares: { gt: 0 }, company: { status: 'ACTIVE' } },
         include: {
           company: {
             select: {
