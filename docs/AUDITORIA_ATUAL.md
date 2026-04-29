@@ -95,3 +95,13 @@ Regras:
 - Depósito direto ADM → jogador só deve ser usado para evento, correção, premiação ou ajuste administrativo.
 - Toda ação deve gerar AdminLog.
 - Operações financeiras devem registrar Transaction quando impactarem carteira de usuário.
+
+
+## Visibilidade pública de projetos desligados
+
+Regras:
+- Rotas públicas de mercado só aceitam projetos `ACTIVE`.
+- Projetos `SUSPENDED`, `CLOSED`, `REJECTED`, `BANKRUPT` e `PENDING` ficam ocultos das telas comuns.
+- Histórico permanece preservado no banco.
+- Admin consulta histórico por auditoria e relatórios, não por rotas públicas.
+- Esta regra evita que usuários acessem projetos desligados diretamente pelo ID.
