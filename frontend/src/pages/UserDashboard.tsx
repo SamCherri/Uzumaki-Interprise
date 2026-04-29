@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../services/api';
+import { formatCurrency, formatPrice } from '../utils/formatters';
 
 type Holding = {
   companyId: string;
@@ -16,10 +17,6 @@ type HoldingsResponse = {
   holdings: Holding[];
   totalCompanies: number;
 };
-
-function moeda(value: number) {
-  return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 export function UserDashboard() {
   const [data, setData] = useState<HoldingsResponse | null>(null);
@@ -46,19 +43,19 @@ export function UserDashboard() {
           <div className="summary-grid nested-card">
             <div className="summary-item">
               <span className="summary-label">Saldo disponível RPC</span>
-              <strong className="summary-value">{moeda(Number(data.wallet.availableBalance))} RPC</strong>
+              <strong className="summary-value">{formatCurrency(Number(data.wallet.availableBalance))} RPC</strong>
             </div>
             <div className="summary-item">
               <span className="summary-label">Bloqueado em ordens RPC</span>
-              <strong className="summary-value">{moeda(Number(data.wallet.lockedBalance))} RPC</strong>
+              <strong className="summary-value">{formatCurrency(Number(data.wallet.lockedBalance))} RPC</strong>
             </div>
             <div className="summary-item">
               <span className="summary-label">Pendente de saque RPC</span>
-              <strong className="summary-value">{moeda(Number(data.wallet.pendingWithdrawalBalance))} RPC</strong>
+              <strong className="summary-value">{formatCurrency(Number(data.wallet.pendingWithdrawalBalance))} RPC</strong>
             </div>
             <div className="summary-item">
               <span className="summary-label">Valor estimado em tokens</span>
-              <strong className="summary-value">{moeda(totalEstimado)} RPC</strong>
+              <strong className="summary-value">{formatCurrency(totalEstimado)} RPC</strong>
             </div>
             <div className="summary-item">
               <span className="summary-label">Tokens investidos</span>
@@ -73,9 +70,9 @@ export function UserDashboard() {
                 <p className="company-emoji">🪙 {holding.ticker}/RPC</p>
                 <strong>{holding.companyName}</strong>
                 <p className="info-text">Meus tokens: {holding.quantity}</p>
-                <p className="info-text">Preço médio: {moeda(Number(holding.averageBuyPrice))} RPC</p>
-                <p className="info-text">Preço atual: {moeda(Number(holding.currentPrice))} RPC</p>
-                <p className="info-text">Valor estimado: {moeda(Number(holding.estimatedValue))} RPC</p>
+                <p className="info-text">Preço médio: {formatPrice(Number(holding.averageBuyPrice))} RPC</p>
+                <p className="info-text">Preço atual: {formatPrice(Number(holding.currentPrice))} RPC</p>
+                <p className="info-text">Valor estimado: {formatCurrency(Number(holding.estimatedValue))} RPC</p>
                 <button className="quick-pill" type="button" disabled>Ver mercado</button>
               </article>
             ))}

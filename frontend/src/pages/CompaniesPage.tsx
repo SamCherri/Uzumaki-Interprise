@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../services/api';
+import { formatCurrency, formatPrice } from '../utils/formatters';
 
 type Company = {
   id: string;
@@ -45,10 +46,6 @@ type ChartData = {
   lastPrice: number;
   note: string;
 };
-
-function moeda(value: number) {
-  return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 function normalizeChartData(trades: Trade[], fallbackPrice: number): ChartData {
   const ordered = [...trades].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
@@ -186,7 +183,7 @@ export function CompaniesPage() {
       setInitialQty('');
       setMessage('Compra de tokens concluída com sucesso.');
       setError('');
-      await refreshSelected(selected.id);
+      await Promise.all([refreshSelected(selected.id), loadCompanies()]);
     } catch (err) {
       setError(`Não foi possível comprar tokens: ${(err as Error).message}`);
     }
@@ -266,7 +263,7 @@ export function CompaniesPage() {
                 <p className="company-emoji">🪙 {company.ticker}/RPC</p>
                 <strong>{company.name}</strong>
                 <p className="info-text">Projeto/token criado por usuário • Categoria: {company.sector}</p>
-                <p className="price-highlight">Preço atual em RPC: {moeda(Number(company.currentPrice || company.initialPrice))} RPC</p>
+                <p className="price-highlight">Preço atual em RPC: {formatPrice(Number(company.currentPrice || company.initialPrice))} RPC</p>
                 <p className="info-text">Tokens disponíveis: {company.availableOfferShares.toLocaleString('pt-BR')}</p>
                 {company.status === 'SUSPENDED' && <p className="warning">Pausado</p>}
                 <button className="button-primary" onClick={() => selectCompany(company.id)}>{company.status === 'ACTIVE' ? 'Negociar' : 'Ver mercado'}</button>
@@ -283,11 +280,11 @@ export function CompaniesPage() {
             <h3>{selected.ticker}</h3>
             <p>{selected.name}</p>
             <p className="warning">Simulação</p>
-            <p className="trade-price-big">{moeda(Number(selected.currentPrice))} RPC</p>
+            <p className="trade-price-big">{formatPrice(Number(selected.currentPrice))} RPC</p>
             <div className="summary-grid">
               <div className="summary-item"><span className="summary-label">Setor</span><strong className="summary-value">{selected.sector}</strong></div>
               <div className="summary-item"><span className="summary-label">Meus tokens</span><strong className="summary-value">{holdingQty}</strong></div>
-              <div className="summary-item"><span className="summary-label">Saldo disponível</span><strong className="summary-value">{moeda(walletBalance)} RPC</strong></div>
+              <div className="summary-item"><span className="summary-label">Saldo disponível</span><strong className="summary-value">{formatCurrency(walletBalance)} RPC</strong></div>
             </div>
             {selected.status === 'SUSPENDED' && <p className="status-message error">Mercado pausado. Negociação temporariamente indisponível.</p>}
             <div className="trade-main-actions">
@@ -308,8 +305,8 @@ export function CompaniesPage() {
                 <button className={buyMode === 'market' ? 'quick-pill active' : 'quick-pill'} onClick={() => setBuyMode('market')}>Comprar agora</button>
               </nav>
               {buyMode === 'initial' && <form onSubmit={buyInitialOffer}><input type="number" min="1" value={initialQty} onChange={(e) => setInitialQty(e.target.value)} placeholder="Quantidade de tokens" required /><button className="button-success" type="submit">Comprar tokens</button></form>}
-              {buyMode === 'limit' && <form onSubmit={(event) => createLimitOrder('BUY', event)}><input type="number" min="1" value={limitQty} onChange={(e) => setLimitQty(e.target.value)} placeholder="Quantidade de tokens" required /><input type="number" min="0.01" step="0.01" value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço por token" required /><div className="summary-item"><p>Subtotal: {moeda(limitSubtotal)}</p><p>Taxa: {buyFee}%</p><p>Total estimado: {moeda(limitTotalBuy)}</p></div><button className="button-success" type="submit">Definir preço de compra</button></form>}
-              {buyMode === 'market' && <div><input type="number" min="1" value={marketBuyQty} onChange={(e) => setMarketBuyQty(e.target.value)} placeholder="Quantidade de tokens" /><input type="number" min="0" max="100" value={marketBuySlip} onChange={(e) => setMarketBuySlip(e.target.value)} placeholder="Variação máxima (%)" /><button className="button-success" onClick={() => sendMarket('BUY')}>Comprar agora</button><p className="info-text">Preço agora: {moeda(bestAsk)}</p></div>}
+              {buyMode === 'limit' && <form onSubmit={(event) => createLimitOrder('BUY', event)}><input type="number" min="1" value={limitQty} onChange={(e) => setLimitQty(e.target.value)} placeholder="Quantidade de tokens" required /><input type="number" min="0.01" step="0.01" value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço por token" required /><div className="summary-item"><p>Subtotal: {formatCurrency(limitSubtotal)}</p><p>Taxa: {buyFee}%</p><p>Total estimado: {formatCurrency(limitTotalBuy)}</p></div><button className="button-success" type="submit">Definir preço de compra</button></form>}
+              {buyMode === 'market' && <div><input type="number" min="1" value={marketBuyQty} onChange={(e) => setMarketBuyQty(e.target.value)} placeholder="Quantidade de tokens" /><input type="number" min="0" max="100" value={marketBuySlip} onChange={(e) => setMarketBuySlip(e.target.value)} placeholder="Variação máxima (%)" /><button className="button-success" onClick={() => sendMarket('BUY')}>Comprar agora</button><p className="info-text">Preço agora: {formatPrice(bestAsk)}</p></div>}
             </section>
           )}
 
@@ -320,8 +317,8 @@ export function CompaniesPage() {
                 <button className={sellMode === 'limit' ? 'quick-pill active' : 'quick-pill'} onClick={() => setSellMode('limit')}>Definir preço</button>
                 <button className={sellMode === 'market' ? 'quick-pill active' : 'quick-pill'} onClick={() => setSellMode('market')}>Vender agora</button>
               </nav>
-              {sellMode === 'limit' && <form onSubmit={(event) => createLimitOrder('SELL', event)}><input type="number" min="1" value={limitQty} onChange={(e) => setLimitQty(e.target.value)} placeholder="Quantidade de tokens" required /><input type="number" min="0.01" step="0.01" value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço por token" required /><div className="summary-item"><p>Subtotal: {moeda(limitSubtotal)}</p><p>Taxa: {sellFee}%</p><p>Total estimado: {moeda(limitNetSell)}</p></div><button className="button-danger" type="submit">Definir preço de venda</button></form>}
-              {sellMode === 'market' && <div><input type="number" min="1" value={marketSellQty} onChange={(e) => setMarketSellQty(e.target.value)} placeholder="Quantidade de tokens" /><input type="number" min="0" max="100" value={marketSellSlip} onChange={(e) => setMarketSellSlip(e.target.value)} placeholder="Variação máxima (%)" /><button className="button-danger" onClick={() => sendMarket('SELL')}>Vender agora</button><p className="info-text">Preço agora: {moeda(bestBid)}</p></div>}
+              {sellMode === 'limit' && <form onSubmit={(event) => createLimitOrder('SELL', event)}><input type="number" min="1" value={limitQty} onChange={(e) => setLimitQty(e.target.value)} placeholder="Quantidade de tokens" required /><input type="number" min="0.01" step="0.01" value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço por token" required /><div className="summary-item"><p>Subtotal: {formatCurrency(limitSubtotal)}</p><p>Taxa: {sellFee}%</p><p>Total estimado: {formatCurrency(limitNetSell)}</p></div><button className="button-danger" type="submit">Definir preço de venda</button></form>}
+              {sellMode === 'market' && <div><input type="number" min="1" value={marketSellQty} onChange={(e) => setMarketSellQty(e.target.value)} placeholder="Quantidade de tokens" /><input type="number" min="0" max="100" value={marketSellSlip} onChange={(e) => setMarketSellSlip(e.target.value)} placeholder="Variação máxima (%)" /><button className="button-danger" onClick={() => sendMarket('SELL')}>Vender agora</button><p className="info-text">Preço agora: {formatPrice(bestBid)}</p></div>}
             </section>
           )}
 
@@ -350,7 +347,7 @@ export function CompaniesPage() {
                   {chartData.points.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="1.7" fill="#f59e0b" />)}
                 </svg>
               </div>
-              <div className="chart-meta"><div><span>Último</span><strong>{moeda(chartData.lastPrice)}</strong></div><div><span>Maior</span><strong>{moeda(chartData.maxPrice)}</strong></div><div><span>Menor</span><strong>{moeda(chartData.minPrice)}</strong></div></div>
+              <div className="chart-meta"><div><span>Último</span><strong>{formatPrice(chartData.lastPrice)}</strong></div><div><span>Maior</span><strong>{formatPrice(chartData.maxPrice)}</strong></div><div><span>Menor</span><strong>{formatPrice(chartData.minPrice)}</strong></div></div>
               {chartData.note && <p className="info-text">{chartData.note}</p>}
             </section>
           )}
@@ -358,9 +355,9 @@ export function CompaniesPage() {
           {activeTab === 'livro' && (
             <section className="card nested-card">
               <h4>📊 Livro de ofertas</h4>
-              <div className="summary-item sell-side"><strong>Vendas</strong>{book.sellOrders.length === 0 && <p className="empty-state">Nenhuma oferta disponível ainda.</p>}{book.sellOrders.map((order) => { const price = Number(order.limitPrice ?? 0); return <p key={order.id}>{moeda(price)} | {order.remainingQuantity} | {moeda(price * order.remainingQuantity)}</p>; })}</div>
-              <div className="summary-item nested-card"><strong>Preço atual: {moeda(Number(selected.currentPrice))}</strong></div>
-              <div className="summary-item buy-side nested-card"><strong>Compras</strong>{book.buyOrders.length === 0 && <p className="empty-state">Nenhuma oferta disponível ainda.</p>}{book.buyOrders.map((order) => { const price = Number(order.limitPrice ?? 0); return <p key={order.id}>{moeda(price)} | {order.remainingQuantity} | {moeda(price * order.remainingQuantity)}</p>; })}</div>
+              <div className="summary-item sell-side"><strong>Vendas</strong>{book.sellOrders.length === 0 && <p className="empty-state">Nenhuma oferta disponível ainda.</p>}{book.sellOrders.map((order) => { const price = Number(order.limitPrice ?? 0); return <p key={order.id}>{formatPrice(price)} | {order.remainingQuantity} | {formatCurrency(price * order.remainingQuantity)}</p>; })}</div>
+              <div className="summary-item nested-card"><strong>Preço atual: {formatPrice(Number(selected.currentPrice))}</strong></div>
+              <div className="summary-item buy-side nested-card"><strong>Compras</strong>{book.buyOrders.length === 0 && <p className="empty-state">Nenhuma oferta disponível ainda.</p>}{book.buyOrders.map((order) => { const price = Number(order.limitPrice ?? 0); return <p key={order.id}>{formatPrice(price)} | {order.remainingQuantity} | {formatCurrency(price * order.remainingQuantity)}</p>; })}</div>
             </section>
           )}
 
@@ -368,7 +365,7 @@ export function CompaniesPage() {
             <section className="card nested-card">
               <h4>🧾 Minhas ordens</h4>
               {myOrders.length === 0 && <p className="empty-state">Você ainda não possui ordens neste mercado.</p>}
-              <div className="mobile-card-list">{myOrders.map((order) => (<article key={order.id} className="summary-item compact-card"><p><strong>{order.type === 'BUY' ? 'Compra' : 'Venda'}</strong> · {order.mode === 'LIMIT' ? 'Definir preço' : 'Agora'}</p><p>Quantidade: {order.quantity} · Restante: {order.remainingQuantity}</p><p>Status: {order.status}</p><p>Preço: {order.limitPrice ? moeda(Number(order.limitPrice)) : 'Agora'}</p>{(order.status === 'OPEN' || order.status === 'PARTIALLY_FILLED') && order.mode === 'LIMIT' && <button className="button-danger" onClick={() => cancelOrder(order.id)}>Cancelar ordem</button>}</article>))}</div>
+              <div className="mobile-card-list">{myOrders.map((order) => (<article key={order.id} className="summary-item compact-card"><p><strong>{order.type === 'BUY' ? 'Compra' : 'Venda'}</strong> · {order.mode === 'LIMIT' ? 'Definir preço' : 'Agora'}</p><p>Quantidade: {order.quantity} · Restante: {order.remainingQuantity}</p><p>Status: {order.status}</p><p>Preço: {order.limitPrice ? formatPrice(Number(order.limitPrice)) : 'Agora'}</p>{(order.status === 'OPEN' || order.status === 'PARTIALLY_FILLED') && order.mode === 'LIMIT' && <button className="button-danger" onClick={() => cancelOrder(order.id)}>Cancelar ordem</button>}</article>))}</div>
             </section>
           )}
 
@@ -376,7 +373,7 @@ export function CompaniesPage() {
             <section className="card nested-card">
               <h4>🕒 Histórico de negociações</h4>
               {trades.length === 0 && <p className="empty-state">Sem histórico de negociações para este mercado.</p>}
-              <div className="mobile-card-list">{trades.map((trade) => (<article key={trade.id} className="summary-item compact-card"><p><strong>Preço:</strong> {moeda(Number(trade.unitPrice))}</p><p><strong>Quantidade:</strong> {trade.quantity}</p><p><strong>Data/hora:</strong> {new Date(trade.createdAt).toLocaleString('pt-BR')}</p></article>))}</div>
+              <div className="mobile-card-list">{trades.map((trade) => (<article key={trade.id} className="summary-item compact-card"><p><strong>Preço:</strong> {formatPrice(Number(trade.unitPrice))}</p><p><strong>Quantidade:</strong> {trade.quantity}</p><p><strong>Data/hora:</strong> {new Date(trade.createdAt).toLocaleString('pt-BR')}</p></article>))}</div>
             </section>
           )}
         </div>
