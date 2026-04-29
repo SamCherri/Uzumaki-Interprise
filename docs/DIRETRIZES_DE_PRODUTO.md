@@ -132,3 +132,25 @@ A impulsão gasta RPC e aumenta o preço sem entregar tokens. É definitiva e so
 
 ## Regra permanente — visibilidade de projetos desligados
 - Projetos desligados ficam ocultos das telas comuns, inclusive para dono e investidores. Eles continuam preservados no banco e visíveis apenas para administração, auditoria e relatórios.
+
+## Diretriz para uso do Codex
+
+Todas as tarefas enviadas ao Codex devem indicar a skill principal.
+
+Exemplo:
+
+Skill usada:
+- Frontend Mobile-First Developer
+- PR Reviewer
+
+Tipo de PR:
+- UX
+- Frontend
+- Sem backend
+- Sem migration
+
+Critérios:
+- Não criar dados falsos.
+- Não criar abas falsas.
+- Não alterar regras econômicas.
+- Rodar typecheck/build.
