@@ -357,6 +357,7 @@ export async function companyRoutes(app: FastifyInstance) {
       const body = buyInitialOfferSchema.parse(request.body);
 
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await tx.$queryRaw`SELECT id FROM "Company" WHERE id = ${params.id} FOR UPDATE`;
         const company = await tx.company.findUnique({ where: { id: params.id } });
         if (!company || company.status !== 'ACTIVE') {
           throw new Error('Mercado não está ativo para compra de lançamento inicial.');
