@@ -123,6 +123,15 @@ Regras:
 - Selects mantêm value técnico e label traduzido.
 - Valores desconhecidos aparecem como valor original para não quebrar tela.
 
+## Seed de produção e seed demo
+
+Regras:
+- Seed padrão cria apenas roles, permissões, admin inicial e contas essenciais.
+- Dados demo só são criados com `SEED_DEMO_DATA=true`.
+- Produção não deve criar usuários demo nem token DEMO3 automaticamente.
+- Para ambiente de testes/desenvolvimento, usar `npm run prisma:seed:demo --workspace backend`.
+- Em produção/Railway, usar `npm run prisma:seed --workspace backend`, se necessário.
+
 ## Modais administrativos
 
 Regras:

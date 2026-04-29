@@ -45,7 +45,7 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(401).send({ message: 'Não autenticado.' });
     }
 
-    const roles = user.roles.map((item) => item.role.key);
+    const roles = user.roles.map((item: { role: { key: string } }) => item.role.key);
 
     return {
       user: {
