@@ -1,4 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
+
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3333';
 import { api } from '../services/api';
 import {
   translateCompanyStatus,
@@ -26,6 +28,7 @@ export function AdminReportsPanel() {
   const [brokerLoading, setBrokerLoading] = useState(false);
   const [userError, setUserError] = useState('');
   const [brokerError, setBrokerError] = useState('');
+  const [exportLoading, setExportLoading] = useState<string | null>(null);
 
   useEffect(() => { void load(); }, []);
 
@@ -44,6 +47,63 @@ export function AdminReportsPanel() {
     if (to) query.set('to', to);
     const queryString = query.toString();
     return queryString ? `?${queryString}` : '';
+  }
+
+
+
+  async function downloadCsv(path: string, filename?: string) {
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('Sessão expirada. Faça login novamente.');
+
+    const response = await fetch(`${API_URL}/api${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      let message = 'Falha ao exportar CSV.';
+      try {
+        const body = await response.json();
+        if (body?.message) message = body.message;
+      } catch {}
+      throw new Error(message);
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename ?? `export-${Date.now()}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleExport(type: string, filters: Record<string, string> = {}, requiredUserId = false) {
+    const userId = (filters.userId ?? '').trim();
+    if (requiredUserId && !userId) {
+      const message = type === 'broker-report' ? 'Informe o ID do corretor para exportar CSV.' : 'Informe o ID do usuário para exportar CSV.';
+      if (type === 'broker-report') setBrokerError(message); else setUserError(message);
+      return;
+    }
+
+    const query = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value?.trim()) query.set(key, value.trim());
+    });
+
+    const path = `/admin/reports/export/${type}${query.toString() ? `?${query.toString()}` : ''}`;
+    setExportLoading(type);
+    try {
+      await downloadCsv(path, `rpc-exchange-${type}.csv`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao exportar CSV.';
+      if (type === 'broker-report') setBrokerError(message);
+      else if (type === 'user-report') setUserError(message);
+      else alert(message);
+    } finally {
+      setExportLoading(null);
+    }
   }
 
   async function handleUserReportSubmit(event: FormEvent) {
@@ -90,6 +150,16 @@ export function AdminReportsPanel() {
     <h3>Relatórios</h3>
     {overview && <div className="summary-grid">{Object.entries(overview).map(([k, v]) => <div key={k} className="summary-item"><span className="summary-label">{k}</span><strong className="summary-value">{String(v)}</strong></div>)}</div>}
 
+    <h4>Relatórios gerais (CSV)</h4>
+    <div className="filters-row">
+      <button type="button" disabled={exportLoading === 'transactions'} onClick={() => void handleExport('transactions')}>Exportar transações CSV</button>
+      <button type="button" disabled={exportLoading === 'transfers'} onClick={() => void handleExport('transfers')}>Exportar transferências CSV</button>
+      <button type="button" disabled={exportLoading === 'withdrawals'} onClick={() => void handleExport('withdrawals')}>Exportar saques CSV</button>
+      <button type="button" disabled={exportLoading === 'orders'} onClick={() => void handleExport('orders')}>Exportar ordens CSV</button>
+      <button type="button" disabled={exportLoading === 'trades'} onClick={() => void handleExport('trades')}>Exportar trades CSV</button>
+      <button type="button" disabled={exportLoading === 'company-revenues'} onClick={() => void handleExport('company-revenues')}>Exportar receitas por projeto CSV</button>
+    </div>
+
     <h4>Receitas por projeto</h4>
     <div className="mobile-card-list">{revenues.map((item) => <article className="summary-item compact-card" key={item.companyId}><strong>{item.ticker} - {item.token}</strong><p>Dono: {item.owner?.name ?? '-'}</p><p>Saldo: {String(item.balance)}</p><p>Taxas: {String(item.totalReceivedFees)}</p><p>Status: {translateCompanyStatus(item.status)}</p></article>)}</div>
 
@@ -99,6 +169,7 @@ export function AdminReportsPanel() {
       <input type="date" value={userFilters.from} onChange={(event) => setUserFilters((prev) => ({ ...prev, from: event.target.value }))} />
       <input type="date" value={userFilters.to} onChange={(event) => setUserFilters((prev) => ({ ...prev, to: event.target.value }))} />
       <button type="submit" disabled={userLoading}>{userLoading ? 'Buscando...' : 'Buscar usuário'}</button>
+      <button type="button" disabled={exportLoading === 'user-report'} onClick={() => void handleExport('user-report', userFilters, true)}>Exportar relatório do usuário CSV</button>
     </form>
     {userError && <p>{userError}</p>}
     {userReport && <>
@@ -141,6 +212,7 @@ export function AdminReportsPanel() {
       <input type="date" value={brokerFilters.from} onChange={(event) => setBrokerFilters((prev) => ({ ...prev, from: event.target.value }))} />
       <input type="date" value={brokerFilters.to} onChange={(event) => setBrokerFilters((prev) => ({ ...prev, to: event.target.value }))} />
       <button type="submit" disabled={brokerLoading}>{brokerLoading ? 'Buscando...' : 'Buscar corretor'}</button>
+      <button type="button" disabled={exportLoading === 'broker-report'} onClick={() => void handleExport('broker-report', brokerFilters, true)}>Exportar relatório do corretor CSV</button>
     </form>
     {brokerError && <p>{brokerError}</p>}
     {brokerReport && <>

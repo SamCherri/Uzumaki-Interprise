@@ -179,3 +179,12 @@ Regras:
 - Filtros from/to devem ser aplicados antes dos cálculos agregados.
 - Relatórios administrativos não alteram saldos nem regras econômicas.
 - Nenhum dado sensível como passwordHash deve ser exposto.
+
+## Exportação CSV administrativa
+
+- Exportações CSV são somente leitura.
+- Exportações não alteram saldos, ordens, saques ou taxas.
+- Exportações respeitam filtros enviados.
+- Exportações são limitadas a 5000 registros por tipo para evitar arquivos gigantes.
+- Relatórios por usuário e corretor exigem userId.
+- CSV não expõe passwordHash nem dados sensíveis desnecessários.
