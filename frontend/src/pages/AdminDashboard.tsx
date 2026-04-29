@@ -7,7 +7,7 @@ import { AdminAuditPanel } from './AdminAuditPanel';
 import { AdminReportsPanel } from './AdminReportsPanel';
 
 type Overview = { users: number; companies: number; logs: number; treasuryBalance: string | number };
-type PlatformAccount = { balance: string | number; totalReceivedFees: string | number };
+type PlatformAccount = { balance: string | number; totalReceivedFees: string | number; totalWithdrawn: string | number; updatedAt: string | null };
 type CompanyRevenueAccount = {
   companyId: string;
   ticker: string;
@@ -35,6 +35,10 @@ export function AdminDashboard() {
   const [userDepositEmail, setUserDepositEmail] = useState('');
   const [userDepositAmount, setUserDepositAmount] = useState('');
   const [userDepositReason, setUserDepositReason] = useState('');
+  const [platformWithdrawEmail, setPlatformWithdrawEmail] = useState('');
+  const [platformWithdrawAmount, setPlatformWithdrawAmount] = useState('');
+  const [platformWithdrawReason, setPlatformWithdrawReason] = useState('');
+  const [isSubmittingPlatformWithdraw, setIsSubmittingPlatformWithdraw] = useState(false);
 
   async function load() {
     try {
@@ -54,6 +58,33 @@ export function AdminDashboard() {
   }
 
   useEffect(() => { load(); }, []);
+
+  function decodeRolesFromToken(): string[] {
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      return [];
+    }
+
+    try {
+      const payload = token.split('.')[1] ?? '';
+      const padded = payload.padEnd(Math.ceil(payload.length / 4) * 4, '=');
+      const parsed = JSON.parse(atob(padded)) as { role?: unknown; roles?: unknown };
+      const extracted = [
+        ...(Array.isArray(parsed.roles) ? parsed.roles : []),
+        parsed.role,
+      ]
+        .filter((role): role is string => typeof role === 'string')
+        .map((role) => role.toUpperCase());
+
+      return Array.from(new Set(extracted));
+    } catch {
+      return [];
+    }
+  }
+
+  const roles = decodeRolesFromToken();
+  const canWithdrawPlatformProfit = roles.includes('SUPER_ADMIN') || roles.includes('COIN_CHIEF_ADMIN');
 
   async function submitIssuance(event: FormEvent) {
     event.preventDefault();
@@ -91,6 +122,35 @@ export function AdminDashboard() {
       setError((err as Error).message);
     } finally {
       setIsSubmittingTreasury(false);
+    }
+  }
+
+
+
+  async function submitPlatformWithdraw(event: FormEvent) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+    setIsSubmittingPlatformWithdraw(true);
+
+    try {
+      await api('/admin/platform-account/withdraw-to-admin', {
+        method: 'POST',
+        body: JSON.stringify({
+          adminEmail: platformWithdrawEmail,
+          amount: platformWithdrawAmount,
+          reason: platformWithdrawReason,
+        }),
+      });
+      setPlatformWithdrawEmail('');
+      setPlatformWithdrawAmount('');
+      setPlatformWithdrawReason('');
+      await load();
+      setMessage('Lucro da Exchange transferido com sucesso.');
+    } catch (err) {
+      setError((err as Error).message || 'Não foi possível transferir o lucro da Exchange.');
+    } finally {
+      setIsSubmittingPlatformWithdraw(false);
     }
   }
 
@@ -182,7 +242,40 @@ export function AdminDashboard() {
             <div className="summary-grid">
               <div className="summary-item"><span className="summary-label">Saldo</span><strong className="summary-value">{platformAccount.balance}</strong></div>
               <div className="summary-item"><span className="summary-label">Taxas recebidas</span><strong className="summary-value">{platformAccount.totalReceivedFees}</strong></div>
+              <div className="summary-item"><span className="summary-label">Total retirado</span><strong className="summary-value">{platformAccount.totalWithdrawn}</strong></div>
             </div>
+          )}
+
+
+
+          {canWithdrawPlatformProfit && (
+            <>
+              <h3 className="nested-card">Retirar lucro da Exchange</h3>
+              <form onSubmit={submitPlatformWithdraw} className="form-grid">
+                <input
+                  value={platformWithdrawEmail}
+                  onChange={(e) => setPlatformWithdrawEmail(e.target.value)}
+                  placeholder="E-mail do administrador"
+                  type="email"
+                  required
+                />
+                <input
+                  value={platformWithdrawAmount}
+                  onChange={(e) => setPlatformWithdrawAmount(e.target.value)}
+                  placeholder="Quantidade RPC"
+                  required
+                />
+                <input
+                  value={platformWithdrawReason}
+                  onChange={(e) => setPlatformWithdrawReason(e.target.value)}
+                  placeholder="Motivo"
+                  required
+                />
+                <button className="button-primary" type="submit" disabled={isSubmittingPlatformWithdraw}>
+                  {isSubmittingPlatformWithdraw ? 'Processando...' : 'Transferir lucro'}
+                </button>
+              </form>
+            </>
           )}
 
           <h3 className="nested-card">Receita dos projetos/tokens</h3>
