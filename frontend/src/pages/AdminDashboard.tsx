@@ -24,12 +24,17 @@ export function AdminDashboard() {
   const [platformAccount, setPlatformAccount] = useState<PlatformAccount | null>(null);
   const [companyRevenueAccounts, setCompanyRevenueAccounts] = useState<CompanyRevenueAccount[]>([]);
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [isSubmittingTreasury, setIsSubmittingTreasury] = useState(false);
 
   const [issuanceAmount, setIssuanceAmount] = useState('');
   const [issuanceReason, setIssuanceReason] = useState('');
   const [brokerEmail, setBrokerEmail] = useState('');
   const [brokerAmount, setBrokerAmount] = useState('');
   const [brokerReason, setBrokerReason] = useState('');
+  const [userDepositEmail, setUserDepositEmail] = useState('');
+  const [userDepositAmount, setUserDepositAmount] = useState('');
+  const [userDepositReason, setUserDepositReason] = useState('');
 
   async function load() {
     try {
@@ -42,6 +47,7 @@ export function AdminDashboard() {
       setPlatformAccount(platform);
       setCompanyRevenueAccounts(companyRevenue.accounts);
       setError('');
+      setMessage('');
     } catch (err) {
       setError((err as Error).message);
     }
@@ -51,25 +57,71 @@ export function AdminDashboard() {
 
   async function submitIssuance(event: FormEvent) {
     event.preventDefault();
-    await api('/admin/treasury/issuance', { method: 'POST', body: JSON.stringify({ amount: issuanceAmount, reason: issuanceReason }) });
-    setIssuanceAmount('');
-    setIssuanceReason('');
-    await load();
+    setError('');
+    setMessage('');
+    setIsSubmittingTreasury(true);
+
+    try {
+      await api('/admin/treasury/issuance', { method: 'POST', body: JSON.stringify({ amount: issuanceAmount, reason: issuanceReason }) });
+      setIssuanceAmount('');
+      setIssuanceReason('');
+      await load();
+      setMessage('RPC emitido na tesouraria com sucesso.');
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsSubmittingTreasury(false);
+    }
   }
 
   async function submitBrokerTransfer(event: FormEvent) {
     event.preventDefault();
-    await api('/admin/treasury/transfer-to-broker', { method: 'POST', body: JSON.stringify({ brokerEmail, amount: brokerAmount, reason: brokerReason }) });
-    setBrokerEmail('');
-    setBrokerAmount('');
-    setBrokerReason('');
-    await load();
+    setError('');
+    setMessage('');
+    setIsSubmittingTreasury(true);
+
+    try {
+      await api('/admin/treasury/transfer-to-broker', { method: 'POST', body: JSON.stringify({ brokerEmail, amount: brokerAmount, reason: brokerReason }) });
+      setBrokerEmail('');
+      setBrokerAmount('');
+      setBrokerReason('');
+      await load();
+      setMessage('RPC enviado ao corretor com sucesso.');
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsSubmittingTreasury(false);
+    }
+  }
+
+  async function submitUserDeposit(event: FormEvent) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+    setIsSubmittingTreasury(true);
+
+    try {
+      await api('/admin/treasury/transfer-to-user', {
+        method: 'POST',
+        body: JSON.stringify({ userEmail: userDepositEmail, amount: userDepositAmount, reason: userDepositReason }),
+      });
+      setUserDepositEmail('');
+      setUserDepositAmount('');
+      setUserDepositReason('');
+      await load();
+      setMessage('RPC depositado na carteira do jogador com sucesso.');
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsSubmittingTreasury(false);
+    }
   }
 
   return (
     <section className="card">
       <h2>🛠️ Painel Admin</h2>
       {error && <p className="status-message error">{error}</p>}
+      {message && <p className="status-message success">{message}</p>}
 
       <nav className="pill-nav nested-card">
         <button className={tab === 'overview' ? 'pill active' : 'pill'} onClick={() => setTab('overview')}>Visão geral</button>
@@ -102,7 +154,7 @@ export function AdminDashboard() {
           <form onSubmit={submitIssuance} className="form-grid">
             <input value={issuanceAmount} onChange={(e) => setIssuanceAmount(e.target.value)} placeholder="Quantidade" required />
             <input value={issuanceReason} onChange={(e) => setIssuanceReason(e.target.value)} placeholder="Motivo" required />
-            <button className="button-primary" type="submit">Emitir RPC</button>
+            <button className="button-primary" type="submit" disabled={isSubmittingTreasury}>{isSubmittingTreasury ? 'Processando...' : 'Emitir RPC'}</button>
           </form>
 
           <h3 className="nested-card">Enviar RPC para corretor</h3>
@@ -110,7 +162,15 @@ export function AdminDashboard() {
             <input value={brokerEmail} onChange={(e) => setBrokerEmail(e.target.value)} placeholder="E-mail do corretor" type="email" required />
             <input value={brokerAmount} onChange={(e) => setBrokerAmount(e.target.value)} placeholder="Quantidade RPC" required />
             <input value={brokerReason} onChange={(e) => setBrokerReason(e.target.value)} placeholder="Observação" required />
-            <button className="button-primary" type="submit">Enviar RPC ao corretor</button>
+            <button className="button-primary" type="submit" disabled={isSubmittingTreasury}>{isSubmittingTreasury ? 'Processando...' : 'Enviar RPC ao corretor'}</button>
+          </form>
+
+          <h3 className="nested-card">Depositar RPC em jogador</h3>
+          <form onSubmit={submitUserDeposit} className="form-grid">
+            <input value={userDepositEmail} onChange={(e) => setUserDepositEmail(e.target.value)} placeholder="E-mail do jogador" type="email" required />
+            <input value={userDepositAmount} onChange={(e) => setUserDepositAmount(e.target.value)} placeholder="Quantidade RPC" required />
+            <input value={userDepositReason} onChange={(e) => setUserDepositReason(e.target.value)} placeholder="Motivo" required />
+            <button className="button-primary" type="submit" disabled={isSubmittingTreasury}>{isSubmittingTreasury ? 'Processando...' : 'Depositar RPC no jogador'}</button>
           </form>
         </>
       )}
