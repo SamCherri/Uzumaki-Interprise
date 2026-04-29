@@ -19,6 +19,27 @@ function checkAdmin(reply: FastifyReply, request: FastifyRequest) {
   return true;
 }
 
+
+const EXPORT_LIMIT = 5000;
+
+function escapeCsvValue(value: unknown): string {
+  if (value === null || value === undefined) return '';
+
+  let normalized: string;
+  if (value instanceof Date) normalized = value.toISOString();
+  else if (typeof value === 'object') normalized = JSON.stringify(value);
+  else normalized = String(value);
+
+  const escaped = normalized.replace(/"/g, '""');
+  if (/[",;\n\r]/u.test(normalized)) return `"${escaped}"`;
+  return escaped;
+}
+
+function toCsv(headers: string[], rows: unknown[][]): string {
+  const lines = [headers, ...rows].map((row) => row.map((value) => escapeCsvValue(value)).join(','));
+  return `${lines.join('\n')}\n`;
+}
+
 function dateRange(from?: string, to?: string) {
   const createdAt: { gte?: Date; lte?: Date } = {};
   if (from) createdAt.gte = new Date(from);
@@ -128,6 +149,114 @@ export async function adminAuditRoutes(app: FastifyInstance) {
     const where = { ...(query.companyId ? { companyId: query.companyId } : {}), ...(query.buyerId ? { buyerId: query.buyerId } : {}), ...(query.sellerId ? { sellerId: query.sellerId } : {}), ...(query.search ? { OR: [{ buyer: { name: { contains: query.search, mode: 'insensitive' as const } } }, { seller: { name: { contains: query.search, mode: 'insensitive' as const } } }, { company: { ticker: { contains: query.search, mode: 'insensitive' as const } } }] } : {}), ...(dateRange(query.from, query.to) ? { createdAt: dateRange(query.from, query.to) } : {}) };
     const [total, items] = await Promise.all([prisma.trade.count({ where }), prisma.trade.findMany({ where, include: { company: { select: { id: true, ticker: true, name: true } }, buyer: { select: { id: true, name: true, email: true } }, seller: { select: { id: true, name: true, email: true } } }, orderBy: { createdAt: 'desc' }, skip: (query.page - 1) * query.pageSize, take: query.pageSize })]);
     return { items, pagination: { page: query.page, pageSize: query.pageSize, total } };
+  });
+
+
+  app.get('/reports/export/:type', { preHandler: [app.authenticate] }, async (request, reply) => {
+    if (!checkAdmin(reply, request)) return;
+
+    const params = z.object({ type: z.enum(['transactions', 'transfers', 'withdrawals', 'orders', 'trades', 'company-revenues', 'user-report', 'broker-report']) }).parse(request.params);
+    const query = z.object({
+      from: z.string().optional(),
+      to: z.string().optional(),
+      userId: z.string().optional(),
+      walletId: z.string().optional(),
+      companyId: z.string().optional(),
+      type: z.string().optional(),
+      mode: z.string().optional(),
+      status: z.string().optional(),
+      search: z.string().optional(),
+      senderId: z.string().optional(),
+      receiverId: z.string().optional(),
+      buyerId: z.string().optional(),
+      sellerId: z.string().optional(),
+      code: z.string().optional(),
+    }).parse(request.query);
+
+    const range = dateRange(query.from, query.to);
+    const take = EXPORT_LIMIT;
+
+    let headers: string[] = [];
+    let rows: unknown[][] = [];
+
+    if (params.type === 'transactions') {
+      const where: { walletId?: string | { in: string[] }; type?: string; description?: { contains: string; mode: 'insensitive' }; createdAt?: { gte?: Date; lte?: Date } } = {
+        ...(query.walletId ? { walletId: query.walletId } : {}),
+        ...(query.type ? { type: query.type } : {}),
+        ...(query.search ? { description: { contains: query.search, mode: 'insensitive' as const } } : {}),
+        ...(range ? { createdAt: range } : {}),
+      };
+      if (query.userId) {
+        const walletsFromUser = await prisma.wallet.findMany({ where: { userId: query.userId }, select: { id: true } });
+        const walletIdsFromUser = walletsFromUser.map((wallet: { id: string }) => wallet.id);
+        if (walletIdsFromUser.length === 0) {
+          headers = ['id', 'walletId', 'userId', 'userName', 'userEmail', 'type', 'amount', 'description', 'createdAt'];
+          rows = [];
+        } else if (query.walletId && !walletIdsFromUser.includes(query.walletId)) {
+          headers = ['id', 'walletId', 'userId', 'userName', 'userEmail', 'type', 'amount', 'description', 'createdAt'];
+          rows = [];
+        } else if (!query.walletId) {
+          where.walletId = { in: walletIdsFromUser };
+        }
+      }
+      if (headers.length === 0) {
+        const items = await prisma.transaction.findMany({ where, orderBy: { createdAt: 'desc' }, take });
+        const walletIds = [...new Set(items.map((item: { walletId: string }) => item.walletId))];
+        const wallets = await prisma.wallet.findMany({ where: { id: { in: walletIds } }, include: { user: { select: { id: true, name: true, email: true } } } });
+        const walletMap = new Map(wallets.map((wallet: any) => [wallet.id, wallet] as const));
+        headers = ['id', 'walletId', 'userId', 'userName', 'userEmail', 'type', 'amount', 'description', 'createdAt'];
+        rows = items.map((item: { id: string; walletId: string; type: string; amount: unknown; description: unknown; createdAt: Date }) => {
+          const wallet = walletMap.get(item.walletId);
+          return [item.id, item.walletId, wallet?.user?.id ?? '', wallet?.user?.name ?? '', wallet?.user?.email ?? '', item.type, item.amount, item.description, item.createdAt];
+        });
+      }
+    } else if (params.type === 'transfers') {
+      const items = await prisma.coinTransfer.findMany({ where: { ...(query.type ? { type: query.type as any } : {}), ...(query.senderId ? { senderId: query.senderId } : {}), ...(query.receiverId ? { receiverId: query.receiverId } : {}), ...(query.search ? { reason: { contains: query.search, mode: 'insensitive' as const } } : {}), ...(range ? { createdAt: range } : {}) }, include: { sender: { select: { id: true, name: true, email: true } }, receiver: { select: { id: true, name: true, email: true } } }, orderBy: { createdAt: 'desc' }, take });
+      headers = ['id', 'type', 'senderId', 'senderName', 'senderEmail', 'receiverId', 'receiverName', 'receiverEmail', 'amount', 'reason', 'previousValue', 'newValue', 'createdAt'];
+      rows = items.map((item: any) => [item.id, item.type, item.senderId, item.sender?.name, item.sender?.email, item.receiverId, item.receiver?.name, item.receiver?.email, item.amount, item.reason, item.previousValue, item.newValue, item.createdAt]);
+    } else if (params.type === 'withdrawals') {
+      const items = await prisma.withdrawalRequest.findMany({ where: { ...(query.userId ? { userId: query.userId } : {}), ...(query.status ? { status: query.status as any } : {}), ...(query.code ? { code: { contains: query.code, mode: 'insensitive' as const } } : {}), ...(query.search ? { OR: [{ userNote: { contains: query.search, mode: 'insensitive' as const } }, { adminNote: { contains: query.search, mode: 'insensitive' as const } }] } : {}), ...(range ? { createdAt: range } : {}) }, include: { user: { select: { id: true, name: true, email: true } }, reviewedBy: { select: { id: true, name: true } } }, orderBy: { createdAt: 'desc' }, take });
+      headers = ['id', 'code', 'userId', 'userName', 'userEmail', 'amount', 'status', 'userNote', 'adminNote', 'reviewedById', 'reviewedByName', 'requestedAt', 'completedAt', 'rejectedAt', 'createdAt'];
+      rows = items.map((item: any) => [item.id, item.code, item.userId, item.user?.name, item.user?.email, item.amount, item.status, item.userNote, item.adminNote, item.reviewedById, item.reviewedBy?.name, item.requestedAt, item.completedAt, item.rejectedAt, item.createdAt]);
+    } else if (params.type === 'orders') {
+      const items = await prisma.marketOrder.findMany({ where: { ...(query.companyId ? { companyId: query.companyId } : {}), ...(query.userId ? { userId: query.userId } : {}), ...(query.type ? { type: query.type as any } : {}), ...(query.mode ? { mode: query.mode as any } : {}), ...(query.status ? { status: query.status as any } : {}), ...(query.search ? { OR: [{ user: { name: { contains: query.search, mode: 'insensitive' as const } } }, { company: { name: { contains: query.search, mode: 'insensitive' as const } } }, { company: { ticker: { contains: query.search, mode: 'insensitive' as const } } }] } : {}), ...(range ? { createdAt: range } : {}) }, include: { user: { select: { id: true, name: true, email: true } }, company: { select: { id: true, ticker: true, name: true } } }, orderBy: { createdAt: 'desc' }, take });
+      headers = ['id', 'companyId', 'ticker', 'companyName', 'userId', 'userName', 'userEmail', 'type', 'mode', 'status', 'quantity', 'remainingQuantity', 'limitPrice', 'lockedCash', 'lockedShares', 'createdAt', 'executedAt', 'canceledAt'];
+      rows = items.map((item: any) => [item.id, item.companyId, item.company?.ticker, item.company?.name, item.userId, item.user?.name, item.user?.email, item.type, item.mode, item.status, item.quantity, item.remainingQuantity, item.limitPrice, item.lockedCash, item.lockedShares, item.createdAt, item.executedAt, item.canceledAt]);
+    } else if (params.type === 'trades') {
+      const items = await prisma.trade.findMany({ where: { ...(query.companyId ? { companyId: query.companyId } : {}), ...(query.buyerId ? { buyerId: query.buyerId } : {}), ...(query.sellerId ? { sellerId: query.sellerId } : {}), ...(query.search ? { OR: [{ buyer: { name: { contains: query.search, mode: 'insensitive' as const } } }, { seller: { name: { contains: query.search, mode: 'insensitive' as const } } }, { company: { ticker: { contains: query.search, mode: 'insensitive' as const } } }] } : {}), ...(range ? { createdAt: range } : {}) }, include: { company: { select: { id: true, ticker: true, name: true } }, buyer: { select: { id: true, name: true, email: true } }, seller: { select: { id: true, name: true, email: true } } }, orderBy: { createdAt: 'desc' }, take });
+      headers = ['id', 'companyId', 'ticker', 'companyName', 'buyerId', 'buyerName', 'buyerEmail', 'sellerId', 'sellerName', 'sellerEmail', 'quantity', 'unitPrice', 'grossAmount', 'buyFeeAmount', 'sellFeeAmount', 'createdAt'];
+      rows = items.map((item: any) => [item.id, item.companyId, item.company?.ticker, item.company?.name, item.buyerId, item.buyer?.name, item.buyer?.email, item.sellerId, item.seller?.name, item.seller?.email, item.quantity, item.unitPrice, item.grossAmount, item.buyFeeAmount, item.sellFeeAmount, item.createdAt]);
+    } else if (params.type === 'company-revenues') {
+      const items = await prisma.companyRevenueAccount.findMany({ where: { ...(query.companyId ? { companyId: query.companyId } : {}), ...(query.status ? { company: { status: query.status as any } } : {}), ...(query.search ? { OR: [{ company: { ticker: { contains: query.search, mode: 'insensitive' as const } } }, { company: { name: { contains: query.search, mode: 'insensitive' as const } } }, { company: { founder: { name: { contains: query.search, mode: 'insensitive' as const } } } }] } : {}) }, include: { company: { include: { founder: { select: { id: true, name: true, email: true } } } } }, orderBy: { updatedAt: 'desc' }, take });
+      headers = ['companyId', 'ticker', 'companyName', 'ownerId', 'ownerName', 'ownerEmail', 'status', 'balance', 'totalReceivedFees', 'totalWithdrawn', 'totalUsedForBoost', 'currentPrice'];
+      rows = items.map((item: any) => [item.companyId, item.company?.ticker, item.company?.name, item.company?.founder?.id, item.company?.founder?.name, item.company?.founder?.email, item.company?.status, item.balance, item.totalReceivedFees, item.totalWithdrawn, item.totalUsedForBoost, item.company?.currentPrice]);
+    } else if (params.type === 'user-report') {
+      if (!query.userId) return reply.code(400).send({ message: 'Informe userId para exportar relatório de usuário.' });
+      const user = await prisma.user.findUnique({ where: { id: query.userId }, select: { id: true, name: true, email: true } });
+      if (!user) return reply.code(404).send({ message: 'Usuário não encontrado.' });
+      const wallet = await prisma.wallet.findUnique({ where: { userId: query.userId } });
+      const transactions = await prisma.transaction.findMany({ where: { ...(wallet ? { walletId: wallet.id } : { walletId: '__NO_WALLET__' }), ...(range ? { createdAt: range } : {}) }, orderBy: { createdAt: 'desc' }, take: 50 });
+      const transfers = await prisma.coinTransfer.findMany({ where: { OR: [{ senderId: query.userId }, { receiverId: query.userId }], ...(range ? { createdAt: range } : {}) }, orderBy: { createdAt: 'desc' }, take: 50 });
+      const withdrawals = await prisma.withdrawalRequest.findMany({ where: { userId: query.userId, ...(range ? { createdAt: range } : {}) }, orderBy: { createdAt: 'desc' }, take: 50 });
+      const orders = await prisma.marketOrder.findMany({ where: { userId: query.userId, ...(range ? { createdAt: range } : {}) }, orderBy: { createdAt: 'desc' }, take: 50 });
+      const holdings = await prisma.companyHolding.findMany({ where: { userId: query.userId }, include: { company: { select: { ticker: true, name: true } } } });
+      headers = ['section', 'key', 'value'];
+      rows = [['user', 'id', user.id], ['user', 'name', user.name], ['user', 'email', user.email], ['wallet', 'availableBalance', wallet?.availableBalance ?? 0], ...transactions.map((t: any) => ['transaction', t.id, JSON.stringify({ type: t.type, amount: t.amount, createdAt: t.createdAt })]), ...transfers.map((t: any) => ['transfer', t.id, JSON.stringify({ type: t.type, amount: t.amount, createdAt: t.createdAt })]), ...withdrawals.map((w: any) => ['withdrawal', w.id, JSON.stringify({ status: w.status, amount: w.amount, createdAt: w.createdAt })]), ...orders.map((o: any) => ['order', o.id, JSON.stringify({ status: o.status, type: o.type, quantity: o.quantity, createdAt: o.createdAt })]), ...holdings.map((h: any) => ['holding', h.id, JSON.stringify({ ticker: h.company?.ticker, shares: h.shares })])];
+    } else if (params.type === 'broker-report') {
+      if (!query.userId) return reply.code(400).send({ message: 'Informe userId para exportar relatório de corretor.' });
+      const user = await prisma.user.findUnique({ where: { id: query.userId }, select: { id: true, name: true, email: true } });
+      if (!user) return reply.code(404).send({ message: 'Corretor não encontrado.' });
+      const brokerAccount = await prisma.brokerAccount.findUnique({ where: { userId: query.userId } });
+      const transfers = await prisma.coinTransfer.findMany({ where: { OR: [{ senderId: query.userId }, { receiverId: query.userId }], ...(range ? { createdAt: range } : {}) }, orderBy: { createdAt: 'desc' }, take: 50 });
+      headers = ['section', 'key', 'value'];
+      rows = [['broker', 'id', user.id], ['broker', 'name', user.name], ['broker', 'email', user.email], ['brokerAccount', 'available', brokerAccount?.available ?? 0], ['brokerAccount', 'receivedTotal', brokerAccount?.receivedTotal ?? 0], ...transfers.map((t: any) => ['transfer', t.id, JSON.stringify({ type: t.type, amount: t.amount, createdAt: t.createdAt, senderId: t.senderId, receiverId: t.receiverId })])];
+    }
+
+    const csv = toCsv(headers, rows);
+    const filenameDate = new Date().toISOString().slice(0, 10);
+    reply.header('content-type', 'text/csv; charset=utf-8');
+    reply.header('Content-Disposition', `attachment; filename="rpc-exchange-${params.type}-${filenameDate}.csv"`);
+    return reply.send(csv);
   });
 
 
