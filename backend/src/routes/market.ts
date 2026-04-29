@@ -191,8 +191,6 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
 
   const company = await getCompanyOrThrow(tx, taker.companyId);
 
-  const takerWallet = await ensureWallet(tx, taker.userId);
-
   const initialOppositeOrders = await tx.marketOrder.findMany({
     where: {
       companyId: taker.companyId,
@@ -230,6 +228,12 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
   for (const restingOrder of initialOppositeOrders) {
     if (taker.remainingQuantity <= 0) break;
 
+    const takerFresh = await tx.marketOrder.findUnique({ where: { id: taker.id } });
+    if (!takerFresh || takerFresh.remainingQuantity <= 0) break;
+    taker.remainingQuantity = takerFresh.remainingQuantity;
+    taker.lockedCash = takerFresh.lockedCash;
+    taker.lockedShares = takerFresh.lockedShares;
+
     const maker = await tx.marketOrder.findUnique({ where: { id: restingOrder.id } });
     if (!maker || maker.remainingQuantity <= 0) continue;
 
@@ -261,39 +265,47 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
     const buyerId = taker.type === 'BUY' ? taker.userId : maker.userId;
     const sellerId = taker.type === 'SELL' ? taker.userId : maker.userId;
 
-    const buyerWallet = buyerId === taker.userId ? takerWallet : await ensureWallet(tx, buyerId);
-    const sellerWallet = sellerId === taker.userId ? takerWallet : await ensureWallet(tx, sellerId);
+    const buyerWallet = await ensureWallet(tx, buyerId);
+    const sellerWallet = await ensureWallet(tx, sellerId);
 
     const buyerIsTaker = taker.type === 'BUY';
     const sellerIsTaker = taker.type === 'SELL';
 
     if (buyerIsTaker) {
       if (taker.mode === 'LIMIT') {
-        if (buyerWallet.lockedBalance.lessThan(buyerTotalPay)) {
+        const reserveCheck = await tx.wallet.findUnique({ where: { id: buyerWallet.id }, select: { lockedBalance: true } });
+        if (!reserveCheck || reserveCheck.lockedBalance.lessThan(buyerTotalPay)) {
           throw new Error('Saldo bloqueado insuficiente para concluir a ordem de compra.');
         }
-        await tx.wallet.update({
-          where: { id: buyerWallet.id },
-          data: { lockedBalance: buyerWallet.lockedBalance.sub(buyerTotalPay) },
+        const debited = await tx.wallet.updateMany({
+          where: { id: buyerWallet.id, lockedBalance: { gte: buyerTotalPay } },
+          data: { lockedBalance: { decrement: buyerTotalPay } },
         });
+        if (debited.count !== 1) throw new Error('Falha de consistência ao debitar saldo bloqueado do comprador.');
       } else {
-        if (buyerWallet.availableBalance.lessThan(buyerTotalPay)) {
+        const buyerCash = await tx.wallet.findUnique({ where: { id: buyerWallet.id }, select: { availableBalance: true } });
+        if (!buyerCash || buyerCash.availableBalance.lessThan(buyerTotalPay)) {
           if (taker.remainingQuantity === taker.quantity) throw new Error('Saldo insuficiente para compra a mercado.');
           break;
         }
-        await tx.wallet.update({
-          where: { id: buyerWallet.id },
-          data: { availableBalance: buyerWallet.availableBalance.sub(buyerTotalPay) },
+        const debited = await tx.wallet.updateMany({
+          where: { id: buyerWallet.id, availableBalance: { gte: buyerTotalPay } },
+          data: { availableBalance: { decrement: buyerTotalPay } },
         });
+        if (debited.count !== 1) {
+          if (taker.remainingQuantity === taker.quantity) throw new Error('Saldo insuficiente para compra a mercado.');
+          break;
+        }
       }
     } else {
       if (maker.lockedCash.lessThan(buyerTotalPay)) {
         throw new Error('Saldo bloqueado do comprador em ordem limite está inconsistente.');
       }
-      await tx.wallet.update({
-        where: { id: buyerWallet.id },
-        data: { lockedBalance: buyerWallet.lockedBalance.sub(buyerTotalPay) },
+      const debited = await tx.wallet.updateMany({
+        where: { id: buyerWallet.id, lockedBalance: { gte: buyerTotalPay } },
+        data: { lockedBalance: { decrement: buyerTotalPay } },
       });
+      if (debited.count !== 1) throw new Error('Saldo bloqueado do comprador em ordem limite está inconsistente.');
     }
 
     if (sellerIsTaker) {
@@ -311,7 +323,7 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
 
     await tx.wallet.update({
       where: { id: sellerWallet.id },
-      data: { availableBalance: sellerWallet.availableBalance.add(sellerNetReceive) },
+      data: { availableBalance: { increment: sellerNetReceive } },
     });
 
     await addSharesToBuyer(tx, {
@@ -344,6 +356,14 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
     taker.remainingQuantity = takerRemaining;
     taker.lockedCash = toDecimal(takerOrderUpdateData.lockedCash as Decimal);
     taker.lockedShares = (takerOrderUpdateData.lockedShares as number) ?? taker.lockedShares;
+
+    if (takerOrderUpdateData.lockedCash.lessThan(0) || (takerOrderUpdateData.lockedShares as number) < 0) {
+      throw new Error('Consistência inválida na ordem taker: bloqueios negativos.');
+    }
+
+    if (makerOrderUpdateData.lockedCash.lessThan(0) || (makerOrderUpdateData.lockedShares as number) < 0) {
+      throw new Error('Consistência inválida na ordem maker: bloqueios negativos.');
+    }
 
     await tx.marketOrder.update({ where: { id: taker.id }, data: takerOrderUpdateData });
     await tx.marketOrder.update({ where: { id: maker.id }, data: makerOrderUpdateData });
@@ -437,13 +457,14 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
   const refreshed = await tx.marketOrder.findUnique({ where: { id: taker.id } });
   if (refreshed && refreshed.mode === 'LIMIT' && refreshed.type === 'BUY' && refreshed.remainingQuantity === 0 && refreshed.lockedCash.greaterThan(0)) {
     const buyerWallet = await ensureWallet(tx, refreshed.userId);
-    await tx.wallet.update({
-      where: { id: buyerWallet.id },
+    const refunded = await tx.wallet.updateMany({
+      where: { id: buyerWallet.id, lockedBalance: { gte: refreshed.lockedCash } },
       data: {
-        lockedBalance: buyerWallet.lockedBalance.sub(refreshed.lockedCash),
-        availableBalance: buyerWallet.availableBalance.add(refreshed.lockedCash),
+        lockedBalance: { decrement: refreshed.lockedCash },
+        availableBalance: { increment: refreshed.lockedCash },
       },
     });
+    if (refunded.count !== 1) throw new Error('Falha de consistência no reembolso de sobra da ordem limite de compra.');
     await tx.marketOrder.update({ where: { id: refreshed.id }, data: { lockedCash: ZERO } });
   }
 }

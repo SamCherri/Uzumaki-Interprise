@@ -73,3 +73,10 @@ Auditoria consolidada do estado atual da **RPC Exchange**, mantendo o projeto ex
 ## Atualização 2026-04-29 — Impulsão definitiva
 Implementado: reserva de boost por projeto, histórico de injeções, fonte por carteira pessoal/receita/ajuste admin e logs de auditoria.
 Pendente: fórmula avançada, recompra/queima, automação de retirada de lucro da Exchange.
+
+## Atualização 2026-04-29 — Segurança econômica no matching multi-fill
+- **Severidade:** CRÍTICO.
+- **Risco identificado:** inconsistência de saldo/bloqueio quando uma ordem executa em múltiplos fills no mesmo loop de matching, por uso de snapshots antigos de wallet/ordem.
+- **Correção aplicada:** revisão completa de `runMatching` para recarregar estado atual da ordem taker a cada fill, debitar `availableBalance`/`lockedBalance` com `updateMany` condicionado (`gte`) e `increment/decrement` atômico, validar bloqueios negativos e interromper com erro claro em inconsistência.
+- **Proteções garantidas:** sem `availableBalance` negativo, sem `lockedBalance` negativo, sem `lockedCash` negativo, sem `lockedShares` negativo e reembolso consistente da sobra em ordem limite de compra.
+- **Regra econômica preservada:** sem alteração na taxa 50/50 e sem alteração da fórmula de preço/matching econômico.
