@@ -105,3 +105,13 @@ Regras:
 - Histórico permanece preservado no banco.
 - Admin consulta histórico por auditoria e relatórios, não por rotas públicas.
 - Esta regra evita que usuários acessem projetos desligados diretamente pelo ID.
+
+
+## Feedback de preço na compra inicial
+
+Regras:
+- Compra no lançamento inicial altera `Company.currentPrice`.
+- Compra no lançamento inicial não cria `Trade`.
+- A API retorna `priceBefore`, `priceAfter` e `priceIncrease`.
+- O frontend exibe preço antes/depois para evitar confusão visual.
+- O gráfico continua usando `initialPrice`, `trades` e `currentPrice`.
