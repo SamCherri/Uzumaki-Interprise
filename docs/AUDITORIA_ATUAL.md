@@ -142,3 +142,12 @@ Regras:
 - O saldo é fictício/RP.
 - Não existe dinheiro real, Pix, gateway, blockchain ou saque real.
 - A taxa 50/50 não é alterada por este fluxo.
+
+
+## Sincronização de usuário atual
+
+- Cadastro e login normalizam e-mail com `trim().toLowerCase()`.
+- `GET /auth/me` retorna dados atuais do usuário e roles vindas do banco.
+- O frontend deve usar `/auth/me` como fonte principal de permissões visuais.
+- JWT continua servindo para autenticação, mas roles antigas não devem ser a única fonte visual.
+- Alteração de cargos pode exigir recarregamento da tela se não houver atualização em tempo real.

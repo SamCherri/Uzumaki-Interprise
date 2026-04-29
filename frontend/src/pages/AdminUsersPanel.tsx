@@ -18,7 +18,25 @@ type UserRow = {
 
 const ALL_ROLES = ['USER', 'VIRTUAL_BROKER', 'BUSINESS_OWNER', 'ADMIN', 'SUPER_ADMIN'];
 
-export function AdminUsersPanel() {
+type AdminUsersPanelProps = {
+  onPermissionsUpdated: () => Promise<void>;
+};
+
+function getCurrentUserIdFromToken(): string | null {
+  const token = localStorage.getItem('token');
+  if (!token) return null;
+
+  try {
+    const payload = token.split('.')[1] ?? "";
+    const padded = payload.padEnd(Math.ceil(payload.length / 4) * 4, "=");
+    const parsed = JSON.parse(atob(padded)) as { sub?: unknown };
+    return typeof parsed.sub === "string" ? parsed.sub : null;
+  } catch {
+    return null;
+  }
+}
+
+export function AdminUsersPanel({ onPermissionsUpdated }: AdminUsersPanelProps) {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
@@ -71,7 +89,14 @@ export function AdminUsersPanel() {
       body: JSON.stringify({ roles: Array.from(new Set(['USER', ...editingRoles])) }),
     });
 
-    setSuccess('Permissões atualizadas com sucesso. Alterações são registradas em auditoria.');
+    const currentUserId = getCurrentUserIdFromToken();
+    if (currentUserId && editingUserId === currentUserId) {
+      await onPermissionsUpdated();
+      setSuccess('Suas permissões foram alteradas. Recarregue a página para atualizar o menu.');
+    } else {
+      setSuccess('Permissões atualizadas com sucesso. Alterações são registradas em auditoria.');
+    }
+
     setEditingUserId(null);
     await loadUsers();
   }

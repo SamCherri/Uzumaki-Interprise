@@ -8,7 +8,7 @@ import { CompanyRequestPage } from './pages/CompanyRequestPage';
 import { CompaniesPage } from './pages/CompaniesPage';
 import { WithdrawalsPage } from './pages/WithdrawalsPage';
 import { ProjectOwnerPanel } from './pages/ProjectOwnerPanel';
-import { api } from './services/api';
+import { api, getCurrentUser, CurrentUserResponse } from './services/api';
 
 type PublicTab = 'login' | 'register';
 type PrivateScreen = 'home' | 'markets' | 'wallet' | 'withdrawals' | 'company-request' | 'admin' | 'broker' | 'my-projects';
@@ -18,6 +18,8 @@ type ViewerRoles = {
   canSeeBroker: boolean;
   canSeeProjectOwner: boolean;
 };
+
+type CurrentUser = CurrentUserResponse['user'];
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -66,8 +68,21 @@ export function App() {
   );
   const [installHint, setInstallHint] = useState('');
   const [hasOwnedProjects, setHasOwnedProjects] = useState(false);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
 
-  const roles = useMemo(() => decodeRolesFromToken(token), [token]);
+  const tokenRoles = useMemo(() => decodeRolesFromToken(token), [token]);
+  const roles = useMemo(() => {
+    if (currentUser) {
+      const normalized = currentUser.roles.map((role) => role.trim().toUpperCase());
+      return {
+        canSeeAdmin: normalized.some((role) => ADMIN_ROLES.has(role)),
+        canSeeBroker: normalized.some((role) => BROKER_ROLES.has(role)),
+        canSeeProjectOwner: normalized.some((role) => PROJECT_OWNER_ROLES.has(role)),
+      };
+    }
+
+    return tokenRoles;
+  }, [currentUser, tokenRoles]);
   const canSeeMyProjects = roles.canSeeProjectOwner || hasOwnedProjects;
 
   useEffect(() => {
@@ -94,8 +109,23 @@ export function App() {
   useEffect(() => {
     if (!token) {
       setHasOwnedProjects(false);
+      setCurrentUser(null);
       return;
     }
+
+    getCurrentUser()
+      .then((response) => {
+        setCurrentUser(response.user);
+      })
+      .catch((error: Error) => {
+        if (error.message.toLowerCase().includes('não autenticado')) {
+          setToken(null);
+          setScreen('home');
+          setPublicTab('login');
+          return;
+        }
+        setCurrentUser(null);
+      });
 
     api<{ companies: Array<{ id: string }> }>('/project-boosts/my-projects')
       .then((response) => setHasOwnedProjects(response.companies.length > 0))
@@ -261,7 +291,7 @@ export function App() {
       {screen === 'withdrawals' && <WithdrawalsPage />}
       {screen === 'company-request' && <CompanyRequestPage />}
       {screen === 'my-projects' && canSeeMyProjects && <ProjectOwnerPanel />}
-      {screen === 'admin' && roles.canSeeAdmin && <AdminDashboard />}
+      {screen === 'admin' && roles.canSeeAdmin && <AdminDashboard currentUserRoles={currentUser?.roles ?? []} onPermissionsUpdated={async () => { const response = await getCurrentUser(); setCurrentUser(response.user); }} />}
       {screen === 'broker' && roles.canSeeBroker && <BrokerDashboard />}
     </main>
   );

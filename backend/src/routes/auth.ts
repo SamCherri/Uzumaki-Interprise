@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { loginUser, registerUser } from '../services/auth-service.js';
+import { prisma } from '../lib/prisma.js';
 
 export async function authRoutes(app: FastifyInstance) {
   app.post('/auth/register', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -24,6 +25,49 @@ export async function authRoutes(app: FastifyInstance) {
     } catch (error) {
       return reply.code(400).send({ message: (error as Error).message });
     }
+  });
+
+
+
+  app.get('/auth/me', { preHandler: [app.authenticate] }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const schema = z.object({ sub: z.string() });
+    const payload = schema.parse(request.user);
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      include: {
+        wallet: true,
+        roles: { include: { role: true } },
+      },
+    });
+
+    if (!user) {
+      return reply.code(401).send({ message: 'Não autenticado.' });
+    }
+
+    const roles = user.roles.map((item) => item.role.key);
+
+    return {
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        roles,
+        isBlocked: user.isBlocked,
+        createdAt: user.createdAt,
+      },
+      wallet: user.wallet
+        ? {
+            availableBalance: user.wallet.availableBalance,
+            lockedBalance: user.wallet.lockedBalance,
+            pendingWithdrawalBalance: user.wallet.pendingWithdrawalBalance,
+          }
+        : {
+            availableBalance: '0',
+            lockedBalance: '0',
+            pendingWithdrawalBalance: '0',
+          },
+    };
   });
 
   app.post('/auth/login', async (request: FastifyRequest, reply: FastifyReply) => {

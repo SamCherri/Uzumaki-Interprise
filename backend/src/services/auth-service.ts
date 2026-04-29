@@ -2,7 +2,8 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma.js';
 
 export async function registerUser(name: string, email: string, password: string) {
-  const exists = await prisma.user.findUnique({ where: { email } });
+  const normalizedEmail = email.trim().toLowerCase();
+  const exists = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (exists) {
     throw new Error('E-mail já cadastrado.');
   }
@@ -17,7 +18,7 @@ export async function registerUser(name: string, email: string, password: string
   const user = await prisma.user.create({
     data: {
       name,
-      email,
+      email: normalizedEmail,
       passwordHash,
       wallet: { create: {} },
       roles: { create: [{ roleId: userRole.id }] },
@@ -29,8 +30,9 @@ export async function registerUser(name: string, email: string, password: string
 }
 
 export async function loginUser(email: string, password: string) {
+  const normalizedEmail = email.trim().toLowerCase();
   const user = await prisma.user.findUnique({
-    where: { email },
+    where: { email: normalizedEmail },
     include: { roles: { include: { role: true } }, wallet: true },
   });
 
