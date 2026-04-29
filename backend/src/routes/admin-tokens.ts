@@ -74,7 +74,7 @@ export async function adminTokensRoutes(app: FastifyInstance) {
     });
 
     return {
-      tokens: companies.map((company) => ({
+      tokens: companies.map((company: { id: string; name: string; ticker: string; sector: string; status: string; founder: { id: string; name: string | null; email: string } | null; currentPrice: unknown; totalShares: number; availableOfferShares: number; createdAt: Date; approvedAt: Date | null; suspendedAt: Date | null }) => ({
         id: company.id,
         name: company.name,
         ticker: company.ticker,
@@ -439,7 +439,7 @@ export async function adminTokensRoutes(app: FastifyInstance) {
         prisma.companyRevenueAccount.findUnique({ where: { companyId: id } }),
       ]);
 
-      const economicOps = operations.filter((operation) => !(operation.type === 'ADMIN_APPROVE' && operation.description.includes('manualmente por administrador'))).length;
+      const economicOps = operations.filter((operation: { type: string; description: string }) => !(operation.type === 'ADMIN_APPROVE' && operation.description.includes('manualmente por administrador'))).length;
 
       const blockedByHistory = hasEconomicHistory({
         trades,

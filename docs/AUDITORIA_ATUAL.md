@@ -80,3 +80,18 @@ Pendente: fórmula avançada, recompra/queima, automação de retirada de lucro 
 - **Correção aplicada:** revisão completa de `runMatching` para recarregar estado atual da ordem taker a cada fill, debitar `availableBalance`/`lockedBalance` com `updateMany` condicionado (`gte`) e `increment/decrement` atômico, validar bloqueios negativos e interromper com erro claro em inconsistência.
 - **Proteções garantidas:** sem `availableBalance` negativo, sem `lockedBalance` negativo, sem `lockedCash` negativo, sem `lockedShares` negativo e reembolso consistente da sobra em ordem limite de compra.
 - **Regra econômica preservada:** sem alteração na taxa 50/50 e sem alteração da fórmula de preço/matching econômico.
+
+## Fluxos de distribuição de RPC
+
+Fluxo normal:
+Tesouraria → Corretor → Jogador
+
+Fluxo administrativo:
+Tesouraria → Jogador, com justificativa obrigatória e auditoria
+
+Regras:
+- Toda emissão de RPC precisa de motivo.
+- Todo envio da tesouraria precisa de motivo.
+- Depósito direto ADM → jogador só deve ser usado para evento, correção, premiação ou ajuste administrativo.
+- Toda ação deve gerar AdminLog.
+- Operações financeiras devem registrar Transaction quando impactarem carteira de usuário.

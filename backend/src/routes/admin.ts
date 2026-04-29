@@ -23,7 +23,7 @@ export async function adminRoutes(app: FastifyInstance) {
   app.get('/admin/overview', { preHandler: [app.authenticate] }, async (request: FastifyRequest, reply: FastifyReply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
-    const isAdmin = roles.includes('ADMIN') || roles.includes('SUPER_ADMIN');
+    const isAdmin = roles.includes('ADMIN') || roles.includes('SUPER_ADMIN') || roles.includes('COIN_CHIEF_ADMIN');
 
     if (!isAdmin) {
       return reply.code(403).send({ message: 'Sem permissão para o painel admin.' });
@@ -224,6 +224,145 @@ export async function adminRoutes(app: FastifyInstance) {
   });
 
 
+  app.post('/admin/treasury/transfer-to-user', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authRequest = request as AuthRequest;
+    const roles = authRequest.user.roles ?? [];
+
+    if (!requireRole(reply, roles, ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN'], 'Sem permissão para enviar RPC a usuário.')) {
+      return;
+    }
+
+    try {
+      const schema = z.object({
+        userId: z.string().min(1).optional(),
+        userEmail: z.string().email().optional(),
+        amount: amountSchema,
+        reason: z.string().trim().min(3),
+      }).superRefine((value, ctx) => {
+        if (!value.userId && !value.userEmail) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Informe o e-mail ou id do usuário de destino.',
+            path: ['userEmail'],
+          });
+        }
+      });
+
+      const parsed = schema.parse(request.body);
+      const userEmail = parsed.userEmail?.trim().toLowerCase();
+
+      const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const treasury = await tx.treasuryAccount.findFirstOrThrow();
+        const amount = new Decimal(parsed.amount);
+
+        const targetUser = await tx.user.findFirst({
+          where: userEmail ? { email: userEmail } : { id: parsed.userId },
+        });
+
+        if (!targetUser) {
+          throw new Error('Usuário de destino não encontrado.');
+        }
+
+        const userWallet = await tx.wallet.upsert({
+          where: { userId: targetUser.id },
+          update: {},
+          create: {
+            userId: targetUser.id,
+            availableBalance: new Decimal(0),
+            lockedBalance: new Decimal(0),
+            pendingWithdrawalBalance: new Decimal(0),
+          },
+        });
+
+        const treasuryPrevious = treasury.balance;
+        const userPrevious = userWallet.availableBalance;
+
+        const treasuryMutation = await tx.treasuryAccount.updateMany({
+          where: {
+            id: treasury.id,
+            balance: { gte: amount },
+          },
+          data: {
+            balance: { decrement: amount },
+          },
+        });
+
+        if (treasuryMutation.count !== 1) {
+          throw new Error('Saldo insuficiente na tesouraria.');
+        }
+
+        const updatedTreasury = await tx.treasuryAccount.findUniqueOrThrow({
+          where: { id: treasury.id },
+        });
+
+        const updatedWallet = await tx.wallet.update({
+          where: { id: userWallet.id },
+          data: {
+            availableBalance: { increment: amount },
+          },
+        });
+
+
+        const transfer = await tx.coinTransfer.create({
+          data: {
+            type: 'ADJUSTMENT',
+            senderId: null,
+            receiverId: targetUser.id,
+            amount,
+            reason: parsed.reason,
+            previousValue: treasuryPrevious,
+            newValue: updatedTreasury.balance,
+          },
+        });
+
+        await tx.transaction.create({
+          data: {
+            walletId: userWallet.id,
+            type: 'ADMIN_TREASURY_TRANSFER_IN',
+            amount,
+            description: parsed.reason,
+          },
+        });
+
+        await tx.adminLog.create({
+          data: {
+            userId: authRequest.user.sub,
+            action: 'TREASURY_TRANSFER_TO_USER',
+            entity: 'Wallet',
+            reason: parsed.reason,
+            previous: JSON.stringify({
+              targetUserId: targetUser.id,
+              targetUserEmail: targetUser.email,
+              treasuryBalance: treasuryPrevious.toString(),
+              userAvailableBalance: userPrevious.toString(),
+            }),
+            current: JSON.stringify({
+              targetUserId: targetUser.id,
+              targetUserEmail: targetUser.email,
+              treasuryBalance: updatedTreasury.balance.toString(),
+              userAvailableBalance: updatedWallet.availableBalance.toString(),
+              amount: amount.toString(),
+            }),
+            ip: request.ip,
+            userAgent: request.headers['user-agent'] ?? null,
+          },
+        });
+
+        return {
+          message: 'RPC depositado na carteira do usuário com sucesso.',
+          transfer,
+          treasuryBalance: updatedTreasury.balance,
+          userBalance: updatedWallet.availableBalance,
+        };
+      });
+
+      return reply.code(201).send(result);
+    } catch (error) {
+      return reply.code(400).send({ message: (error as Error).message });
+    }
+  });
+
+
   app.get('/admin/platform-account', { preHandler: [app.authenticate] }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
@@ -262,7 +401,7 @@ export async function adminRoutes(app: FastifyInstance) {
     });
 
     return {
-      accounts: accounts.map((account) => ({
+      accounts: accounts.map((account: { companyId: string; company: { ticker: string; name: string }; balance: unknown; totalReceivedFees: unknown; totalWithdrawn: unknown }) => ({
         companyId: account.companyId,
         ticker: account.company.ticker,
         companyName: account.company.name,

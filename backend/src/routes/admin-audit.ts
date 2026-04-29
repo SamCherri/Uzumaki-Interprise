@@ -44,11 +44,11 @@ export async function adminAuditRoutes(app: FastifyInstance) {
     const query = z.object({ userId: z.string().optional(), walletId: z.string().optional(), type: z.string().optional(), search: z.string().optional(), from: z.string().optional(), to: z.string().optional() }).merge(paginationSchema).parse(request.query);
     const where = { ...(query.walletId ? { walletId: query.walletId } : {}), ...(query.type ? { type: query.type } : {}), ...(query.search ? { description: { contains: query.search, mode: 'insensitive' as const } } : {}), ...(dateRange(query.from, query.to) ? { createdAt: dateRange(query.from, query.to) } : {}) };
     const [total, items] = await Promise.all([prisma.transaction.count({ where }), prisma.transaction.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (query.page - 1) * query.pageSize, take: query.pageSize })]);
-    const walletIds = [...new Set(items.map((item) => item.walletId))];
+    const walletIds = [...new Set(items.map((item: { walletId: string }) => item.walletId))];
     const wallets = await prisma.wallet.findMany({ where: { id: { in: walletIds }, ...(query.userId ? { userId: query.userId } : {}) }, include: { user: { select: { id: true, name: true, email: true } } } });
-    const walletMap = new Map(wallets.map((w) => [w.id, w]));
-    const filtered = query.userId ? items.filter((i) => walletMap.has(i.walletId)) : items;
-    return { items: filtered.map((item) => ({ ...item, wallet: walletMap.get(item.walletId) ?? null })), pagination: { page: query.page, pageSize: query.pageSize, total } };
+    const walletMap = new Map(wallets.map((w: { id: string }) => [w.id, w] as const));
+    const filtered = query.userId ? items.filter((i: { walletId: string }) => walletMap.has(i.walletId)) : items;
+    return { items: filtered.map((item: { walletId: string }) => ({ ...item, wallet: walletMap.get(item.walletId) ?? null })), pagination: { page: query.page, pageSize: query.pageSize, total } };
   });
 
   app.get('/audit/transfers', { preHandler: [app.authenticate] }, async (request, reply) => {
@@ -94,7 +94,7 @@ export async function adminAuditRoutes(app: FastifyInstance) {
   app.get('/reports/company-revenues', { preHandler: [app.authenticate] }, async (request, reply) => {
     if (!checkAdmin(reply, request)) return;
     const items = await prisma.companyRevenueAccount.findMany({ include: { company: { include: { founder: { select: { id: true, name: true, email: true } } } } }, orderBy: { updatedAt: 'desc' } });
-    return { items: items.map((item) => ({ companyId: item.companyId, token: item.company.name, ticker: item.company.ticker, owner: item.company.founder, balance: item.balance, totalReceivedFees: item.totalReceivedFees, totalWithdrawn: item.totalWithdrawn, status: item.company.status, currentPrice: item.company.currentPrice })) };
+    return { items: items.map((item: { companyId: string; company: { name: string; ticker: string; founder: { id: string; name: string | null; email: string } | null; status: string; currentPrice: unknown }; balance: unknown; totalReceivedFees: unknown; totalWithdrawn: unknown }) => ({ companyId: item.companyId, token: item.company.name, ticker: item.company.ticker, owner: item.company.founder, balance: item.balance, totalReceivedFees: item.totalReceivedFees, totalWithdrawn: item.totalWithdrawn, status: item.company.status, currentPrice: item.company.currentPrice })) };
   });
 
   app.get('/reports/platform-account', { preHandler: [app.authenticate] }, async (request, reply) => {

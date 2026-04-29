@@ -8,6 +8,8 @@ export function BrokerDashboard() {
   const [balance, setBalance] = useState<BrokerBalance | null>(null);
   const [history, setHistory] = useState<BrokerHistory | null>(null);
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [userEmail, setUserEmail] = useState('');
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
@@ -18,6 +20,7 @@ export function BrokerDashboard() {
       setBalance(balanceResponse);
       setHistory(historyResponse);
       setError('');
+      setMessage('');
     } catch (err) {
       setError((err as Error).message);
     }
@@ -27,14 +30,21 @@ export function BrokerDashboard() {
 
   async function submitTransfer(event: FormEvent) {
     event.preventDefault();
+    setError('');
+    setMessage('');
+    setIsSubmitting(true);
+
     try {
       await api('/broker/transfer-to-user', { method: 'POST', body: JSON.stringify({ userEmail, amount, reason }) });
       setUserEmail('');
       setAmount('');
       setReason('');
       await load();
+      setMessage('RPC enviado ao usuário com sucesso.');
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -42,6 +52,7 @@ export function BrokerDashboard() {
     <section className="card">
       <h2>🤝 Painel Corretor</h2>
       {error && <p className="status-message error">{error}</p>}
+      {message && <p className="status-message success">{message}</p>}
 
       {balance && (
         <div className="summary-grid">
@@ -56,7 +67,7 @@ export function BrokerDashboard() {
         <input value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="E-mail do usuário" type="email" required />
         <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Quantidade RPC" required />
         <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Observação" required />
-        <button className="button-primary" type="submit">Enviar RPC ao usuário</button>
+        <button className="button-primary" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Processando...' : 'Enviar RPC ao usuário'}</button>
       </form>
 
       <h3 className="nested-card">Histórico de envios</h3>
