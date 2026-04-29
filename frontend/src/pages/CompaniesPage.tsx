@@ -295,6 +295,7 @@ export function CompaniesPage() {
               <div className="summary-item"><span className="summary-label">Meus tokens</span><strong className="summary-value">{holdingQty}</strong></div>
               <div className="summary-item"><span className="summary-label">Saldo disponível</span><strong className="summary-value">{formatCurrency(walletBalance)} RPC</strong></div>
             </div>
+            <div className="summary-grid market-balance-cards nested-card"><div className="summary-item"><span className="summary-label">Saldo RPC disponível</span><strong className="summary-value">{formatCurrency(walletBalance)} RPC</strong></div><div className="summary-item"><span className="summary-label">Tokens em carteira</span><strong className="summary-value">{holdingQty}</strong></div></div>
             <div className="trade-main-actions">
               <button className="button-success" disabled={selected.status !== 'ACTIVE'} onClick={() => { setTradeFlow('buy'); setBuyMode('initial'); }}>Comprar</button>
               <button className="button-danger" disabled={selected.status !== 'ACTIVE'} onClick={() => { setTradeFlow('sell'); setSellMode('limit'); }}>Vender</button>
@@ -351,8 +352,7 @@ export function CompaniesPage() {
                     </pattern>
                   </defs>
                   <rect x="0" y="0" width="100" height="100" fill="url(#grid)" />
-                  <polyline points={chartData.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" stroke="#4f46e5" strokeWidth="3" vectorEffect="non-scaling-stroke" />
-                  {chartData.points.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="1.7" fill="#f59e0b" />)}
+                  <polyline points={chartData.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" stroke="#4f46e5" strokeWidth="2.6" vectorEffect="non-scaling-stroke" />
                 </svg>
               </div>
               <div className="chart-meta"><div><span>Último</span><strong>{formatPrice(chartData.lastPrice)}</strong></div><div><span>Maior</span><strong>{formatPrice(chartData.maxPrice)}</strong></div><div><span>Menor</span><strong>{formatPrice(chartData.minPrice)}</strong></div></div>
