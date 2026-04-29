@@ -5,11 +5,16 @@ export function formatCurrency(value: number) {
 export function formatPrice(value: number) {
   if (!Number.isFinite(value)) return '0,00';
 
-  const absValue = Math.abs(value);
-  const options =
-    absValue >= 1
-      ? { minimumFractionDigits: 2, maximumFractionDigits: 4 }
-      : { minimumFractionDigits: 2, maximumFractionDigits: 8 };
+  return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 8 });
+}
 
-  return value.toLocaleString('pt-BR', options);
+export function formatSignedPrice(value: number) {
+  const sign = value >= 0 ? '+' : '-';
+  return `${sign}${formatPrice(Math.abs(value))}`;
+}
+
+export function formatPercent(value: number) {
+  if (!Number.isFinite(value)) return '0%';
+
+  return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 }
