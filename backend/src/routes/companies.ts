@@ -357,6 +357,7 @@ export async function companyRoutes(app: FastifyInstance) {
       const body = buyInitialOfferSchema.parse(request.body);
 
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await tx.$queryRaw`SELECT id FROM "Company" WHERE id = ${params.id} FOR UPDATE`;
         const company = await tx.company.findUnique({ where: { id: params.id } });
         if (!company || company.status !== 'ACTIVE') {
           throw new Error('Mercado não está ativo para compra de lançamento inicial.');
@@ -387,6 +388,10 @@ export async function companyRoutes(app: FastifyInstance) {
         }
 
         const walletNext = wallet.availableBalance.sub(totalAmount);
+        const priceBefore = company.currentPrice;
+        const priceIncrease = grossAmount.div(new Decimal(company.totalShares));
+        const priceAfter = priceBefore.add(priceIncrease);
+        const nextMarketCap = priceAfter.mul(new Decimal(company.totalShares));
 
         await tx.wallet.update({ where: { id: wallet.id }, data: { availableBalance: walletNext } });
 
@@ -402,14 +407,14 @@ export async function companyRoutes(app: FastifyInstance) {
           update: {
             shares: newShares,
             averageBuyPrice: nextAveragePrice,
-            estimatedValue: new Decimal(newShares).mul(company.currentPrice),
+            estimatedValue: new Decimal(newShares).mul(priceAfter),
           },
           create: {
             userId: authRequest.user.sub,
             companyId: company.id,
             shares: body.quantity,
             averageBuyPrice: company.initialPrice,
-            estimatedValue: quantity.mul(company.currentPrice),
+            estimatedValue: quantity.mul(priceAfter),
           },
         });
 
@@ -419,6 +424,8 @@ export async function companyRoutes(app: FastifyInstance) {
           data: {
             availableOfferShares: company.availableOfferShares - body.quantity,
             circulatingShares: company.circulatingShares + body.quantity,
+            currentPrice: priceAfter,
+            fictitiousMarketCap: nextMarketCap,
           },
         });
 
@@ -441,7 +448,7 @@ export async function companyRoutes(app: FastifyInstance) {
             grossAmount,
             feeAmount,
             totalAmount,
-            description: `Compra no lançamento inicial (${company.ticker}).`,
+            description: `Compra no lançamento inicial (${company.ticker}) com ajuste de preço automático.`,
           },
         });
 
@@ -460,7 +467,7 @@ export async function companyRoutes(app: FastifyInstance) {
             entity: 'CompanyOperation',
             reason: `Compra de ${body.quantity} tokens (${company.ticker})`,
             previous: JSON.stringify({ wallet: wallet.availableBalance.toString(), availableOfferShares: offer.availableShares }),
-            current: JSON.stringify({ wallet: walletNext.toString(), availableOfferShares: offer.availableShares - body.quantity, totalAmount: totalAmount.toString() }),
+            current: JSON.stringify({ wallet: walletNext.toString(), availableOfferShares: offer.availableShares - body.quantity, totalAmount: totalAmount.toString(), priceBefore: priceBefore.toString(), priceAfter: priceAfter.toString() }),
             ip: request.ip,
             userAgent: request.headers['user-agent'] ?? null,
           },

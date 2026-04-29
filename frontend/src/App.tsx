@@ -8,6 +8,7 @@ import { CompanyRequestPage } from './pages/CompanyRequestPage';
 import { CompaniesPage } from './pages/CompaniesPage';
 import { WithdrawalsPage } from './pages/WithdrawalsPage';
 import { ProjectOwnerPanel } from './pages/ProjectOwnerPanel';
+import { api } from './services/api';
 
 type PublicTab = 'login' | 'register';
 type PrivateScreen = 'home' | 'markets' | 'wallet' | 'withdrawals' | 'company-request' | 'admin' | 'broker' | 'my-projects';
@@ -64,8 +65,10 @@ export function App() {
     () => window.matchMedia('(display-mode: standalone)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true,
   );
   const [installHint, setInstallHint] = useState('');
+  const [hasOwnedProjects, setHasOwnedProjects] = useState(false);
 
   const roles = useMemo(() => decodeRolesFromToken(token), [token]);
+  const canSeeMyProjects = roles.canSeeProjectOwner || hasOwnedProjects;
 
   useEffect(() => {
     if (token) {
@@ -82,11 +85,22 @@ export function App() {
     if (screen === 'broker' && !roles.canSeeBroker) {
       setScreen('home');
     }
-    if (screen === 'my-projects' && !roles.canSeeProjectOwner) {
+    if (screen === 'my-projects' && !canSeeMyProjects) {
       setScreen('home');
     }
-  }, [roles.canSeeAdmin, roles.canSeeBroker, roles.canSeeProjectOwner, screen]);
+  }, [roles.canSeeAdmin, roles.canSeeBroker, canSeeMyProjects, screen]);
 
+
+  useEffect(() => {
+    if (!token) {
+      setHasOwnedProjects(false);
+      return;
+    }
+
+    api<{ companies: Array<{ id: string }> }>('/project-boosts/my-projects')
+      .then((response) => setHasOwnedProjects(response.companies.length > 0))
+      .catch(() => setHasOwnedProjects(false));
+  }, [token]);
   useEffect(() => {
     const onBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
@@ -234,7 +248,7 @@ export function App() {
             <button className="home-tile" onClick={() => setScreen('wallet')}><span>💼</span><strong>Carteira</strong><small>Acompanhe seu saldo e seus ativos.</small></button>
             <button className="home-tile" onClick={() => setScreen('withdrawals')}><span>🏧</span><strong>Saque</strong><small>Solicite a retirada de RPC para receber dentro do RP.</small></button>
             <button className="home-tile" onClick={() => setScreen('company-request')}><span>🚀</span><strong>Criar token</strong><small>Crie seu projeto e solicite listagem no mercado.</small></button>
-            {roles.canSeeProjectOwner && <button className="home-tile" onClick={() => setScreen('my-projects')}><span>📊</span><strong>Meus Projetos</strong><small>Gerencie impulsões da sua moeda.</small></button>}
+            {canSeeMyProjects && <button className="home-tile" onClick={() => setScreen('my-projects')}><span>📊</span><strong>Meus Projetos</strong><small>Gerencie impulsões da sua moeda.</small></button>}
             {roles.canSeeAdmin && <button className="home-tile" onClick={() => setScreen('admin')}><span>🛠️</span><strong>Admin</strong><small>Painel administrativo</small></button>}
             {roles.canSeeBroker && <button className="home-tile" onClick={() => setScreen('broker')}><span>🤝</span><strong>Corretor</strong><small>Painel corretor</small></button>}
             <button className="home-tile home-tile-danger" onClick={handleLogout}><span>🚪</span><strong>Sair</strong><small>Encerrar sessão</small></button>
@@ -246,7 +260,7 @@ export function App() {
       {screen === 'wallet' && <UserDashboard />}
       {screen === 'withdrawals' && <WithdrawalsPage />}
       {screen === 'company-request' && <CompanyRequestPage />}
-      {screen === 'my-projects' && roles.canSeeProjectOwner && <ProjectOwnerPanel />}
+      {screen === 'my-projects' && canSeeMyProjects && <ProjectOwnerPanel />}
       {screen === 'admin' && roles.canSeeAdmin && <AdminDashboard />}
       {screen === 'broker' && roles.canSeeBroker && <BrokerDashboard />}
     </main>

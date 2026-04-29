@@ -75,10 +75,10 @@ async function boostCompany({ tx, companyId, actorUserId, amountRpc, source, rea
     const amount = new Decimal(amountRpc);
     const priceBefore = new Decimal(company.currentPrice);
     const increase = amount.div(new Decimal(company.totalShares));
-    const priceAfter = priceBefore.add(increase).toDecimalPlaces(2);
+    const priceAfter = priceBefore.add(increase).toDecimalPlaces(8);
     if (!priceAfter.greaterThan(priceBefore)) throw new Error('Valor insuficiente para alterar o preço da moeda. Aumente o valor da injeção.');
     const capBefore = new Decimal(company.fictitiousMarketCap);
-    const capAfter = priceAfter.mul(company.totalShares).toDecimalPlaces(2);
+    const capAfter = priceAfter.mul(company.totalShares).toDecimalPlaces(8);
 
     if (source === 'PERSONAL_WALLET') {
       const wallet = await db.wallet.findUniqueOrThrow({ where: { userId: actorUserId } });
