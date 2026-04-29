@@ -277,18 +277,6 @@ export async function adminRoutes(app: FastifyInstance) {
         const treasuryPrevious = treasury.balance;
         const userPrevious = userWallet.availableBalance;
 
-        const transfer = await tx.coinTransfer.create({
-          data: {
-            type: 'ADJUSTMENT',
-            senderId: null,
-            receiverId: targetUser.id,
-            amount,
-            reason: parsed.reason,
-            previousValue: treasuryPrevious,
-            newValue: treasuryPrevious.sub(amount),
-          },
-        });
-
         const treasuryMutation = await tx.treasuryAccount.updateMany({
           where: {
             id: treasury.id,
@@ -311,6 +299,19 @@ export async function adminRoutes(app: FastifyInstance) {
           where: { id: userWallet.id },
           data: {
             availableBalance: { increment: amount },
+          },
+        });
+
+
+        const transfer = await tx.coinTransfer.create({
+          data: {
+            type: 'ADJUSTMENT',
+            senderId: null,
+            receiverId: targetUser.id,
+            amount,
+            reason: parsed.reason,
+            previousValue: treasuryPrevious,
+            newValue: updatedTreasury.balance,
           },
         });
 
