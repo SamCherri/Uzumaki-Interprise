@@ -20,11 +20,14 @@ export async function projectBoostRoutes(app: FastifyInstance) {
     return { companies };
   });
 
-  app.get('/project-boosts/companies/:companyId', { preHandler: [app.authenticate] }, async (request) => {
+  app.get('/project-boosts/companies/:companyId', { preHandler: [app.authenticate] }, async (request, reply) => {
     const auth = request as AuthRequest;
     const { companyId } = request.params as { companyId: string };
+    const accessProbe = await prisma.company.findUniqueOrThrow({ where: { id: companyId }, select: { founderUserId: true } });
+    const canBoost = accessProbe.founderUserId === auth.user.sub || isAdmin(auth.user.roles ?? []);
+    if (!canBoost) return reply.code(403).send({ message: 'Sem permissão para visualizar impulsões deste projeto.' });
+
     const company = await prisma.company.findUniqueOrThrow({ where: { id: companyId }, include: { boostAccount: true, revenueAccount: true, boostInjections: { orderBy: { createdAt: 'desc' }, take: 50 } } });
-    const canBoost = company.founderUserId === auth.user.sub || isAdmin(auth.user.roles ?? []);
     return { company, canBoost };
   });
 
@@ -33,11 +36,11 @@ export async function projectBoostRoutes(app: FastifyInstance) {
     const { companyId } = request.params as { companyId: string };
     const body = z.object({ amountRpc: z.coerce.number().positive(), source: z.enum(OWNER_SOURCES), reason: z.string().min(3) }).parse(request.body);
 
-    const company = await prisma.company.findUniqueOrThrow({ where: { id: companyId }, include: { revenueAccount: true } });
+    const company = await prisma.company.findUniqueOrThrow({ where: { id: companyId }, select: { founderUserId: true, status: true } });
     if (company.founderUserId !== auth.user.sub) return reply.code(403).send({ message: 'Você só pode impulsionar seu próprio projeto.' });
     if (!activeOnly(company.status)) return reply.code(400).send({ message: 'A moeda precisa estar ACTIVE para impulsão.' });
 
-    const result = await boostCompany({ tx: prisma, company, actorUserId: auth.user.sub, amountRpc: body.amountRpc, source: body.source, reason: body.reason, ip: request.ip, userAgent: request.headers['user-agent'] ?? null });
+    const result = await boostCompany({ tx: prisma, companyId, actorUserId: auth.user.sub, amountRpc: body.amountRpc, source: body.source, reason: body.reason, ip: request.ip, userAgent: request.headers['user-agent'] ?? null, enforceOwner: true });
     return { message: 'Moeda impulsionada com sucesso.', ...result };
   });
 
@@ -55,15 +58,20 @@ export async function projectBoostRoutes(app: FastifyInstance) {
     if (!isAdmin(roles)) return reply.code(403).send({ message: 'Sem permissão.' });
     const body = z.object({ amountRpc: z.coerce.number().positive(), source: z.enum(ADMIN_SOURCES).default('ADMIN_ADJUSTMENT'), reason: z.string().min(3) }).parse(request.body);
     const { companyId } = request.params as { companyId: string };
-    const company = await prisma.company.findUniqueOrThrow({ where: { id: companyId }, include: { revenueAccount: true } });
+    const company = await prisma.company.findUniqueOrThrow({ where: { id: companyId }, select: { status: true } });
     if (!activeOnly(company.status)) return reply.code(400).send({ message: 'A moeda precisa estar ACTIVE para impulsão.' });
-    const result = await boostCompany({ tx: prisma, company, actorUserId: auth.user.sub, amountRpc: body.amountRpc, source: body.source, reason: body.reason, ip: request.ip, userAgent: request.headers['user-agent'] ?? null });
+    const result = await boostCompany({ tx: prisma, companyId, actorUserId: auth.user.sub, amountRpc: body.amountRpc, source: body.source, reason: body.reason, ip: request.ip, userAgent: request.headers['user-agent'] ?? null, enforceOwner: false });
     return { message: 'Boost administrativo concluído.', ...result };
   });
 }
 
-async function boostCompany({ tx, company, actorUserId, amountRpc, source, reason, ip, userAgent }: { tx: typeof prisma; company: any; actorUserId: string; amountRpc: number; source: (typeof OWNER_SOURCES)[number] | (typeof ADMIN_SOURCES)[number]; reason: string; ip: string; userAgent: string | null }) {
+async function boostCompany({ tx, companyId, actorUserId, amountRpc, source, reason, ip, userAgent, enforceOwner }: { tx: typeof prisma; companyId: string; actorUserId: string; amountRpc: number; source: (typeof OWNER_SOURCES)[number] | (typeof ADMIN_SOURCES)[number]; reason: string; ip: string; userAgent: string | null; enforceOwner: boolean }) {
   return tx.$transaction(async (db: Prisma.TransactionClient) => {
+    await db.$queryRaw`SELECT id FROM "Company" WHERE id = ${companyId} FOR UPDATE`;
+    const company = await db.company.findUniqueOrThrow({ where: { id: companyId } });
+    if (enforceOwner && company.founderUserId !== actorUserId) throw new Error('Você só pode impulsionar seu próprio projeto.');
+    if (!activeOnly(company.status)) throw new Error('A moeda precisa estar ACTIVE para impulsão.');
+
     const amount = new Decimal(amountRpc);
     const priceBefore = new Decimal(company.currentPrice);
     const increase = amount.div(new Decimal(company.totalShares));
