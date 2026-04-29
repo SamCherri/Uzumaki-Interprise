@@ -35,7 +35,7 @@ type MarketOrder = {
 
 type Trade = { id: string; quantity: number; unitPrice: string; createdAt: string };
 type DetailTab = 'resumo' | 'grafico' | 'livro' | 'ordens' | 'historico';
-type MarketListTab = 'favoritos' | 'mercado' | 'destaques' | 'dados';
+type MarketListTab = 'mercado' | 'destaques';
 type TradeFlow = 'buy' | 'sell' | null;
 type BuyMode = 'initial' | 'limit' | 'market';
 type SellMode = 'limit' | 'market';
@@ -51,6 +51,14 @@ type ChartData = {
   lastPrice: number;
   note: string;
 };
+
+
+function getPriceChangePercent(company: Company) {
+  const initial = Number(company.initialPrice);
+  const current = Number(company.currentPrice);
+  if (!Number.isFinite(initial) || initial <= 0 || !Number.isFinite(current)) return 0;
+  return ((current - initial) / initial) * 100;
+}
 
 function normalizeChartData(trades: Trade[], initialPrice: number, currentPrice: number): ChartData {
   const ordered = [...trades].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
@@ -272,28 +280,28 @@ export function CompaniesPage() {
           <h2>🪙 Mercados</h2>
           <input placeholder="Buscar token ou ticker" value={search} onChange={(e) => setSearch(e.target.value)} />
           <nav className="quick-actions nested-card">
-            <button className={marketListTab === 'favoritos' ? 'quick-pill active' : 'quick-pill'} onClick={() => setMarketListTab('favoritos')}>Favoritos</button>
             <button className={marketListTab === 'mercado' ? 'quick-pill active' : 'quick-pill'} onClick={() => setMarketListTab('mercado')}>Mercado</button>
             <button className={marketListTab === 'destaques' ? 'quick-pill active' : 'quick-pill'} onClick={() => setMarketListTab('destaques')}>Destaques</button>
-            <button className={marketListTab === 'dados' ? 'quick-pill active' : 'quick-pill'} onClick={() => setMarketListTab('dados')}>Dados</button>
           </nav>
           <p className="info-text">Negocie tokens criados por usuários usando RPC.</p>
-          <div className="summary-grid nested-card">{featuredCompanies.map((company) => <article className="summary-item" key={company.id}><p className="company-emoji">⭐ {company.ticker}/RPC</p><strong>{formatPrice(Number(company.currentPrice))} RPC</strong></article>)}</div>
           {error && <p className="status-message error">{error}</p>}
           {companies.length === 0 && <p className="empty-state">Nenhum token listado ainda.</p>}
           <ul className="company-list">
-            {visibleCompanies.map((company) => (
+            {(marketListTab === 'destaques' ? featuredCompanies.filter((company) => `${company.name} ${company.ticker}`.toLowerCase().includes(search.toLowerCase())) : visibleCompanies).map((company) => (
               <li key={company.id} className="card company-visual-card finance-card">
                 <p className="company-emoji">🪙 {company.ticker}/RPC</p>
                 <strong>{company.name}</strong>
                 <p className="info-text">Projeto/token criado por usuário • Categoria: {company.sector}</p>
                 <p className="price-highlight">Preço atual em RPC: {formatPrice(Number(company.currentPrice || company.initialPrice))} RPC</p>
-                <p className={Number(company.currentPrice) >= Number(company.initialPrice) ? 'positive-change' : 'negative-change'}>{Number(company.currentPrice) >= Number(company.initialPrice) ? '▲' : '▼'} {formatPercent(Math.abs(((Number(company.currentPrice) - Number(company.initialPrice)) / Number(company.initialPrice || 1)) * 100))}%</p>
+                {(() => { const changePercent = getPriceChangePercent(company); return <p className={changePercent >= 0 ? 'positive-change' : 'negative-change'}>{changePercent >= 0 ? '▲' : '▼'} {formatPercent(Math.abs(changePercent))}%</p>; })()}
                 <p className="info-text">Tokens disponíveis: {company.availableOfferShares.toLocaleString('pt-BR')}</p>
                 <button className="button-primary" onClick={() => selectCompany(company.id)}>Negociar</button>
               </li>
             ))}
           </ul>
+          {(marketListTab === 'mercado' ? visibleCompanies : featuredCompanies.filter((company) => `${company.name} ${company.ticker}`.toLowerCase().includes(search.toLowerCase()))).length === 0 && (
+            <p className="empty-state">Nenhum token encontrado para essa busca.</p>
+          )}
         </>
       )}
 
@@ -317,7 +325,6 @@ export function CompaniesPage() {
             </div>
           </header>
 
-          <div className="summary-grid nested-card">{featuredCompanies.map((company) => <article className="summary-item" key={company.id}><p className="company-emoji">⭐ {company.ticker}/RPC</p><strong>{formatPrice(Number(company.currentPrice))} RPC</strong></article>)}</div>
           {error && <p className="status-message error">{error}</p>}
           {message && <p className="status-message success">{message}</p>}
 
