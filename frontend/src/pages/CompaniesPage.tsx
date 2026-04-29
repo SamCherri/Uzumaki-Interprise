@@ -35,6 +35,7 @@ type MarketOrder = {
 
 type Trade = { id: string; quantity: number; unitPrice: string; createdAt: string };
 type DetailTab = 'resumo' | 'grafico' | 'livro' | 'ordens' | 'historico';
+type MarketListTab = 'mercado' | 'destaques';
 type TradeFlow = 'buy' | 'sell' | null;
 type BuyMode = 'initial' | 'limit' | 'market';
 type SellMode = 'limit' | 'market';
@@ -50,6 +51,14 @@ type ChartData = {
   lastPrice: number;
   note: string;
 };
+
+
+function getPriceChangePercent(company: Company) {
+  const initial = Number(company.initialPrice);
+  const current = Number(company.currentPrice);
+  if (!Number.isFinite(initial) || initial <= 0 || !Number.isFinite(current)) return 0;
+  return ((current - initial) / initial) * 100;
+}
 
 function normalizeChartData(trades: Trade[], initialPrice: number, currentPrice: number): ChartData {
   const ordered = [...trades].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
@@ -104,6 +113,8 @@ export function CompaniesPage() {
   const [trades, setTrades] = useState<Trade[]>([]);
 
   const [activeTab, setActiveTab] = useState<DetailTab>('grafico');
+  const [marketListTab, setMarketListTab] = useState<MarketListTab>('mercado');
+  const [search, setSearch] = useState('');
   const [tradeFlow, setTradeFlow] = useState<TradeFlow>(null);
   const [buyMode, setBuyMode] = useState<BuyMode>('initial');
   const [sellMode, setSellMode] = useState<SellMode>('limit');
@@ -259,26 +270,38 @@ export function CompaniesPage() {
     [trades, selected?.currentPrice, selected?.initialPrice]
   );
 
+  const visibleCompanies = useMemo(() => companies.filter((company) => `${company.name} ${company.ticker}`.toLowerCase().includes(search.toLowerCase())), [companies, search]);
+  const featuredCompanies = useMemo(() => companies.slice(0, 3), [companies]);
+
   return (
     <section className="card market-page">
       {!selected && (
         <>
           <h2>🪙 Mercados</h2>
+          <input placeholder="Buscar token ou ticker" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <nav className="quick-actions nested-card">
+            <button className={marketListTab === 'mercado' ? 'quick-pill active' : 'quick-pill'} onClick={() => setMarketListTab('mercado')}>Mercado</button>
+            <button className={marketListTab === 'destaques' ? 'quick-pill active' : 'quick-pill'} onClick={() => setMarketListTab('destaques')}>Destaques</button>
+          </nav>
           <p className="info-text">Negocie tokens criados por usuários usando RPC.</p>
           {error && <p className="status-message error">{error}</p>}
           {companies.length === 0 && <p className="empty-state">Nenhum token listado ainda.</p>}
           <ul className="company-list">
-            {companies.map((company) => (
+            {(marketListTab === 'destaques' ? featuredCompanies.filter((company) => `${company.name} ${company.ticker}`.toLowerCase().includes(search.toLowerCase())) : visibleCompanies).map((company) => (
               <li key={company.id} className="card company-visual-card finance-card">
                 <p className="company-emoji">🪙 {company.ticker}/RPC</p>
                 <strong>{company.name}</strong>
                 <p className="info-text">Projeto/token criado por usuário • Categoria: {company.sector}</p>
                 <p className="price-highlight">Preço atual em RPC: {formatPrice(Number(company.currentPrice || company.initialPrice))} RPC</p>
+                {(() => { const changePercent = getPriceChangePercent(company); return <p className={changePercent >= 0 ? 'positive-change' : 'negative-change'}>{changePercent >= 0 ? '▲' : '▼'} {formatPercent(Math.abs(changePercent))}%</p>; })()}
                 <p className="info-text">Tokens disponíveis: {company.availableOfferShares.toLocaleString('pt-BR')}</p>
                 <button className="button-primary" onClick={() => selectCompany(company.id)}>Negociar</button>
               </li>
             ))}
           </ul>
+          {(marketListTab === 'mercado' ? visibleCompanies : featuredCompanies.filter((company) => `${company.name} ${company.ticker}`.toLowerCase().includes(search.toLowerCase()))).length === 0 && (
+            <p className="empty-state">Nenhum token encontrado para essa busca.</p>
+          )}
         </>
       )}
 
