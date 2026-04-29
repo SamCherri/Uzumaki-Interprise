@@ -41,6 +41,13 @@ enum CompanyOperationType {
   MARKET_ORDER_CREATE
   MARKET_ORDER_CANCEL
   MARKET_TRADE_EXECUTED
+  PROJECT_BOOST
+}
+
+enum CompanyBoostSource {
+  PERSONAL_WALLET
+  PROJECT_REVENUE
+  ADMIN_ADJUSTMENT
 }
 
 enum MarketOrderType {
@@ -90,6 +97,7 @@ model User {
   paidFeeDistributions FeeDistribution[] @relation("fee_distribution_payer")
   withdrawalRequests WithdrawalRequest[] @relation("withdrawal_request_user")
   reviewedWithdrawalRequests WithdrawalRequest[] @relation("withdrawal_request_reviewer")
+  boostInjections CompanyBoostInjection[]
 }
 
 model Role {
@@ -185,6 +193,8 @@ model Company {
   trades              Trade[]
   revenueAccount      CompanyRevenueAccount?
   feeDistributions    FeeDistribution[]
+  boostAccount        CompanyBoostAccount?
+  boostInjections     CompanyBoostInjection[]
 }
 
 model CompanyHolding {
@@ -288,9 +298,42 @@ model CompanyRevenueAccount {
   balance           Decimal  @default(0) @db.Decimal(18, 2)
   totalReceivedFees Decimal  @default(0) @db.Decimal(18, 2)
   totalWithdrawn    Decimal  @default(0) @db.Decimal(18, 2)
+  totalUsedForBoost Decimal  @default(0) @db.Decimal(18, 2)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   company           Company  @relation(fields: [companyId], references: [id])
+}
+
+model CompanyBoostAccount {
+  id               String   @id @default(cuid())
+  companyId        String   @unique
+  rpcBalance       Decimal  @default(0) @db.Decimal(18, 2)
+  totalInjectedRpc Decimal  @default(0) @db.Decimal(18, 2)
+  totalUsedRpc     Decimal  @default(0) @db.Decimal(18, 2)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  company          Company  @relation(fields: [companyId], references: [id])
+}
+
+model CompanyBoostInjection {
+  id              String            @id @default(cuid())
+  companyId       String
+  userId          String?
+  source          CompanyBoostSource
+  amountRpc       Decimal           @db.Decimal(18, 2)
+  priceBefore     Decimal           @db.Decimal(18, 2)
+  priceAfter      Decimal           @db.Decimal(18, 2)
+  marketCapBefore Decimal           @db.Decimal(18, 2)
+  marketCapAfter  Decimal           @db.Decimal(18, 2)
+  reason          String
+  createdAt       DateTime          @default(now())
+  company         Company           @relation(fields: [companyId], references: [id])
+  user            User?             @relation(fields: [userId], references: [id])
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([source])
+  @@index([createdAt])
 }
 
 model FeeDistribution {

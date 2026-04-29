@@ -68,3 +68,8 @@ Auditoria consolidada do estado atual da **RPC Exchange**, mantendo o projeto ex
 - Relatório por usuário.
 - Notificações.
 
+
+
+## Atualização 2026-04-29 — Impulsão definitiva
+Implementado: reserva de boost por projeto, histórico de injeções, fonte por carteira pessoal/receita/ajuste admin e logs de auditoria.
+Pendente: fórmula avançada, recompra/queima, automação de retirada de lucro da Exchange.

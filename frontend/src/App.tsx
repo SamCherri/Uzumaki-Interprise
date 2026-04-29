@@ -7,13 +7,15 @@ import { BrokerDashboard } from './pages/BrokerDashboard';
 import { CompanyRequestPage } from './pages/CompanyRequestPage';
 import { CompaniesPage } from './pages/CompaniesPage';
 import { WithdrawalsPage } from './pages/WithdrawalsPage';
+import { ProjectOwnerPanel } from './pages/ProjectOwnerPanel';
 
 type PublicTab = 'login' | 'register';
-type PrivateScreen = 'home' | 'markets' | 'wallet' | 'withdrawals' | 'company-request' | 'admin' | 'broker';
+type PrivateScreen = 'home' | 'markets' | 'wallet' | 'withdrawals' | 'company-request' | 'admin' | 'broker' | 'my-projects';
 
 type ViewerRoles = {
   canSeeAdmin: boolean;
   canSeeBroker: boolean;
+  canSeeProjectOwner: boolean;
 };
 
 type InstallPromptEvent = Event & {
@@ -23,13 +25,14 @@ type InstallPromptEvent = Event & {
 
 const ADMIN_ROLES = new Set(['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN']);
 const BROKER_ROLES = new Set(['VIRTUAL_BROKER']);
+const PROJECT_OWNER_ROLES = new Set(['BUSINESS_OWNER']);
 
 function decodeRolesFromToken(token: string | null): ViewerRoles {
-  if (!token) return { canSeeAdmin: false, canSeeBroker: false };
+  if (!token) return { canSeeAdmin: false, canSeeBroker: false, canSeeProjectOwner: false };
 
   try {
     const [, payload] = token.split('.');
-    if (!payload) return { canSeeAdmin: false, canSeeBroker: false };
+    if (!payload) return { canSeeAdmin: false, canSeeBroker: false, canSeeProjectOwner: false };
 
     const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
     const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
@@ -45,9 +48,10 @@ function decodeRolesFromToken(token: string | null): ViewerRoles {
     return {
       canSeeAdmin: extractedRoles.some((role) => ADMIN_ROLES.has(role)),
       canSeeBroker: extractedRoles.some((role) => BROKER_ROLES.has(role)),
+      canSeeProjectOwner: extractedRoles.some((role) => PROJECT_OWNER_ROLES.has(role)),
     };
   } catch {
-    return { canSeeAdmin: false, canSeeBroker: false };
+    return { canSeeAdmin: false, canSeeBroker: false, canSeeProjectOwner: false };
   }
 }
 
@@ -78,7 +82,10 @@ export function App() {
     if (screen === 'broker' && !roles.canSeeBroker) {
       setScreen('home');
     }
-  }, [roles.canSeeAdmin, roles.canSeeBroker, screen]);
+    if (screen === 'my-projects' && !roles.canSeeProjectOwner) {
+      setScreen('home');
+    }
+  }, [roles.canSeeAdmin, roles.canSeeBroker, roles.canSeeProjectOwner, screen]);
 
   useEffect(() => {
     const onBeforeInstallPrompt = (event: Event) => {
@@ -227,6 +234,7 @@ export function App() {
             <button className="home-tile" onClick={() => setScreen('wallet')}><span>💼</span><strong>Carteira</strong><small>Acompanhe seu saldo e seus ativos.</small></button>
             <button className="home-tile" onClick={() => setScreen('withdrawals')}><span>🏧</span><strong>Saque</strong><small>Solicite a retirada de RPC para receber dentro do RP.</small></button>
             <button className="home-tile" onClick={() => setScreen('company-request')}><span>🚀</span><strong>Criar token</strong><small>Crie seu projeto e solicite listagem no mercado.</small></button>
+            {roles.canSeeProjectOwner && <button className="home-tile" onClick={() => setScreen('my-projects')}><span>📊</span><strong>Meus Projetos</strong><small>Gerencie impulsões da sua moeda.</small></button>}
             {roles.canSeeAdmin && <button className="home-tile" onClick={() => setScreen('admin')}><span>🛠️</span><strong>Admin</strong><small>Painel administrativo</small></button>}
             {roles.canSeeBroker && <button className="home-tile" onClick={() => setScreen('broker')}><span>🤝</span><strong>Corretor</strong><small>Painel corretor</small></button>}
             <button className="home-tile home-tile-danger" onClick={handleLogout}><span>🚪</span><strong>Sair</strong><small>Encerrar sessão</small></button>
@@ -238,6 +246,7 @@ export function App() {
       {screen === 'wallet' && <UserDashboard />}
       {screen === 'withdrawals' && <WithdrawalsPage />}
       {screen === 'company-request' && <CompanyRequestPage />}
+      {screen === 'my-projects' && roles.canSeeProjectOwner && <ProjectOwnerPanel />}
       {screen === 'admin' && roles.canSeeAdmin && <AdminDashboard />}
       {screen === 'broker' && roles.canSeeBroker && <BrokerDashboard />}
     </main>

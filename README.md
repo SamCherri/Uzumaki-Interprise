@@ -299,3 +299,8 @@ npm run prisma:seed
 - Relatório por usuário.
 - Notificações.
 
+
+## Impulsionar moeda (boost definitivo)
+- Dono do projeto (ou admin autorizado) pode injetar RPC para elevar preço sem receber tokens vendáveis.
+- Fontes: carteira pessoal, receita do projeto e ajuste administrativo.
+- Ação definitiva, auditada e sem alterar a regra de taxa 50/50.

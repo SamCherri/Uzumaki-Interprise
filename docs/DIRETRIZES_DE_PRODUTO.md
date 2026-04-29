@@ -124,3 +124,7 @@ Toda PR visual deve respeitar:
 - Relatório por usuário.
 - Notificações.
 
+
+
+### Impulsionar moeda
+A impulsão gasta RPC e aumenta o preço sem entregar tokens. É definitiva e somente dono/admin pode executar.
