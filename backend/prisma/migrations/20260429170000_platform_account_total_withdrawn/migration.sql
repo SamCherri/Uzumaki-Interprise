@@ -1,0 +1,2 @@
+ALTER TABLE "PlatformAccount"
+ADD COLUMN "totalWithdrawn" DECIMAL(18,2) NOT NULL DEFAULT 0;

@@ -131,3 +131,14 @@ Regras:
 - Motivo deve ser obrigatório quando a ação exigir auditoria.
 - Modais devem mostrar erro sem perder dados digitados.
 - A UX deve funcionar bem no mobile.
+
+## Retirada auditada do lucro da Exchange
+
+Regras:
+- A conta da Exchange acumula taxas da plataforma.
+- SUPER_ADMIN e COIN_CHIEF_ADMIN podem transferir saldo da PlatformAccount para carteira administrativa.
+- Toda retirada exige motivo.
+- Toda retirada gera Transaction e AdminLog.
+- O saldo é fictício/RP.
+- Não existe dinheiro real, Pix, gateway, blockchain ou saque real.
+- A taxa 50/50 não é alterada por este fluxo.

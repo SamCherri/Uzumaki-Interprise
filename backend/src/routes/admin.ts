@@ -363,6 +363,140 @@ export async function adminRoutes(app: FastifyInstance) {
   });
 
 
+  app.post('/admin/platform-account/withdraw-to-admin', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authRequest = request as AuthRequest;
+    const roles = authRequest.user.roles ?? [];
+
+    if (!requireRole(reply, roles, ['SUPER_ADMIN', 'COIN_CHIEF_ADMIN'], 'Sem permissão para retirar lucro da Exchange.')) {
+      return;
+    }
+
+    try {
+      const schema = z.object({
+        adminEmail: z.string().email().optional(),
+        adminId: z.string().min(1).optional(),
+        amount: amountSchema,
+        reason: z.string().trim().min(3),
+      }).superRefine((value, ctx) => {
+        if (!value.adminEmail && !value.adminId) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Informe o e-mail ou id do administrador de destino.',
+            path: ['adminEmail'],
+          });
+        }
+      });
+
+      const parsed = schema.parse(request.body);
+      const targetEmail = parsed.adminEmail?.trim().toLowerCase();
+
+      const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const amount = new Decimal(parsed.amount);
+        const targetAdmin = await tx.user.findFirst({
+          where: targetEmail ? { email: targetEmail } : { id: parsed.adminId },
+          include: { roles: { select: { role: { select: { key: true } } } } },
+        });
+
+        if (!targetAdmin) {
+          throw new Error('Administrador de destino não encontrado.');
+        }
+
+        const hasAdminRole = targetAdmin.roles.some(({ role }: { role: { key: string } }) => ['SUPER_ADMIN', 'ADMIN', 'COIN_CHIEF_ADMIN'].includes(role.key));
+
+        if (!hasAdminRole) {
+          throw new Error('Usuário de destino não possui permissão administrativa.');
+        }
+
+        const platformAccount = await tx.platformAccount.findFirstOrThrow();
+        const previousPlatformBalance = platformAccount.balance;
+        const previousPlatformWithdrawn = new Decimal((platformAccount as { totalWithdrawn?: Decimal }).totalWithdrawn ?? 0);
+
+        if (previousPlatformBalance.lessThan(amount)) {
+          throw new Error('Saldo insuficiente na conta da Exchange.');
+        }
+
+        const debitCount = await tx.$executeRaw`
+          UPDATE "PlatformAccount"
+          SET "balance" = "balance" - ${amount},
+              "totalWithdrawn" = COALESCE("totalWithdrawn", 0) + ${amount}
+          WHERE "id" = ${platformAccount.id}
+            AND "balance" >= ${amount}
+        `;
+
+        if (Number(debitCount) !== 1) {
+          throw new Error('Saldo insuficiente na conta da Exchange.');
+        }
+
+        const wallet = await tx.wallet.upsert({
+          where: { userId: targetAdmin.id },
+          update: {},
+          create: {
+            userId: targetAdmin.id,
+            availableBalance: 0,
+            lockedBalance: 0,
+            pendingWithdrawalBalance: 0,
+          },
+        });
+
+        const previousAdminWalletBalance = wallet.availableBalance;
+        const updatedWallet = await tx.wallet.update({
+          where: { id: wallet.id },
+          data: { availableBalance: { increment: amount } },
+        });
+
+        await tx.transaction.create({
+          data: {
+            walletId: updatedWallet.id,
+            type: 'PLATFORM_PROFIT_WITHDRAWAL_IN',
+            amount,
+            description: parsed.reason,
+          },
+        });
+
+        const platformBalanceAfter = previousPlatformBalance.sub(amount);
+        const platformWithdrawnAfter = previousPlatformWithdrawn.add(amount);
+
+        await tx.adminLog.create({
+          data: {
+            userId: authRequest.user.sub,
+            action: 'PLATFORM_PROFIT_WITHDRAWAL',
+            entity: 'PlatformAccount',
+            reason: parsed.reason,
+            previous: JSON.stringify({
+              platformBalance: previousPlatformBalance.toString(),
+              platformTotalWithdrawn: previousPlatformWithdrawn.toString(),
+              adminWalletBalance: previousAdminWalletBalance.toString(),
+              adminId: targetAdmin.id,
+              adminEmail: targetAdmin.email,
+            }),
+            current: JSON.stringify({
+              platformBalance: platformBalanceAfter.toString(),
+              platformTotalWithdrawn: platformWithdrawnAfter.toString(),
+              adminWalletBalance: updatedWallet.availableBalance.toString(),
+              adminId: targetAdmin.id,
+              adminEmail: targetAdmin.email,
+              amount: amount.toString(),
+              reason: parsed.reason,
+            }),
+            ip: request.ip,
+            userAgent: request.headers['user-agent'] ?? null,
+          },
+        });
+
+        return {
+          message: 'Lucro da Exchange transferido para o administrador com sucesso.',
+          platformBalance: platformBalanceAfter,
+          adminBalance: updatedWallet.availableBalance,
+        };
+      });
+
+      return reply.code(201).send(result);
+    } catch (error) {
+      return reply.code(400).send({ message: (error as Error).message });
+    }
+  });
+
+
   app.get('/admin/platform-account', { preHandler: [app.authenticate] }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
@@ -376,6 +510,8 @@ export async function adminRoutes(app: FastifyInstance) {
     return {
       balance: platform?.balance ?? new Decimal(0),
       totalReceivedFees: platform?.totalReceivedFees ?? new Decimal(0),
+      totalWithdrawn: (platform as { totalWithdrawn?: Decimal } | null)?.totalWithdrawn ?? new Decimal(0),
+      updatedAt: platform?.updatedAt ?? null,
     };
   });
 

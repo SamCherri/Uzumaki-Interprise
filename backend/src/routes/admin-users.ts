@@ -177,7 +177,7 @@ export async function adminUsersRoutes(app: FastifyInstance) {
       await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         await tx.userRole.deleteMany({ where: { userId: id } });
         await tx.userRole.createMany({
-          data: dbRoles.map((role) => ({ userId: id, roleId: role.id })),
+          data: dbRoles.map((role: { id: string }) => ({ userId: id, roleId: role.id })),
         });
 
         if (normalizedRoles.includes('VIRTUAL_BROKER')) {
