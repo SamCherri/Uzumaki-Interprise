@@ -170,3 +170,12 @@ Regras:
 - A rota não deve filtrar items em memória depois da paginação.
 - Se userId e walletId forem enviados juntos, a wallet precisa pertencer ao usuário.
 - Relatórios da plataforma devem expor totalWithdrawn quando disponível.
+
+## Relatórios por usuário e corretor
+
+Regras:
+- Relatório por usuário consolida wallet, transações, transferências, saques, ordens e holdings.
+- Relatório por corretor consolida BrokerAccount e transferências de RPC.
+- Filtros from/to devem ser aplicados antes dos cálculos agregados.
+- Relatórios administrativos não alteram saldos nem regras econômicas.
+- Nenhum dado sensível como passwordHash deve ser exposto.

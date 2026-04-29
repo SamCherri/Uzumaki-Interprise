@@ -130,6 +130,166 @@ export async function adminAuditRoutes(app: FastifyInstance) {
     return { items, pagination: { page: query.page, pageSize: query.pageSize, total } };
   });
 
+
+
+  app.get('/reports/users/:userId', { preHandler: [app.authenticate] }, async (request, reply) => {
+    if (!checkAdmin(reply, request)) return;
+
+    const params = z.object({ userId: z.string().min(1) }).parse(request.params);
+    const query = z.object({ from: z.string().optional(), to: z.string().optional() }).parse(request.query);
+    const range = dateRange(query.from, query.to);
+
+    const user = await prisma.user.findUnique({
+      where: { id: params.userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        isBlocked: true,
+        roles: { select: { role: { select: { key: true } } } },
+      },
+    });
+
+    if (!user) {
+      return reply.code(404).send({ message: 'Usuário não encontrado.' });
+    }
+
+    const wallet = await prisma.wallet.findUnique({ where: { userId: params.userId } });
+
+    const transactionsWhere = {
+      ...(wallet ? { walletId: wallet.id } : { walletId: '__NO_WALLET__' }),
+      ...(range ? { createdAt: range } : {}),
+    };
+    const transfersInWhere = { receiverId: params.userId, ...(range ? { createdAt: range } : {}) };
+    const transfersOutWhere = { senderId: params.userId, ...(range ? { createdAt: range } : {}) };
+    const transfersWhere = { OR: [{ senderId: params.userId }, { receiverId: params.userId }], ...(range ? { createdAt: range } : {}) };
+    const withdrawalsWhere = { userId: params.userId, ...(range ? { createdAt: range } : {}) };
+    const ordersWhere = { userId: params.userId, ...(range ? { createdAt: range } : {}) };
+    const holdingsWhere = { userId: params.userId };
+
+    const [
+      transactionsCount,
+      recentTransactions,
+      transferredIn,
+      transferredOut,
+      withdrawalsPending,
+      withdrawalsCompleted,
+      recentTransfers,
+      recentWithdrawals,
+      openOrders,
+      filledOrders,
+      recentOrders,
+      holdingsCount,
+      holdings,
+    ] = await Promise.all([
+      prisma.transaction.count({ where: transactionsWhere }),
+      prisma.transaction.findMany({ where: transactionsWhere, orderBy: { createdAt: 'desc' }, take: 10 }),
+      prisma.coinTransfer.aggregate({ where: transfersInWhere, _sum: { amount: true } }),
+      prisma.coinTransfer.aggregate({ where: transfersOutWhere, _sum: { amount: true } }),
+      prisma.withdrawalRequest.aggregate({ where: { ...withdrawalsWhere, status: 'PENDING' }, _sum: { amount: true } }),
+      prisma.withdrawalRequest.aggregate({ where: { ...withdrawalsWhere, status: 'COMPLETED' }, _sum: { amount: true } }),
+      prisma.coinTransfer.findMany({ where: transfersWhere, include: { sender: { select: { id: true, name: true, email: true } }, receiver: { select: { id: true, name: true, email: true } } }, orderBy: { createdAt: 'desc' }, take: 10 }),
+      prisma.withdrawalRequest.findMany({ where: withdrawalsWhere, orderBy: { createdAt: 'desc' }, take: 10 }),
+      prisma.marketOrder.count({ where: { ...ordersWhere, status: { in: ['OPEN', 'PARTIALLY_FILLED'] } } }),
+      prisma.marketOrder.count({ where: { ...ordersWhere, status: 'FILLED' } }),
+      prisma.marketOrder.findMany({ where: ordersWhere, include: { company: { select: { id: true, name: true, ticker: true, status: true } } }, orderBy: { createdAt: 'desc' }, take: 10 }),
+      prisma.companyHolding.count({ where: holdingsWhere }),
+      prisma.companyHolding.findMany({ where: holdingsWhere, include: { company: { select: { id: true, name: true, ticker: true, status: true, currentPrice: true } } }, orderBy: { updatedAt: 'desc' } }),
+    ]);
+
+    return {
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        isBlocked: user.isBlocked,
+        roles: user.roles.map((item: { role: { key: string } }) => item.role.key),
+      },
+      wallet: {
+        availableBalance: wallet?.availableBalance ?? 0,
+        lockedBalance: wallet?.lockedBalance ?? 0,
+        pendingWithdrawalBalance: wallet?.pendingWithdrawalBalance ?? 0,
+      },
+      summary: {
+        transactionsCount,
+        transferredIn: transferredIn._sum.amount ?? 0,
+        transferredOut: transferredOut._sum.amount ?? 0,
+        withdrawalsPending: withdrawalsPending._sum.amount ?? 0,
+        withdrawalsCompleted: withdrawalsCompleted._sum.amount ?? 0,
+        openOrders,
+        filledOrders,
+        holdingsCount,
+      },
+      recentTransactions,
+      recentTransfers,
+      recentWithdrawals,
+      recentOrders,
+      holdings,
+    };
+  });
+
+  app.get('/reports/brokers/:userId', { preHandler: [app.authenticate] }, async (request, reply) => {
+    if (!checkAdmin(reply, request)) return;
+
+    const params = z.object({ userId: z.string().min(1) }).parse(request.params);
+    const query = z.object({ from: z.string().optional(), to: z.string().optional() }).parse(request.query);
+    const range = dateRange(query.from, query.to);
+
+    const user = await prisma.user.findUnique({
+      where: { id: params.userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        roles: { select: { role: { select: { key: true } } } },
+      },
+    });
+
+    if (!user) {
+      return reply.code(404).send({ message: 'Usuário não encontrado.' });
+    }
+
+    const userRoles = user.roles.map((item: { role: { key: string } }) => item.role.key);
+    if (!userRoles.includes('VIRTUAL_BROKER')) {
+      return reply.code(400).send({ message: 'Usuário não é corretor.' });
+    }
+
+    const brokerAccount = await prisma.brokerAccount.findUnique({ where: { userId: params.userId } });
+    const brokerTransfersToUsersWhere = { senderId: params.userId, type: 'BROKER_TO_USER' as const, ...(range ? { createdAt: range } : {}) };
+    const treasuryToBrokerWhere = { receiverId: params.userId, type: 'TREASURY_TO_BROKER' as const, ...(range ? { createdAt: range } : {}) };
+    const brokerTransfersWhere = { OR: [{ senderId: params.userId }, { receiverId: params.userId }], ...(range ? { createdAt: range } : {}) };
+
+    const [receivedFromTreasury, sentToUsers, transfersToUsersCount, usersServedDistinct, lastTransfer, recentTransfers] = await Promise.all([
+      prisma.coinTransfer.aggregate({ where: treasuryToBrokerWhere, _sum: { amount: true } }),
+      prisma.coinTransfer.aggregate({ where: brokerTransfersToUsersWhere, _sum: { amount: true } }),
+      prisma.coinTransfer.count({ where: brokerTransfersToUsersWhere }),
+      prisma.coinTransfer.findMany({ where: brokerTransfersToUsersWhere, select: { receiverId: true }, distinct: ['receiverId'] }),
+      prisma.coinTransfer.findFirst({ where: brokerTransfersWhere, orderBy: { createdAt: 'desc' } }),
+      prisma.coinTransfer.findMany({ where: brokerTransfersWhere, include: { sender: { select: { id: true, name: true, email: true } }, receiver: { select: { id: true, name: true, email: true } } }, orderBy: { createdAt: 'desc' }, take: 20 }),
+    ]);
+
+    return {
+      broker: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        roles: userRoles,
+      },
+      brokerAccount: {
+        availableBalance: brokerAccount?.available ?? 0,
+        receivedTotal: brokerAccount?.receivedTotal ?? 0,
+        transferredTotal: Number(brokerAccount?.receivedTotal ?? 0) - Number(brokerAccount?.available ?? 0),
+      },
+      summary: {
+        receivedFromTreasury: receivedFromTreasury._sum.amount ?? 0,
+        sentToUsers: sentToUsers._sum.amount ?? 0,
+        transfersToUsersCount,
+        usersServedCount: usersServedDistinct.filter((item: { receiverId: string | null }) => item.receiverId).length,
+        lastTransferAt: lastTransfer?.createdAt ?? null,
+      },
+      recentTransfers,
+    };
+  });
   app.get('/reports/overview', { preHandler: [app.authenticate] }, async (request, reply) => {
     if (!checkAdmin(reply, request)) return;
     const [users, brokers, active, suspended, closed, wallets, treasury, platform, pendingWithdrawals, openOrders, traded, companyFees] = await Promise.all([
