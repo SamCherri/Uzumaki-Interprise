@@ -115,3 +115,10 @@ Regras:
 - A API retorna `priceBefore`, `priceAfter` e `priceIncrease`.
 - O frontend exibe preço antes/depois para evitar confusão visual.
 - O gráfico continua usando `initialPrice`, `trades` e `currentPrice`.
+
+## Tradução visual de enums
+
+- Enums internos continuam em inglês.
+- Interface exibe traduções em português.
+- Selects mantêm value técnico e label traduzido.
+- Valores desconhecidos aparecem como valor original para não quebrar tela.

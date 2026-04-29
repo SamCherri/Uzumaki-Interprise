@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../services/api';
+import { translateWithdrawalStatus } from '../utils/labels';
 
 type HoldingsResponse = {
   wallet: {
@@ -105,7 +106,7 @@ export function WithdrawalsPage() {
           <article key={item.id} className="summary-item compact-card">
             <p><strong>Código:</strong> {item.code}</p>
             <p><strong>Valor:</strong> {moeda(Number(item.amount))} RPC</p>
-            <p><strong>Status:</strong> {item.status}</p>
+            <p><strong>Status:</strong> {translateWithdrawalStatus(item.status)}</p>
             <p><strong>Data:</strong> {new Date(item.createdAt).toLocaleString('pt-BR')}</p>
             <p><strong>Observação:</strong> {item.userNote || 'Sem observação'}</p>
             {item.status === 'PENDING' && (

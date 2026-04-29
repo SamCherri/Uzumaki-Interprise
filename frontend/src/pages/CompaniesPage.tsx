@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../services/api';
 import { formatCurrency, formatPercent, formatPrice, formatSignedPrice } from '../utils/formatters';
+import { translateCompanyStatus, translateOrderMode, translateOrderStatus, translateOrderType } from '../utils/labels';
 
 type Company = {
   id: string;
@@ -330,7 +331,7 @@ export function CompaniesPage() {
               <li key={company.id} className="card company-visual-card finance-card">
                 <p className="company-emoji">🪙 {company.ticker}/RPC</p>
                 <strong>{company.name}</strong>
-                <p className="info-text">Projeto/token criado por usuário • Categoria: {company.sector}</p>
+                <p className="info-text">Projeto/token criado por usuário • Categoria: {company.sector} • Status: {translateCompanyStatus(company.status)}</p>
                 <p className="price-highlight">Preço atual em RPC: {formatPrice(Number(company.currentPrice || company.initialPrice))} RPC</p>
                 {(() => { const changePercent = getPriceChangePercent(company); return <p className={changePercent >= 0 ? 'positive-change' : 'negative-change'}>{changePercent >= 0 ? '▲' : '▼'} {formatPercent(Math.abs(changePercent))}%</p>; })()}
                 <p className="info-text">Tokens disponíveis: {company.availableOfferShares.toLocaleString('pt-BR')}</p>
@@ -447,7 +448,7 @@ export function CompaniesPage() {
             <section className="card nested-card">
               <h4>🧾 Minhas ordens</h4>
               {myOrders.length === 0 && <p className="empty-state">Você ainda não possui ordens neste mercado.</p>}
-              <div className="mobile-card-list">{myOrders.map((order) => (<article key={order.id} className="summary-item compact-card"><p><strong>{order.type === 'BUY' ? 'Compra' : 'Venda'}</strong> · {order.mode === 'LIMIT' ? 'Definir preço' : 'Agora'}</p><p>Quantidade: {order.quantity} · Restante: {order.remainingQuantity}</p><p>Status: {order.status}</p><p>Preço: {order.limitPrice ? formatPrice(Number(order.limitPrice)) : 'Agora'}</p>{(order.status === 'OPEN' || order.status === 'PARTIALLY_FILLED') && order.mode === 'LIMIT' && <button className="button-danger" onClick={() => cancelOrder(order.id)}>Cancelar ordem</button>}</article>))}</div>
+              <div className="mobile-card-list">{myOrders.map((order) => (<article key={order.id} className="summary-item compact-card"><p><strong>{translateOrderType(order.type)}</strong> · {translateOrderMode(order.mode)}</p><p>Quantidade: {order.quantity} · Restante: {order.remainingQuantity}</p><p>Status: {translateOrderStatus(order.status)}</p><p>Preço: {order.limitPrice ? formatPrice(Number(order.limitPrice)) : 'Agora'}</p>{(order.status === 'OPEN' || order.status === 'PARTIALLY_FILLED') && order.mode === 'LIMIT' && <button className="button-danger" onClick={() => cancelOrder(order.id)}>Cancelar ordem</button>}</article>))}</div>
             </section>
           )}
 

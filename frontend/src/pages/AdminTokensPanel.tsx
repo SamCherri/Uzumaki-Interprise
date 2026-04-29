@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../services/api';
+import { translateCompanyStatus } from '../utils/labels';
 
 type TokenRow = {
   id: string;
@@ -133,11 +134,11 @@ export function AdminTokensPanel() {
         <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por ticker/nome" />
         <select value={status} onChange={(event) => setStatus(event.target.value)}>
           <option value="">Todos os status</option>
-          <option value="ACTIVE">ACTIVE</option>
-          <option value="SUSPENDED">SUSPENDED</option>
-          <option value="CLOSED">CLOSED</option>
-          <option value="REJECTED">REJECTED</option>
-          <option value="BANKRUPT">BANKRUPT</option>
+          <option value="ACTIVE">{translateCompanyStatus('ACTIVE')}</option>
+          <option value="SUSPENDED">{translateCompanyStatus('SUSPENDED')}</option>
+          <option value="CLOSED">{translateCompanyStatus('CLOSED')}</option>
+          <option value="REJECTED">{translateCompanyStatus('REJECTED')}</option>
+          <option value="BANKRUPT">{translateCompanyStatus('BANKRUPT')}</option>
         </select>
         <button className="button-primary" type="submit">Filtrar mercados</button>
       </form>
@@ -162,7 +163,7 @@ export function AdminTokensPanel() {
         {tokens.map((token) => (
           <article key={token.id} className="summary-item compact-card">
             <strong>{token.name} ({token.ticker})</strong>
-            <p>Status: {token.status}</p>
+            <p>Status: {translateCompanyStatus(token.status)}</p>
             <p>Dono: {token.founder.name} ({token.founder.email})</p>
             <p>Preço atual: {token.currentPrice}</p>
             <p>Total tokens: {token.totalTokens} · Disponível: {token.availableTokens}</p>
