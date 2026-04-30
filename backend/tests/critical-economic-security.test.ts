@@ -274,12 +274,13 @@ test('tesouraria envia RPC para corretor e corretor envia para jogador', async (
 
   assert.equal(Number(treasury.balance), 600);
   assert.equal(Number(brokerAccount.available), 250);
-  assert.equal(Number(playerWallet.availableBalance), 150);
+  assert.equal(Number(playerWallet.fiatAvailableBalance), 150);
+  assert.equal(Number(playerWallet.rpcAvailableBalance), 0);
   assert.ok(transfers.length >= 2);
   assert.ok(adminLogs.length >= 3);
   assert.ok(Number(treasury.balance) >= 0);
   assert.ok(Number(brokerAccount.available) >= 0);
-  assert.ok(Number(playerWallet.availableBalance) >= 0);
+  assert.ok(Number(playerWallet.fiatAvailableBalance) >= 0);
 });
 
 test('admin deposita RPC direto em jogador com débito atômico da tesouraria', async () => {

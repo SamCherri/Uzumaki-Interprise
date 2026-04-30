@@ -58,11 +58,21 @@ export async function authRoutes(app: FastifyInstance) {
       },
       wallet: user.wallet
         ? {
+            fiatAvailableBalance: user.wallet.fiatAvailableBalance,
+            fiatLockedBalance: user.wallet.fiatLockedBalance,
+            fiatPendingWithdrawalBalance: user.wallet.fiatPendingWithdrawalBalance,
+            rpcAvailableBalance: user.wallet.rpcAvailableBalance,
+            rpcLockedBalance: user.wallet.rpcLockedBalance,
             availableBalance: user.wallet.availableBalance,
             lockedBalance: user.wallet.lockedBalance,
             pendingWithdrawalBalance: user.wallet.pendingWithdrawalBalance,
           }
         : {
+            fiatAvailableBalance: '0',
+            fiatLockedBalance: '0',
+            fiatPendingWithdrawalBalance: '0',
+            rpcAvailableBalance: '0',
+            rpcLockedBalance: '0',
             availableBalance: '0',
             lockedBalance: '0',
             pendingWithdrawalBalance: '0',

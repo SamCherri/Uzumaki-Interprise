@@ -526,6 +526,11 @@ export async function companyRoutes(app: FastifyInstance) {
 
     return {
       wallet: {
+        fiatAvailableBalance: wallet?.fiatAvailableBalance ?? new Decimal(0),
+        fiatLockedBalance: wallet?.fiatLockedBalance ?? new Decimal(0),
+        fiatPendingWithdrawalBalance: wallet?.fiatPendingWithdrawalBalance ?? new Decimal(0),
+        rpcAvailableBalance: wallet?.rpcAvailableBalance ?? new Decimal(0),
+        rpcLockedBalance: wallet?.rpcLockedBalance ?? new Decimal(0),
         availableBalance: wallet?.availableBalance ?? new Decimal(0),
         lockedBalance: wallet?.lockedBalance ?? new Decimal(0),
         pendingWithdrawalBalance: wallet?.pendingWithdrawalBalance ?? new Decimal(0),
