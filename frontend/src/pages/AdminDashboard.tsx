@@ -78,7 +78,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
     brokers: 'Corretores',
     tokens: 'Tokens/Mercados',
     withdrawals: 'Saques',
-    treasury: 'Tesouraria / Emitir RPC',
+    treasury: 'Tesouraria administrativa',
     revenues: 'Receitas',
     audit: 'Auditoria',
     reports: 'Relatórios',
@@ -98,7 +98,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
     { key: 'brokers', label: 'Corretores', active: tab === 'brokers', onClick: () => setTab('brokers') },
     { key: 'tokens', label: 'Tokens/Mercados', active: tab === 'tokens', onClick: () => setTab('tokens') },
     { key: 'withdrawals', label: 'Saques', active: tab === 'withdrawals', onClick: () => setTab('withdrawals') },
-    { key: 'treasury', label: 'Tesouraria / Emitir RPC', active: tab === 'treasury', onClick: () => setTab('treasury') },
+    { key: 'treasury', label: 'Tesouraria administrativa', active: tab === 'treasury', onClick: () => setTab('treasury') },
     { key: 'revenues', label: 'Receitas', active: tab === 'revenues', onClick: () => setTab('revenues') },
     { key: 'audit', label: 'Auditoria', active: tab === 'audit', onClick: () => setTab('audit') },
     { key: 'reports', label: 'Relatórios', active: tab === 'reports', onClick: () => setTab('reports') },
@@ -135,7 +135,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
       setBrokerAmount('');
       setBrokerReason('');
       await load();
-      setMessage('RPC enviado ao corretor com sucesso.');
+      setMessage('R$ enviado ao corretor com sucesso.');
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -187,7 +187,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
       setUserDepositAmount('');
       setUserDepositReason('');
       await load();
-      setMessage('RPC depositado na carteira do jogador com sucesso.');
+      setMessage('R$ depositado na carteira do jogador com sucesso.');
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -250,13 +250,13 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
           <article className="admin-metric-card">
             <span className="admin-metric-icon" aria-hidden="true">🏦</span>
             <span className="admin-metric-label">Tesouraria</span>
-            <strong className="admin-metric-value">{formatNumberPtBr(data.treasuryBalance)} RPC</strong>
+            <strong className="admin-metric-value">{formatNumberPtBr(data.treasuryBalance)} R$</strong>
             <small className="admin-metric-description">Saldo administrativo</small>
           </article>
           <button className="admin-quick-action-card" type="button" onClick={() => setTab('treasury')}>
             <span className="admin-quick-action-icon" aria-hidden="true">🪙</span>
             <span className="admin-quick-action-content">
-              <strong>Tesouraria / Emitir RPC</strong>
+              <strong>Tesouraria administrativa</strong>
               <small>Acessar emissão e transferências administrativas.</small>
             </span>
             <span className="admin-quick-action-arrow" aria-hidden="true">→</span>
@@ -283,20 +283,20 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
             <p className="status-message error">Você pode acessar a tesouraria, mas apenas SUPER_ADMIN ou ADM Chefe da Moeda pode emitir RPC.</p>
           )}
 
-          <h3 className="nested-card">Enviar RPC para corretor</h3>
+          <h3 className="nested-card">Enviar R$ para corretor</h3>
           <form onSubmit={submitBrokerTransfer} className="form-grid">
             <input value={brokerEmail} onChange={(e) => setBrokerEmail(e.target.value)} placeholder="E-mail do corretor" type="email" required />
-            <input value={brokerAmount} onChange={(e) => setBrokerAmount(e.target.value)} placeholder="Quantidade RPC" required />
+            <input value={brokerAmount} onChange={(e) => setBrokerAmount(e.target.value)} placeholder="Valor em R$" required />
             <input value={brokerReason} onChange={(e) => setBrokerReason(e.target.value)} placeholder="Observação" required />
-            <button className="button-primary" type="submit" disabled={isSubmittingBrokerTransfer}>{isSubmittingBrokerTransfer ? 'Processando...' : 'Enviar RPC ao corretor'}</button>
+            <button className="button-primary" type="submit" disabled={isSubmittingBrokerTransfer}>{isSubmittingBrokerTransfer ? 'Processando...' : 'Enviar R$ ao corretor'}</button>
           </form>
 
-          <h3 className="nested-card">Depositar RPC em jogador</h3>
+          <h3 className="nested-card">Depositar R$ em jogador</h3>
           <form onSubmit={submitUserDeposit} className="form-grid">
             <input value={userDepositEmail} onChange={(e) => setUserDepositEmail(e.target.value)} placeholder="E-mail do jogador" type="email" required />
-            <input value={userDepositAmount} onChange={(e) => setUserDepositAmount(e.target.value)} placeholder="Quantidade RPC" required />
+            <input value={userDepositAmount} onChange={(e) => setUserDepositAmount(e.target.value)} placeholder="Valor em R$" required />
             <input value={userDepositReason} onChange={(e) => setUserDepositReason(e.target.value)} placeholder="Motivo" required />
-            <button className="button-primary" type="submit" disabled={isSubmittingUserDeposit}>{isSubmittingUserDeposit ? 'Processando...' : 'Depositar RPC no jogador'}</button>
+            <button className="button-primary" type="submit" disabled={isSubmittingUserDeposit}>{isSubmittingUserDeposit ? 'Processando...' : 'Depositar R$ no jogador'}</button>
           </form>
         </>
       )}
@@ -328,7 +328,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
                 <input
                   value={platformWithdrawAmount}
                   onChange={(e) => setPlatformWithdrawAmount(e.target.value)}
-                  placeholder="Quantidade RPC"
+                  placeholder="Valor em R$"
                   required
                 />
                 <input

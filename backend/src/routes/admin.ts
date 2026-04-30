@@ -119,7 +119,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
 
-    if (!requireRole(reply, roles, ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN'], 'Sem permissão para enviar RPC a corretor.')) {
+    if (!requireRole(reply, roles, ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN'], 'Sem permissão para enviar R$ a corretor.')) {
       return;
     }
 
@@ -145,7 +145,7 @@ export async function adminRoutes(app: FastifyInstance) {
       const amount = new Decimal(body.amount);
 
       if (treasury.balance.lessThan(amount)) {
-        throw new Error('Saldo insuficiente na tesouraria.');
+        throw new Error('Saldo em R$ insuficiente na tesouraria.');
       }
 
       const brokerUser = await tx.user.findFirst({
@@ -228,7 +228,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
 
-    if (!requireRole(reply, roles, ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN'], 'Sem permissão para enviar RPC a usuário.')) {
+    if (!requireRole(reply, roles, ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN'], 'Sem permissão para enviar R$ a usuário.')) {
       return;
     }
 
@@ -271,11 +271,16 @@ export async function adminRoutes(app: FastifyInstance) {
             availableBalance: new Decimal(0),
             lockedBalance: new Decimal(0),
             pendingWithdrawalBalance: new Decimal(0),
+            fiatAvailableBalance: new Decimal(0),
+            fiatLockedBalance: new Decimal(0),
+            fiatPendingWithdrawalBalance: new Decimal(0),
+            rpcAvailableBalance: new Decimal(0),
+            rpcLockedBalance: new Decimal(0),
           },
         });
 
         const treasuryPrevious = treasury.balance;
-        const userPrevious = userWallet.availableBalance;
+        const userPrevious = userWallet.fiatAvailableBalance;
 
         const treasuryMutation = await tx.treasuryAccount.updateMany({
           where: {
@@ -288,7 +293,7 @@ export async function adminRoutes(app: FastifyInstance) {
         });
 
         if (treasuryMutation.count !== 1) {
-          throw new Error('Saldo insuficiente na tesouraria.');
+          throw new Error('Saldo em R$ insuficiente na tesouraria.');
         }
 
         const updatedTreasury = await tx.treasuryAccount.findUniqueOrThrow({
@@ -298,7 +303,7 @@ export async function adminRoutes(app: FastifyInstance) {
         const updatedWallet = await tx.wallet.update({
           where: { id: userWallet.id },
           data: {
-            availableBalance: { increment: amount },
+            fiatAvailableBalance: { increment: amount },
           },
         });
 
@@ -318,7 +323,7 @@ export async function adminRoutes(app: FastifyInstance) {
         await tx.transaction.create({
           data: {
             walletId: userWallet.id,
-            type: 'ADMIN_TREASURY_TRANSFER_IN',
+            type: 'ADMIN_TREASURY_FIAT_TRANSFER_IN',
             amount,
             description: parsed.reason,
           },
@@ -334,13 +339,13 @@ export async function adminRoutes(app: FastifyInstance) {
               targetUserId: targetUser.id,
               targetUserEmail: targetUser.email,
               treasuryBalance: treasuryPrevious.toString(),
-              userAvailableBalance: userPrevious.toString(),
+              userFiatAvailableBalance: userPrevious.toString(),
             }),
             current: JSON.stringify({
               targetUserId: targetUser.id,
               targetUserEmail: targetUser.email,
               treasuryBalance: updatedTreasury.balance.toString(),
-              userAvailableBalance: updatedWallet.availableBalance.toString(),
+              userFiatAvailableBalance: updatedWallet.fiatAvailableBalance.toString(),
               amount: amount.toString(),
             }),
             ip: request.ip,
@@ -349,10 +354,10 @@ export async function adminRoutes(app: FastifyInstance) {
         });
 
         return {
-          message: 'RPC depositado na carteira do usuário com sucesso.',
+          message: 'R$ depositado na carteira do jogador com sucesso.',
           transfer,
           treasuryBalance: updatedTreasury.balance,
-          userBalance: updatedWallet.availableBalance,
+          userBalance: updatedWallet.fiatAvailableBalance,
         };
       });
 
@@ -449,7 +454,7 @@ export async function adminRoutes(app: FastifyInstance) {
             walletId: updatedWallet.id,
             type: 'PLATFORM_PROFIT_WITHDRAWAL_IN',
             amount,
-            description: parsed.reason,
+            description: `R$ recebido da tesouraria administrativa - ${parsed.reason}`,
           },
         });
 

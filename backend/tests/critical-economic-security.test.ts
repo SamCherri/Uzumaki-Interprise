@@ -77,7 +77,7 @@ test('matching multi-fill mantém saldos, locks e taxa', async () => {
 
   await prisma.platformAccount.create({ data: {} });
 
-  await prisma.wallet.update({ where: { userId: buyer.id }, data: { availableBalance: 1000 } });
+  await prisma.wallet.update({ where: { userId: buyer.id }, data: { rpcAvailableBalance: 1000 } });
   const company = await prisma.company.create({
     data: {
       name: 'Comp',
@@ -145,8 +145,8 @@ test('matching multi-fill mantém saldos, locks e taxa', async () => {
   assert.equal(String(companyAfter.currentPrice), String(trades[trades.length - 1].unitPrice));
 
   const wallets = await prisma.wallet.findMany();
-  assert.ok(wallets.every((w) => Number(w.availableBalance) >= 0));
-  assert.ok(wallets.every((w) => Number(w.lockedBalance) >= 0));
+  assert.ok(wallets.every((w) => Number(w.rpcAvailableBalance) >= 0));
+  assert.ok(wallets.every((w) => Number(w.rpcLockedBalance) >= 0));
 
   const allOrders = await prisma.marketOrder.findMany();
   assert.ok(allOrders.every((o) => Number(o.lockedCash) >= 0));
@@ -193,7 +193,7 @@ test('compra inicial altera preço, cria operação e não cria trade', async ()
   const buyer = await mkUser('initialbuyer@test.local', 'Initial Buyer');
   await prisma.userRole.create({ data: { userId: buyer.id, roleId: rUser.id } });
   await prisma.platformAccount.create({ data: {} });
-  await prisma.wallet.update({ where: { userId: buyer.id }, data: { availableBalance: 5000 } });
+  await prisma.wallet.update({ where: { userId: buyer.id }, data: { rpcAvailableBalance: 5000 } });
 
   const company = await prisma.company.create({
     data: {
@@ -275,6 +275,7 @@ test('tesouraria envia RPC para corretor e corretor envia para jogador', async (
   assert.equal(Number(treasury.balance), 600);
   assert.equal(Number(brokerAccount.available), 250);
   assert.equal(Number(playerWallet.fiatAvailableBalance), 150);
+  assert.equal(Number(playerWallet.availableBalance), 0);
   assert.equal(Number(playerWallet.rpcAvailableBalance), 0);
   assert.ok(transfers.length >= 2);
   assert.ok(adminLogs.length >= 3);
@@ -283,7 +284,7 @@ test('tesouraria envia RPC para corretor e corretor envia para jogador', async (
   assert.ok(Number(playerWallet.fiatAvailableBalance) >= 0);
 });
 
-test('admin deposita RPC direto em jogador com débito atômico da tesouraria', async () => {
+test('admin deposita R$ direto em jogador com débito atômico da tesouraria', async () => {
   await resetDb();
   const rSuper = await mkRole('SUPER_ADMIN');
   const rUser = await mkRole('USER');
@@ -308,12 +309,14 @@ test('admin deposita RPC direto em jogador com débito atômico da tesouraria', 
 
   const treasury = await prisma.treasuryAccount.findFirstOrThrow();
   const wallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: player.id } });
-  const tx = await prisma.transaction.findFirst({ where: { walletId: wallet.id, type: 'ADMIN_TREASURY_TRANSFER_IN' } });
+  const tx = await prisma.transaction.findFirst({ where: { walletId: wallet.id, type: 'ADMIN_TREASURY_FIAT_TRANSFER_IN' } });
   const adjustment = await prisma.coinTransfer.findFirst({ where: { receiverId: player.id, type: 'ADJUSTMENT' } });
   const adminLog = await prisma.adminLog.findFirst({ where: { action: 'TREASURY_TRANSFER_TO_USER' } });
 
   assert.equal(Number(treasury.balance), 380);
-  assert.equal(Number(wallet.availableBalance), 120);
+  assert.equal(Number(wallet.fiatAvailableBalance), 120);
+  assert.equal(Number(wallet.rpcAvailableBalance), 0);
+  assert.equal(Number(wallet.availableBalance), 0);
   assert.ok(tx);
   assert.ok(adjustment);
   assert.ok(adminLog);
@@ -382,7 +385,7 @@ test('projeto desligado bloqueia rotas públicas de mercado sem apagar históric
   await prisma.userRole.create({ data: { userId: user.id, roleId: rUser.id } });
   await prisma.platformAccount.create({ data: {} });
 
-  await prisma.wallet.update({ where: { userId: user.id }, data: { availableBalance: 2000 } });
+  await prisma.wallet.update({ where: { userId: user.id }, data: { fiatAvailableBalance: 2000 } });
 
   const company = await prisma.company.create({
     data: {
