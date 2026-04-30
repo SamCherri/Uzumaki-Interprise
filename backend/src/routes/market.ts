@@ -27,6 +27,11 @@ const companyParams = z.object({ companyId: z.string().min(1) });
 
 const ZERO = new Decimal(0);
 
+const MARKET_TRANSACTION_OPTIONS = {
+  maxWait: 10000,
+  timeout: 20000,
+};
+
 function toDecimal(value: number | string | Decimal) {
   return value instanceof Decimal ? value : new Decimal(value);
 }
@@ -559,7 +564,7 @@ export async function marketRoutes(app: FastifyInstance) {
 
         await runMatching(tx, created.id, { ip: request.ip, userAgent: request.headers['user-agent'] ?? undefined });
         return tx.marketOrder.findUnique({ where: { id: created.id } });
-      });
+      }, MARKET_TRANSACTION_OPTIONS);
 
       return reply.code(201).send({ order });
     } catch (error) {
@@ -624,7 +629,7 @@ export async function marketRoutes(app: FastifyInstance) {
           ip: request.ip,
           userAgent: request.headers['user-agent'] ?? null,
         });
-      });
+      }, MARKET_TRANSACTION_OPTIONS);
 
       return { order: canceled };
     } catch (error) {
@@ -657,7 +662,7 @@ export async function marketRoutes(app: FastifyInstance) {
 
         await runMatching(tx, order.id, { ip: request.ip, userAgent: request.headers['user-agent'] ?? undefined });
         return tx.marketOrder.findUnique({ where: { id: order.id } });
-      });
+      }, MARKET_TRANSACTION_OPTIONS);
 
       return reply.code(201).send({ order: result });
     } catch (error) {
@@ -695,7 +700,7 @@ export async function marketRoutes(app: FastifyInstance) {
 
         await runMatching(tx, order.id, { ip: request.ip, userAgent: request.headers['user-agent'] ?? undefined });
         return tx.marketOrder.findUnique({ where: { id: order.id } });
-      });
+      }, MARKET_TRANSACTION_OPTIONS);
 
       return reply.code(201).send({ order: result });
     } catch (error) {
