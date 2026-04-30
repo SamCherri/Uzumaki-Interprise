@@ -375,7 +375,7 @@ test('super admin retira lucro da Exchange para carteira administrativa', async 
   assert.equal(tooMuch.statusCode, 400, tooMuch.body);
 
   for (const tk of [adminToken, userToken, brokerToken]) {
-    const forbidden = await app.inject({ method: 'POST', url: '/api/admin/platform-account/withdraw-to-admin', headers: { authorization: `Bearer ${tk}` }, payload: { adminId: adminTarget.id, amount: 10, reason: 'forbidden' } });
+    const forbidden = await app.inject({ method: 'POST', url: '/api/admin/platform-account/withdraw-to-admin', headers: { authorization: `Bearer ${tk}`, 'content-type': 'application/json' }, payload: { adminId: adminTarget.id, amount: 10, reason: 'forbidden' } });
     assert.equal(forbidden.statusCode, 403, forbidden.body);
   }
 });
@@ -507,15 +507,17 @@ test('force delete de projeto de teste só para SUPER_ADMIN e apaga histórico v
   const superToken = await token(superAdmin.id, ['SUPER_ADMIN']);
 
   for (const tk of [userToken, adminToken, chiefToken]) {
-    const forbidden = await app.inject({ method: 'DELETE', url: `/api/admin/companies/${company.id}/force-delete`, headers: { authorization: `Bearer ${tk}` }, payload: { reason: 'limpeza de teste completa', confirmation: 'EXCLUIR DEFINITIVAMENTE' } });
+    const forbidden = await app.inject({ method: 'DELETE', url: `/api/admin/companies/${company.id}/force-delete`, headers: { authorization: `Bearer ${tk}`, 'content-type': 'application/json' }, payload: { reason: 'limpeza de teste completa', confirmation: 'EXCLUIR DEFINITIVAMENTE' } });
     assert.equal(forbidden.statusCode, 403, forbidden.body);
   }
 
-  const invalidConfirmation = await app.inject({ method: 'DELETE', url: `/api/admin/companies/${company.id}/force-delete`, headers: { authorization: `Bearer ${superToken}` }, payload: { reason: 'limpeza de teste completa', confirmation: 'ERRADO' } });
+  const invalidConfirmation = await app.inject({ method: 'DELETE', url: `/api/admin/companies/${company.id}/force-delete`, headers: { authorization: `Bearer ${superToken}`, 'content-type': 'application/json' }, payload: { reason: 'limpeza de teste completa', confirmation: 'ERRADO' } });
   assert.equal(invalidConfirmation.statusCode, 400, invalidConfirmation.body);
 
-  const forceDelete = await app.inject({ method: 'DELETE', url: `/api/admin/companies/${company.id}/force-delete`, headers: { authorization: `Bearer ${superToken}` }, payload: { reason: 'limpeza de teste completa', confirmation: 'EXCLUIR DEFINITIVAMENTE' } });
+  const forceDelete = await app.inject({ method: 'DELETE', url: `/api/admin/companies/${company.id}/force-delete`, headers: { authorization: `Bearer ${superToken}`, 'content-type': 'application/json' }, payload: { reason: 'limpeza de teste completa', confirmation: 'EXCLUIR DEFINITIVAMENTE' } });
+  const forceDeletePayload = forceDelete.json();
   assert.equal(forceDelete.statusCode, 200, forceDelete.body);
+  assert.equal(forceDeletePayload.company?.id, company.id);
 
   assert.equal(await prisma.company.count({ where: { id: company.id } }), 0);
   assert.equal(await prisma.companyHolding.count({ where: { companyId: company.id } }), 0);
