@@ -225,6 +225,7 @@ button { cursor: pointer; font-weight: 700; }
 .current-price-line { stroke:#fbbf24; stroke-width:.7; stroke-dasharray:2 2; }
 .current-price-badge { fill:#fbbf24; opacity:.96; }
 .current-price-badge-text { font-size:2.05px; fill:#0f172a; font-weight:700; }
+.chart-grid-line { opacity: .55; }
 .volume-mini-chart .volume-bars { display:flex; align-items:flex-end; gap:4px; min-height:64px; }
 .volume-mini-chart .volume-bars div { flex:1; background:rgba(34,197,94,.55); border-radius:4px 4px 0 0; }
 .book-strength-bar { display:flex; border:1px solid #334155; border-radius:999px; overflow:hidden; margin:10px 0; font-size:.78rem; }
@@ -246,7 +247,7 @@ button { cursor: pointer; font-weight: 700; }
   .modern-chart-shell,
   .chart-wrap { width: 100%; max-width: 100%; overflow-x: hidden; }
   .market-mobile-shell { padding-bottom: 84px; }
-  .market-compact-header { gap: 8px; padding: 12px; }
+  .market-compact-header { gap: 8px; padding: 14px 12px 12px; }
   .market-compact-top { display: flex; align-items: center; gap: 8px; }
   .market-compact-price { justify-content: space-between; }
   .market-mini-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); font-size: .8rem; }
@@ -258,12 +259,13 @@ button { cursor: pointer; font-weight: 700; }
   .market-price-tab .chart-wrap { min-height: 240px; max-height: 280px; width: 100%; }
   .line-chart { width: 100%; max-width: 100%; height: 248px; }
   .modern-chart-shell { padding-right: 8px; }
-  .price-scale-label { font-size: 3px; }
+  .price-scale-label { display: none; }
+  .current-price-badge,
   .current-price-badge-text { display:none; }
   .chart-meta { gap: 8px; margin-top: 12px; }
   .chart-meta div { padding: 8px; }
   .market-price-tab .info-text { margin-top: 10px; font-size: .78rem; line-height: 1.35; }
-  .current-price-badge { opacity: .95; }
+  .chart-grid-line { opacity: .28; }
   .mobile-trade-actions { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; background: rgba(2,6,23,.95); border-top: 1px solid #334155; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 100%; overflow-x: hidden; }
   .mobile-trade-actions button { min-height: 50px; }
   .trade-panel-backdrop { padding-bottom: 0; }

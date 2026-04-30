@@ -418,7 +418,7 @@ export function CompaniesPage() {
                 <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="line-chart">
                   <defs>
                     <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-                      <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(148,163,184,.22)" strokeWidth="0.32" />
+                      <path className="chart-grid-line" d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(148,163,184,.18)" strokeWidth="0.28" />
                     </pattern>
                   </defs>
                   <rect x="0" y="0" width="100" height="100" fill="url(#grid)" />
