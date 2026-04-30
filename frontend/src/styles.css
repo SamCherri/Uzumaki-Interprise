@@ -217,7 +217,8 @@ button { cursor: pointer; font-weight: 700; }
 .market-price-overview { display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px; }
 .market-stats-row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; font-size:.86rem; color:#cbd5e1; }
 .market-top-tabs, .chart-timeframes, .indicator-tabs, .chart-action-bar { display:flex; gap:8px; overflow-x:auto; }
-.modern-chart-shell { padding-right: 8px; }
+.market-mobile-tabs .quick-pill, .chart-timeframes .quick-pill, .indicator-tabs .quick-pill { min-width: 0; }
+.modern-chart-shell { padding-right: 8px; width: 100%; max-width: 100%; overflow-x: hidden; }
 .price-scale-label { font-size:2.2px; fill:#94a3b8; }
 .current-price-line { stroke:#fbbf24; stroke-width:.7; stroke-dasharray:2 2; }
 .current-price-badge { fill:#fbbf24; }
@@ -233,20 +234,39 @@ button { cursor: pointer; font-weight: 700; }
 @media (min-width:920px){ .market-stats-row{grid-template-columns:repeat(3,minmax(0,1fr));} .chart-action-bar button{max-width:220px;} }
 
 @media (max-width: 719px) {
-  .market-mobile-shell { padding-bottom: 84px; overflow-x: hidden; }
+  .market-page,
+  .market-mobile-shell,
+  .trade-screen,
+  .card,
+  .nested-card,
+  .market-price-tab,
+  .modern-chart-shell,
+  .chart-wrap { width: 100%; max-width: 100%; overflow-x: hidden; }
+  .market-mobile-shell { padding-bottom: 84px; }
   .market-compact-header { gap: 8px; padding: 12px; }
   .market-compact-top { display: flex; align-items: center; gap: 8px; }
   .market-compact-price { justify-content: space-between; }
   .market-mini-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); font-size: .8rem; }
-  .market-mobile-tabs { position: sticky; top: 0; z-index: 40; background: #0f172a; }
-  .market-price-tab .chart-wrap { min-height: 260px; max-height: 320px; }
-  .modern-chart-shell { padding-right: 16px; }
+  .market-mini-stats span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .market-mobile-tabs { position: sticky; top: 0; z-index: 40; background: #0f172a; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; }
+  .market-mobile-tabs .quick-pill { min-width: 0; width: 100%; padding: 8px 6px; font-size: .82rem; }
+  .chart-timeframes { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; overflow-x: visible; }
+  .chart-timeframes .quick-pill { min-width: 0; width: 100%; padding: 8px 4px; font-size: .8rem; }
+  .market-price-tab .chart-wrap { min-height: 260px; max-height: 320px; width: 100%; }
+  .line-chart { width: 100%; max-width: 100%; }
+  .modern-chart-shell { padding-right: 8px; }
   .price-scale-label { font-size: 2.8px; }
   .current-price-badge { opacity: .95; }
-  .mobile-trade-actions { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; background: rgba(2,6,23,.95); border-top: 1px solid #334155; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mobile-trade-actions { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; background: rgba(2,6,23,.95); border-top: 1px solid #334155; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 100%; overflow-x: hidden; }
   .mobile-trade-actions button { min-height: 50px; }
   .trade-panel-backdrop { padding-bottom: 0; }
   .trade-bottom-sheet { max-height: 85vh; border-radius: 16px 16px 0 0; padding: 14px; gap: 12px; }
   .market-book-tab .order-book-grid { grid-template-columns: 1fr; }
   .market-data-grid { display: grid; grid-template-columns: 1fr; gap: 6px; }
+}
+
+.info-text,
+.empty-state {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }

@@ -104,7 +104,7 @@ function normalizeChartData(trades: Trade[], initialPrice: number, currentPrice:
 
   const note =
     trades.length === 0
-      ? 'Ainda sem trades. O gráfico usa preço inicial e preço atual como referência.'
+      ? 'Sem trades. Usando preço inicial e atual.'
       : 'Compras no lançamento, trades executados e impulsões podem alterar o preço atual.';
 
   const minPrice = Math.min(...series);
@@ -121,7 +121,7 @@ function normalizeChartData(trades: Trade[], initialPrice: number, currentPrice:
   const variationPercent = safeInitialPrice === 0 ? 0 : (variationAbsolute / safeInitialPrice) * 100;
 
   const points = series.map((price, index) => ({
-    x: series.length === 1 ? 0 : (index / (series.length - 1)) * 100,
+    x: series.length === 1 ? 0 : (index / (series.length - 1)) * 84,
     y: !hasRange || chartRange === 0 ? 50 : 100 - ((price - chartMin) / chartRange) * 100,
     price,
   }));
@@ -389,8 +389,8 @@ export function CompaniesPage() {
             <div className="market-stats-row market-mini-stats">
               <span>Máx: {formatPrice(chartData.maxPrice)}</span>
               <span>Mín: {formatPrice(chartData.minPrice)}</span>
-              <span>Volume: {totalTradeVolume > 0 ? totalTradeVolume.toLocaleString('pt-BR') : 'Sem negociações'}</span>
-              <span>Meus tokens: {holdingQty}</span>
+              <span>Vol: {totalTradeVolume > 0 ? totalTradeVolume.toLocaleString('pt-BR') : 'Sem volume'}</span>
+              <span>Tokens: {holdingQty}</span>
             </div>
           </header>
 
@@ -415,7 +415,7 @@ export function CompaniesPage() {
                 {['Time', '15m', '1h', '4h', '1D'].map((tf) => <button key={tf} className="quick-pill">{tf}</button>)}
               </div>
               <div className="chart-wrap chart-wrap-highlight modern-chart-shell">
-                <svg viewBox="0 0 118 100" preserveAspectRatio="none" className="line-chart">
+                <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="line-chart">
                   <defs>
                     <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
                       <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#d7e2ff" strokeWidth="0.4" />
@@ -423,14 +423,14 @@ export function CompaniesPage() {
                   </defs>
                   <rect x="0" y="0" width="100" height="100" fill="url(#grid)" />
                   <polyline points={chartData.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" stroke="#4f46e5" strokeWidth="2.6" vectorEffect="non-scaling-stroke" />
-                  <line className="current-price-line" x1="0" x2="100" y1={chartData.points[chartData.points.length - 1].y} y2={chartData.points[chartData.points.length - 1].y} />
+                  <line className="current-price-line" x1="0" x2="84" y1={chartData.points[chartData.points.length - 1].y} y2={chartData.points[chartData.points.length - 1].y} />
                   <circle cx={chartData.points[chartData.points.length - 1].x} cy={chartData.points[chartData.points.length - 1].y} r="1.4" fill="#f8fafc" />
                   {priceTicks.map((tick) => {
                     const y = 100 - (((tick - (chartData.minPrice - Math.max((chartData.maxPrice - chartData.minPrice) * 0.2, 0.01))) / ((chartData.maxPrice + Math.max((chartData.maxPrice - chartData.minPrice) * 0.2, 0.01)) - (chartData.minPrice - Math.max((chartData.maxPrice - chartData.minPrice) * 0.2, 0.01)))) * 100);
-                    return <text key={tick} x="102" y={Math.max(2, Math.min(98, y))} className="price-scale-label">{formatPrice(tick)}</text>;
+                    return <text key={tick} x="86" y={Math.max(3, Math.min(97, y))} className="price-scale-label">{formatPrice(tick)}</text>;
                   })}
-                  <rect x="102" y={chartData.points[chartData.points.length - 1].y - 3} width="14" height="6" rx="1.2" className="current-price-badge" />
-                  <text x="109" y={chartData.points[chartData.points.length - 1].y + 1.2} textAnchor="middle" fontSize="2.1" fill="#0f172a">{formatPrice(chartData.currentPrice)}</text>
+                  <rect x="86" y={chartData.points[chartData.points.length - 1].y - 3} width="13" height="6" rx="1.2" className="current-price-badge" />
+                  <text x="92.5" y={chartData.points[chartData.points.length - 1].y + 1.2} textAnchor="middle" fontSize="2.1" fill="#0f172a">{formatPrice(chartData.currentPrice)}</text>
                 </svg>
               </div>
               <div className="chart-meta"><div><span>Atual</span><strong>{formatPrice(chartData.lastPrice)}</strong></div><div><span>Máximo</span><strong>{formatPrice(chartData.maxPrice)}</strong></div><div><span>Mínimo</span><strong>{formatPrice(chartData.minPrice)}</strong></div></div>
