@@ -188,18 +188,18 @@ export function App() {
 
   const globalDrawerItems = useMemo<SideDrawerItem[]>(() => {
     const items: SideDrawerItem[] = [
-      { key: 'home', label: 'Início', icon: '🏠', active: screen === 'home', onClick: () => setScreen('home') },
-      { key: 'markets', label: 'Mercados', icon: '🪙', active: screen === 'markets', onClick: () => setScreen('markets') },
-      { key: 'wallet', label: 'Carteira', icon: '💼', active: screen === 'wallet', onClick: () => setScreen('wallet') },
-      { key: 'withdrawals', label: 'Saque', icon: '🏧', active: screen === 'withdrawals', onClick: () => setScreen('withdrawals') },
-      { key: 'company-request', label: 'Criar token', icon: '🚀', active: screen === 'company-request', onClick: () => setScreen('company-request') },
+      { key: 'home', label: 'Início', icon: '🏠', active: screen === 'home', onClick: () => setScreen('home'), section: 'main' },
+      { key: 'markets', label: 'Mercados', icon: '🪙', active: screen === 'markets', onClick: () => setScreen('markets'), section: 'main' },
+      { key: 'wallet', label: 'Carteira', icon: '💼', active: screen === 'wallet', onClick: () => setScreen('wallet'), section: 'main' },
+      { key: 'withdrawals', label: 'Saque', icon: '🏧', active: screen === 'withdrawals', onClick: () => setScreen('withdrawals'), section: 'secondary' },
+      { key: 'company-request', label: 'Criar token', icon: '🚀', active: screen === 'company-request', onClick: () => setScreen('company-request'), section: 'secondary' },
     ];
 
-    if (canSeeMyProjects) items.push({ key: 'my-projects', label: 'Meus Projetos', icon: '📊', active: screen === 'my-projects', onClick: () => setScreen('my-projects') });
-    if (roles.canSeeAdmin) items.push({ key: 'admin', label: 'Admin', icon: '🛠️', active: screen === 'admin', onClick: () => setScreen('admin') });
-    if (roles.canSeeBroker) items.push({ key: 'broker', label: 'Corretor', icon: '🤝', active: screen === 'broker', onClick: () => setScreen('broker') });
+    if (canSeeMyProjects) items.push({ key: 'my-projects', label: 'Meus Projetos', icon: '📊', active: screen === 'my-projects', onClick: () => setScreen('my-projects'), section: 'secondary' });
+    if (roles.canSeeAdmin) items.push({ key: 'admin', label: 'Admin', icon: '🛠️', active: screen === 'admin', onClick: () => setScreen('admin'), section: 'main' });
+    if (roles.canSeeBroker) items.push({ key: 'broker', label: 'Corretor', icon: '🤝', active: screen === 'broker', onClick: () => setScreen('broker'), section: 'secondary' });
 
-    items.push({ key: 'logout', label: 'Sair', icon: '🚪', danger: true, onClick: handleLogout });
+    items.push({ key: 'logout', label: 'Sair', icon: '🚪', danger: true, section: 'danger', onClick: handleLogout });
     return items;
   }, [canSeeMyProjects, roles.canSeeAdmin, roles.canSeeBroker, screen]);
 
@@ -268,6 +268,7 @@ export function App() {
           )}
           <button className="hamburger-button mobile-only" type="button" aria-label="Abrir menu" onClick={() => setIsGlobalDrawerOpen(true)}>☰</button>
           <div className="mobile-topbar-title">
+            <span className="mobile-topbar-badge">Simulação RP</span>
             <h1>RPC Exchange</h1>
             <p className="subtitle">Simulação econômica RP</p>
           </div>
@@ -328,6 +329,16 @@ export function App() {
             <div className="mobile-menu-hint">
               <span>☰</span>
               <p>Use o menu lateral para acessar Saque, Criar token, Projetos, Corretor e Sair.</p>
+            </div>
+            <div className="summary-grid">
+              <article className="summary-item">
+                <span className="summary-label">Navegação rápida</span>
+                <strong className="summary-value">Mercados e Carteira</strong>
+              </article>
+              <article className="summary-item">
+                <span className="summary-label">Experiência mobile</span>
+                <strong className="summary-value">Botões grandes e leitura clara</strong>
+              </article>
             </div>
           </section>
 

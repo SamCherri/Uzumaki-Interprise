@@ -1,21 +1,26 @@
 :root {
   font-family: Inter, system-ui, sans-serif;
   color: #e2e8f0;
-  background: linear-gradient(180deg, #0f172a 0%, #1e293b 50%, #0b1220 100%);
+  background: linear-gradient(180deg, #090f1d 0%, #111b31 50%, #0a1120 100%);
+  --bg-main: #0a1120;
+  --bg-card: rgba(11, 19, 36, 0.85);
+  --border-soft: rgba(148, 163, 184, 0.24);
+  --text-muted: #9fb0c9;
+  --shadow-card: 0 12px 30px rgba(5, 10, 24, 0.4);
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; background: linear-gradient(180deg, #0f172a 0%, #1e293b 50%, #0b1220 100%); }
+body { margin: 0; min-height: 100vh; background: linear-gradient(180deg, #090f1d 0%, #111b31 50%, #0a1120 100%); }
 
 .container { width: min(100%, 980px); margin: 0 auto; padding: 12px; }
 .auth-shell { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
 
 .card {
-  background: rgba(15, 23, 42, 0.82);
-  border: 1px solid #334155;
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
   border-radius: 18px;
   padding: 16px;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.32);
+  box-shadow: var(--shadow-card);
   backdrop-filter: blur(8px);
 }
 
@@ -62,7 +67,7 @@ button { cursor: pointer; font-weight: 700; }
 }
 .pill.active, .quick-pill.active { background: #f8fafc; color: #0f172a; border-color: #f8fafc; }
 
-.info-text { color: #94a3b8; margin: 6px 0; }
+.info-text { color: var(--text-muted); margin: 6px 0; }
 .empty-state {
   border: 1px dashed #475569;
   border-radius: 12px;
@@ -368,7 +373,7 @@ input[type="checkbox"] {
 .side-drawer {
   width: min(82vw, 320px);
   height: 100%;
-  background: #0f172a;
+  background: #0b1326;
   border-right: 1px solid rgba(148,163,184,.24);
   padding: 16px;
   display: grid;
@@ -385,6 +390,8 @@ input[type="checkbox"] {
 .side-drawer-item { display:flex; align-items:center; gap:10px; justify-content:flex-start; font-weight:600; }
 .side-drawer-item.active { border-color:#93c5fd; background: rgba(37,99,235,.25); }
 .side-drawer-item.danger { border-color:#ef4444; color:#fecaca; }
+.side-drawer-section-label { margin: 6px 0 0; color: var(--text-muted); font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; }
+.side-drawer-section-label.danger { color: #fca5a5; }
 
 
 .mobile-home-summary {
@@ -401,6 +408,13 @@ input[type="checkbox"] {
   margin: 0;
   font-size: 1.45rem;
   line-height: 1.1;
+}
+.mobile-topbar-badge {
+  font-size: .65rem;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  color: #93c5fd;
+  font-weight: 700;
 }
 
 .mobile-topbar-title .subtitle {
