@@ -111,12 +111,13 @@ test('matching multi-fill mantém saldos, locks e taxa', async () => {
 
   for (const s of sellers) {
     const tk = await token(s.id, ['USER']);
-    await app.inject({
+    const sellResp = await app.inject({
       method: 'POST',
       url: '/api/market/orders',
       headers: { authorization: `Bearer ${tk}` },
       payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 10, limitPrice: 10 },
     });
+    assert.equal(sellResp.statusCode, 201, sellResp.body);
   }
 
   const buyerToken = await token(buyer.id, ['USER']);
@@ -126,7 +127,7 @@ test('matching multi-fill mantém saldos, locks e taxa', async () => {
     headers: { authorization: `Bearer ${buyerToken}` },
     payload: { companyId: company.id, type: 'BUY', mode: 'LIMIT', quantity: 30, limitPrice: 10 },
   });
-  assert.equal(buyResp.statusCode, 201);
+  assert.equal(buyResp.statusCode, 201, buyResp.body);
 
   const trades = await prisma.trade.findMany({ where: { companyId: company.id }, orderBy: { createdAt: 'asc' } });
   assert.equal(trades.length, 3);
@@ -174,15 +175,15 @@ test('export csv exige admin e broker-report valida corretor', async () => {
   const userToken = await token(user.id, ['USER']);
 
   const ok = await app.inject({ method: 'GET', url: '/api/admin/reports/export/transactions', headers: { authorization: `Bearer ${adminToken}` } });
-  assert.equal(ok.statusCode, 200);
+  assert.equal(ok.statusCode, 200, ok.body);
   assert.match(ok.headers['content-type'] || '', /text\/csv/);
   assert.match(ok.body, /type|id/i);
 
   const forbidden = await app.inject({ method: 'GET', url: '/api/admin/reports/export/transactions', headers: { authorization: `Bearer ${userToken}` } });
-  assert.equal(forbidden.statusCode, 403);
+  assert.equal(forbidden.statusCode, 403, forbidden.body);
 
   const notBroker = await app.inject({ method: 'GET', url: `/api/admin/reports/export/broker-report?userId=${user.id}`, headers: { authorization: `Bearer ${adminToken}` } });
-  assert.equal(notBroker.statusCode, 400);
+  assert.equal(notBroker.statusCode, 400, notBroker.body);
   assert.match(notBroker.body, /não é corretor/i);
 });
 
@@ -211,7 +212,7 @@ test('compra inicial altera preço, cria operação e não cria trade', async ()
     payload: { quantity: 50 },
   });
 
-  assert.equal(response.statusCode, 201);
+  assert.equal(response.statusCode, 201, response.body);
   const payload = response.json();
   assert.ok(payload.priceBefore);
   assert.ok(payload.priceAfter);
@@ -257,13 +258,13 @@ test('tesouraria envia RPC para corretor e corretor envia para jogador', async (
   const brokerToken = await token(broker.id, ['VIRTUAL_BROKER']);
 
   const issuance = await app.inject({ method: 'POST', url: '/api/admin/treasury/issuance', headers: { authorization: `Bearer ${adminToken}` }, payload: { amount: 1000, reason: 'emissão teste' } });
-  assert.equal(issuance.statusCode, 201);
+  assert.equal(issuance.statusCode, 201, issuance.body);
 
   const toBroker = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-broker', headers: { authorization: `Bearer ${adminToken}` }, payload: { brokerUserId: broker.id, amount: 400, reason: 'repasse corretor' } });
-  assert.equal(toBroker.statusCode, 201);
+  assert.equal(toBroker.statusCode, 201, toBroker.body);
 
   const toPlayer = await app.inject({ method: 'POST', url: '/api/broker/transfer-to-user', headers: { authorization: `Bearer ${brokerToken}` }, payload: { userId: player.id, amount: 150, reason: 'repasse jogador' } });
-  assert.equal(toPlayer.statusCode, 201);
+  assert.equal(toPlayer.statusCode, 201, toPlayer.body);
 
   const treasury = await prisma.treasuryAccount.findFirstOrThrow();
   const brokerAccount = await prisma.brokerAccount.findUniqueOrThrow({ where: { userId: broker.id } });
@@ -302,7 +303,7 @@ test('admin deposita RPC direto em jogador com débito atômico da tesouraria', 
   const userToken = await token(commonUser.id, ['USER']);
 
   const ok = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${adminToken}` }, payload: { userId: player.id, amount: 120, reason: 'ajuste adm' } });
-  assert.equal(ok.statusCode, 201);
+  assert.equal(ok.statusCode, 201, ok.body);
 
   const treasury = await prisma.treasuryAccount.findFirstOrThrow();
   const wallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: player.id } });
@@ -317,11 +318,11 @@ test('admin deposita RPC direto em jogador com débito atômico da tesouraria', 
   assert.ok(adminLog);
 
   const insufficient = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${adminToken}` }, payload: { userId: player.id, amount: 999999, reason: 'sem saldo' } });
-  assert.equal(insufficient.statusCode, 400);
+  assert.equal(insufficient.statusCode, 400, insufficient.body);
   assert.match(insufficient.body, /saldo insuficiente/i);
 
   const forbidden = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${userToken}` }, payload: { userId: player.id, amount: 10, reason: 'forbidden' } });
-  assert.equal(forbidden.statusCode, 403);
+  assert.equal(forbidden.statusCode, 403, forbidden.body);
 });
 
 test('super admin retira lucro da Exchange para carteira administrativa', async () => {
@@ -351,7 +352,7 @@ test('super admin retira lucro da Exchange para carteira administrativa', async 
   const brokerToken = await token(broker.id, ['VIRTUAL_BROKER']);
 
   const ok = await app.inject({ method: 'POST', url: '/api/admin/platform-account/withdraw-to-admin', headers: { authorization: `Bearer ${superToken}` }, payload: { adminId: adminTarget.id, amount: 300, reason: 'retirada lucro' } });
-  assert.equal(ok.statusCode, 201);
+  assert.equal(ok.statusCode, 201, ok.body);
 
   const platform = await prisma.platformAccount.findFirstOrThrow();
   const adminWallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: adminTarget.id } });
@@ -365,11 +366,11 @@ test('super admin retira lucro da Exchange para carteira administrativa', async 
   assert.ok(log);
 
   const tooMuch = await app.inject({ method: 'POST', url: '/api/admin/platform-account/withdraw-to-admin', headers: { authorization: `Bearer ${superToken}` }, payload: { adminId: adminTarget.id, amount: 99999, reason: 'sem saldo' } });
-  assert.equal(tooMuch.statusCode, 400);
+  assert.equal(tooMuch.statusCode, 400, tooMuch.body);
 
   for (const tk of [adminToken, userToken, brokerToken]) {
     const forbidden = await app.inject({ method: 'POST', url: '/api/admin/platform-account/withdraw-to-admin', headers: { authorization: `Bearer ${tk}` }, payload: { adminId: adminTarget.id, amount: 10, reason: 'forbidden' } });
-    assert.equal(forbidden.statusCode, 403);
+    assert.equal(forbidden.statusCode, 403, forbidden.body);
   }
 });
 
@@ -394,21 +395,21 @@ test('projeto desligado bloqueia rotas públicas de mercado sem apagar históric
   const userToken = await token(user.id, ['USER']);
 
   const listActive = await app.inject({ method: 'GET', url: '/api/companies', headers: { authorization: `Bearer ${userToken}` } });
-  assert.equal(listActive.statusCode, 200);
+  assert.equal(listActive.statusCode, 200, listActive.body);
   assert.match(listActive.body, /MRK1/);
 
   const seedBuy = await app.inject({ method: 'POST', url: `/api/companies/${company.id}/buy-initial-offer`, headers: { authorization: `Bearer ${userToken}` }, payload: { quantity: 20 } });
-  assert.equal(seedBuy.statusCode, 201);
+  assert.equal(seedBuy.statusCode, 201, seedBuy.body);
 
   const orderBookActive = await app.inject({ method: 'GET', url: `/api/market/companies/${company.id}/order-book`, headers: { authorization: `Bearer ${userToken}` } });
   const tradesActive = await app.inject({ method: 'GET', url: `/api/market/companies/${company.id}/trades`, headers: { authorization: `Bearer ${userToken}` } });
-  assert.equal(orderBookActive.statusCode, 200);
-  assert.equal(tradesActive.statusCode, 200);
+  assert.equal(orderBookActive.statusCode, 200, orderBookActive.body);
+  assert.equal(tradesActive.statusCode, 200, tradesActive.body);
 
   await prisma.company.update({ where: { id: company.id }, data: { status: 'SUSPENDED' } });
 
   const listSuspended = await app.inject({ method: 'GET', url: '/api/companies', headers: { authorization: `Bearer ${userToken}` } });
-  assert.equal(listSuspended.statusCode, 200);
+  assert.equal(listSuspended.statusCode, 200, listSuspended.body);
   assert.ok(!listSuspended.body.includes('MRK1'));
 
   const blockedOrderBook = await app.inject({ method: 'GET', url: `/api/market/companies/${company.id}/order-book`, headers: { authorization: `Bearer ${userToken}` } });
@@ -417,11 +418,11 @@ test('projeto desligado bloqueia rotas públicas de mercado sem apagar históric
   const blockedBuyMarket = await app.inject({ method: 'POST', url: `/api/market/companies/${company.id}/buy-market`, headers: { authorization: `Bearer ${userToken}` }, payload: { quantity: 1, slippagePercent: 5 } });
   const blockedSellMarket = await app.inject({ method: 'POST', url: `/api/market/companies/${company.id}/sell-market`, headers: { authorization: `Bearer ${userToken}` }, payload: { quantity: 1, slippagePercent: 5 } });
 
-  assert.equal(blockedOrderBook.statusCode, 400);
-  assert.equal(blockedTrades.statusCode, 400);
-  assert.equal(blockedOrder.statusCode, 400);
-  assert.equal(blockedBuyMarket.statusCode, 400);
-  assert.equal(blockedSellMarket.statusCode, 400);
+  assert.equal(blockedOrderBook.statusCode, 400, blockedOrderBook.body);
+  assert.equal(blockedTrades.statusCode, 400, blockedTrades.body);
+  assert.equal(blockedOrder.statusCode, 400, blockedOrder.body);
+  assert.equal(blockedBuyMarket.statusCode, 400, blockedBuyMarket.body);
+  assert.equal(blockedSellMarket.statusCode, 400, blockedSellMarket.body);
 
   const operationsCount = await prisma.companyOperation.count({ where: { companyId: company.id, type: 'INITIAL_OFFER_BUY' } });
   assert.ok(operationsCount > 0);
