@@ -77,7 +77,7 @@ test('matching multi-fill mantém saldos, locks e taxa', async () => {
 
   await prisma.platformAccount.create({ data: {} });
 
-  await prisma.wallet.update({ where: { userId: buyer.id }, data: { availableBalance: 1000 } });
+  await prisma.wallet.update({ where: { userId: buyer.id }, data: { rpcAvailableBalance: 1000 } });
   const company = await prisma.company.create({
     data: {
       name: 'Comp',
@@ -145,8 +145,8 @@ test('matching multi-fill mantém saldos, locks e taxa', async () => {
   assert.equal(String(companyAfter.currentPrice), String(trades[trades.length - 1].unitPrice));
 
   const wallets = await prisma.wallet.findMany();
-  assert.ok(wallets.every((w) => Number(w.availableBalance) >= 0));
-  assert.ok(wallets.every((w) => Number(w.lockedBalance) >= 0));
+  assert.ok(wallets.every((w) => Number(w.rpcAvailableBalance) >= 0));
+  assert.ok(wallets.every((w) => Number(w.rpcLockedBalance) >= 0));
 
   const allOrders = await prisma.marketOrder.findMany();
   assert.ok(allOrders.every((o) => Number(o.lockedCash) >= 0));
@@ -193,7 +193,7 @@ test('compra inicial altera preço, cria operação e não cria trade', async ()
   const buyer = await mkUser('initialbuyer@test.local', 'Initial Buyer');
   await prisma.userRole.create({ data: { userId: buyer.id, roleId: rUser.id } });
   await prisma.platformAccount.create({ data: {} });
-  await prisma.wallet.update({ where: { userId: buyer.id }, data: { availableBalance: 5000 } });
+  await prisma.wallet.update({ where: { userId: buyer.id }, data: { rpcAvailableBalance: 5000 } });
 
   const company = await prisma.company.create({
     data: {
@@ -274,15 +274,17 @@ test('tesouraria envia RPC para corretor e corretor envia para jogador', async (
 
   assert.equal(Number(treasury.balance), 600);
   assert.equal(Number(brokerAccount.available), 250);
-  assert.equal(Number(playerWallet.availableBalance), 150);
+  assert.equal(Number(playerWallet.fiatAvailableBalance), 150);
+  assert.equal(Number(playerWallet.availableBalance), 0);
+  assert.equal(Number(playerWallet.rpcAvailableBalance), 0);
   assert.ok(transfers.length >= 2);
   assert.ok(adminLogs.length >= 3);
   assert.ok(Number(treasury.balance) >= 0);
   assert.ok(Number(brokerAccount.available) >= 0);
-  assert.ok(Number(playerWallet.availableBalance) >= 0);
+  assert.ok(Number(playerWallet.fiatAvailableBalance) >= 0);
 });
 
-test('admin deposita RPC direto em jogador com débito atômico da tesouraria', async () => {
+test('admin deposita R$ direto em jogador com débito atômico da tesouraria', async () => {
   await resetDb();
   const rSuper = await mkRole('SUPER_ADMIN');
   const rUser = await mkRole('USER');
@@ -307,19 +309,21 @@ test('admin deposita RPC direto em jogador com débito atômico da tesouraria', 
 
   const treasury = await prisma.treasuryAccount.findFirstOrThrow();
   const wallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: player.id } });
-  const tx = await prisma.transaction.findFirst({ where: { walletId: wallet.id, type: 'ADMIN_TREASURY_TRANSFER_IN' } });
+  const tx = await prisma.transaction.findFirst({ where: { walletId: wallet.id, type: 'ADMIN_TREASURY_FIAT_TRANSFER_IN' } });
   const adjustment = await prisma.coinTransfer.findFirst({ where: { receiverId: player.id, type: 'ADJUSTMENT' } });
   const adminLog = await prisma.adminLog.findFirst({ where: { action: 'TREASURY_TRANSFER_TO_USER' } });
 
   assert.equal(Number(treasury.balance), 380);
-  assert.equal(Number(wallet.availableBalance), 120);
+  assert.equal(Number(wallet.fiatAvailableBalance), 120);
+  assert.equal(Number(wallet.rpcAvailableBalance), 0);
+  assert.equal(Number(wallet.availableBalance), 0);
   assert.ok(tx);
   assert.ok(adjustment);
   assert.ok(adminLog);
 
   const insufficient = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${adminToken}` }, payload: { userId: player.id, amount: 999999, reason: 'sem saldo' } });
   assert.equal(insufficient.statusCode, 400, insufficient.body);
-  assert.match(insufficient.body, /saldo insuficiente/i);
+  assert.match(insufficient.body, /saldo.*insuficiente/i);
 
   const forbidden = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${userToken}` }, payload: { userId: player.id, amount: 10, reason: 'forbidden' } });
   assert.equal(forbidden.statusCode, 403, forbidden.body);
@@ -361,7 +365,9 @@ test('super admin retira lucro da Exchange para carteira administrativa', async 
 
   assert.equal(Number(platform.balance), 700);
   assert.equal(Number(platform.totalWithdrawn), 300);
-  assert.equal(Number(adminWallet.availableBalance), 300);
+  assert.equal(Number(adminWallet.fiatAvailableBalance), 300);
+  assert.equal(Number(adminWallet.availableBalance), 0);
+  assert.equal(Number(adminWallet.rpcAvailableBalance), 0);
   assert.ok(tx);
   assert.ok(log);
 
@@ -369,7 +375,7 @@ test('super admin retira lucro da Exchange para carteira administrativa', async 
   assert.equal(tooMuch.statusCode, 400, tooMuch.body);
 
   for (const tk of [adminToken, userToken, brokerToken]) {
-    const forbidden = await app.inject({ method: 'POST', url: '/api/admin/platform-account/withdraw-to-admin', headers: { authorization: `Bearer ${tk}` }, payload: { adminId: adminTarget.id, amount: 10, reason: 'forbidden' } });
+    const forbidden = await app.inject({ method: 'POST', url: '/api/admin/platform-account/withdraw-to-admin', headers: { authorization: `Bearer ${tk}`, 'content-type': 'application/json' }, payload: { adminId: adminTarget.id, amount: 10, reason: 'forbidden' } });
     assert.equal(forbidden.statusCode, 403, forbidden.body);
   }
 });
@@ -381,7 +387,7 @@ test('projeto desligado bloqueia rotas públicas de mercado sem apagar históric
   await prisma.userRole.create({ data: { userId: user.id, roleId: rUser.id } });
   await prisma.platformAccount.create({ data: {} });
 
-  await prisma.wallet.update({ where: { userId: user.id }, data: { availableBalance: 2000 } });
+  await prisma.wallet.update({ where: { userId: user.id }, data: { fiatAvailableBalance: 2000, rpcAvailableBalance: 2000 } });
 
   const company = await prisma.company.create({
     data: {
@@ -501,24 +507,45 @@ test('force delete de projeto de teste só para SUPER_ADMIN e apaga histórico v
   const superToken = await token(superAdmin.id, ['SUPER_ADMIN']);
 
   for (const tk of [userToken, adminToken, chiefToken]) {
-    const forbidden = await app.inject({ method: 'DELETE', url: `/api/admin/companies/${company.id}/force-delete`, headers: { authorization: `Bearer ${tk}` }, payload: { reason: 'limpeza de teste completa', confirmation: 'EXCLUIR DEFINITIVAMENTE' } });
+    const forbidden = await app.inject({ method: 'DELETE', url: `/api/admin/companies/${company.id}/force-delete`, headers: { authorization: `Bearer ${tk}`, 'content-type': 'application/json' }, payload: { reason: 'limpeza de teste completa', confirmation: 'EXCLUIR DEFINITIVAMENTE' } });
     assert.equal(forbidden.statusCode, 403, forbidden.body);
   }
 
-  const invalidConfirmation = await app.inject({ method: 'DELETE', url: `/api/admin/companies/${company.id}/force-delete`, headers: { authorization: `Bearer ${superToken}` }, payload: { reason: 'limpeza de teste completa', confirmation: 'ERRADO' } });
+  const invalidConfirmation = await app.inject({ method: 'DELETE', url: `/api/admin/companies/${company.id}/force-delete`, headers: { authorization: `Bearer ${superToken}`, 'content-type': 'application/json' }, payload: { reason: 'limpeza de teste completa', confirmation: 'ERRADO' } });
   assert.equal(invalidConfirmation.statusCode, 400, invalidConfirmation.body);
 
-  const forceDelete = await app.inject({ method: 'DELETE', url: `/api/admin/companies/${company.id}/force-delete`, headers: { authorization: `Bearer ${superToken}` }, payload: { reason: 'limpeza de teste completa', confirmation: 'EXCLUIR DEFINITIVAMENTE' } });
+  const forceDelete = await app.inject({ method: 'DELETE', url: `/api/admin/companies/${company.id}/force-delete`, headers: { authorization: `Bearer ${superToken}`, 'content-type': 'application/json' }, payload: { reason: 'limpeza de teste completa', confirmation: 'EXCLUIR DEFINITIVAMENTE' } });
+  const forceDeletePayload = JSON.parse(forceDelete.body);
   assert.equal(forceDelete.statusCode, 200, forceDelete.body);
+  assert.equal(forceDeletePayload.company?.id, company.id);
+  assert.ok(forceDeletePayload.deletedCounts);
 
-  assert.equal(await prisma.company.count({ where: { id: company.id } }), 0);
-  assert.equal(await prisma.companyHolding.count({ where: { companyId: company.id } }), 0);
-  assert.equal(await prisma.companyOperation.count({ where: { companyId: company.id } }), 0);
-  assert.equal(await prisma.companyInitialOffer.count({ where: { companyId: company.id } }), 0);
-  assert.equal(await prisma.marketOrder.count({ where: { companyId: company.id } }), 0);
-  assert.equal(await prisma.trade.count({ where: { companyId: company.id } }), 0);
-  assert.equal(await prisma.feeDistribution.count({ where: { companyId: company.id } }), 0);
+  const remainingAfterForceDelete = {
+    companies: await prisma.company.count({ where: { id: company.id } }),
+    holdings: await prisma.companyHolding.count({ where: { companyId: company.id } }),
+    operations: await prisma.companyOperation.count({ where: { companyId: company.id } }),
+    initialOffers: await prisma.companyInitialOffer.count({ where: { companyId: company.id } }),
+    marketOrders: await prisma.marketOrder.count({ where: { companyId: company.id } }),
+    trades: await prisma.trade.count({ where: { companyId: company.id } }),
+    feeDistributions: await prisma.feeDistribution.count({ where: { companyId: company.id } }),
+    revenueAccounts: await prisma.companyRevenueAccount.count({ where: { companyId: company.id } }),
+    boostAccounts: await prisma.companyBoostAccount.count({ where: { companyId: company.id } }),
+    boostInjections: await prisma.companyBoostInjection.count({ where: { companyId: company.id } }),
+    forceDeleteLogs: await prisma.adminLog.count({ where: { action: 'COMPANY_FORCE_DELETED' } }),
+  };
 
-  const forceLog = await prisma.adminLog.findFirst({ where: { action: 'COMPANY_FORCE_DELETED' } });
-  assert.ok(forceLog);
+
+  assert.deepEqual(remainingAfterForceDelete, {
+    companies: 0,
+    holdings: 0,
+    operations: 0,
+    initialOffers: 0,
+    marketOrders: 0,
+    trades: 0,
+    feeDistributions: 0,
+    revenueAccounts: 0,
+    boostAccounts: 0,
+    boostInjections: 0,
+    forceDeleteLogs: 1,
+  });
 });

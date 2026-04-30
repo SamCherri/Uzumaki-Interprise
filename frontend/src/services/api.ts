@@ -45,6 +45,11 @@ export type CurrentUserResponse = {
     createdAt: string;
   };
   wallet: {
+    fiatAvailableBalance: string | number;
+    fiatLockedBalance: string | number;
+    fiatPendingWithdrawalBalance: string | number;
+    rpcAvailableBalance: string | number;
+    rpcLockedBalance: string | number;
     availableBalance: string | number;
     lockedBalance: string | number;
     pendingWithdrawalBalance: string | number;

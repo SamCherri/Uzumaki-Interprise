@@ -133,16 +133,25 @@ model RolePermission {
 }
 
 model Wallet {
-  id               String   @id @default(cuid())
-  userId           String   @unique
-  availableBalance Decimal  @default(0) @db.Decimal(18, 2)
-  lockedBalance    Decimal  @default(0) @db.Decimal(18, 2)
-  pendingWithdrawalBalance Decimal @default(0) @db.Decimal(18, 2)
-  investedValue    Decimal  @default(0) @db.Decimal(18, 2)
-  fictitiousProfit Decimal  @default(0) @db.Decimal(18, 2)
-  user             User     @relation(fields: [userId], references: [id])
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                         String   @id @default(cuid())
+  userId                     String   @unique
+  // Legacy fields (deprecated): manter temporariamente para compatibilidade
+  availableBalance           Decimal  @default(0) @db.Decimal(18, 2)
+  lockedBalance              Decimal  @default(0) @db.Decimal(18, 2)
+  pendingWithdrawalBalance   Decimal  @default(0) @db.Decimal(18, 2)
+
+  fiatAvailableBalance       Decimal  @default(0) @db.Decimal(18, 2)
+  fiatLockedBalance          Decimal  @default(0) @db.Decimal(18, 2)
+  fiatPendingWithdrawalBalance Decimal @default(0) @db.Decimal(18, 2)
+
+  rpcAvailableBalance        Decimal  @default(0) @db.Decimal(18, 2)
+  rpcLockedBalance           Decimal  @default(0) @db.Decimal(18, 2)
+
+  investedValue              Decimal  @default(0) @db.Decimal(18, 2)
+  fictitiousProfit           Decimal  @default(0) @db.Decimal(18, 2)
+  user                       User     @relation(fields: [userId], references: [id])
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 }
 
 model TreasuryAccount {

@@ -76,23 +76,23 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
 
         const amount = new Decimal(body.amount);
 
-        if (wallet.availableBalance.lessThan(amount)) {
-          throw new Error('Saldo disponível insuficiente para saque.');
+        if (wallet.fiatAvailableBalance.lessThan(amount)) {
+          throw new Error('Saldo em R$ insuficiente para saque.');
         }
 
         const walletMutation = await tx.wallet.updateMany({
           where: {
             id: wallet.id,
-            availableBalance: { gte: amount },
+            fiatAvailableBalance: { gte: amount },
           },
           data: {
-            availableBalance: { decrement: amount },
-            pendingWithdrawalBalance: { increment: amount },
+            fiatAvailableBalance: { decrement: amount },
+            fiatPendingWithdrawalBalance: { increment: amount },
           },
         });
 
         if (walletMutation.count !== 1) {
-          throw new Error('Saldo disponível insuficiente para saque.');
+          throw new Error('Saldo em R$ insuficiente para saque.');
         }
 
         const code = await generateWithdrawalCode(tx);
@@ -109,7 +109,7 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
 
         const updatedWallet = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
 
-        await createWalletTransaction(tx, wallet.id, 'WITHDRAWAL_LOCK', amount, 'RPC bloqueado para saque');
+        await createWalletTransaction(tx, wallet.id, 'WITHDRAWAL_LOCK', amount, 'R$ bloqueado para saque');
 
         await tx.adminLog.create({
           data: {
@@ -118,13 +118,13 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
             entity: 'WithdrawalRequest',
             reason: body.userNote ?? 'Solicitação de saque criada pelo usuário.',
             previous: JSON.stringify({
-              availableBalance: wallet.availableBalance.toString(),
-              pendingWithdrawalBalance: wallet.pendingWithdrawalBalance.toString(),
+              fiatAvailableBalance: wallet.fiatAvailableBalance.toString(),
+              fiatPendingWithdrawalBalance: wallet.fiatPendingWithdrawalBalance.toString(),
             }),
             current: JSON.stringify({
               code,
-              availableBalance: updatedWallet.availableBalance.toString(),
-              pendingWithdrawalBalance: updatedWallet.pendingWithdrawalBalance.toString(),
+              fiatAvailableBalance: updatedWallet.fiatAvailableBalance.toString(),
+              fiatPendingWithdrawalBalance: updatedWallet.fiatPendingWithdrawalBalance.toString(),
               amount: amount.toString(),
             }),
             ip: request.ip,
@@ -159,8 +159,8 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
 
         const wallet = await tx.wallet.findUniqueOrThrow({ where: { userId: authRequest.user.sub } });
 
-        const nextPending = wallet.pendingWithdrawalBalance.sub(withdrawal.amount);
-        const nextAvailable = wallet.availableBalance.add(withdrawal.amount);
+        const nextPending = wallet.fiatPendingWithdrawalBalance.sub(withdrawal.amount);
+        const nextAvailable = wallet.fiatAvailableBalance.add(withdrawal.amount);
 
         if (nextPending.lessThan(0) || nextAvailable.lessThan(0)) {
           throw new Error('Operação inválida de saldo ao cancelar saque.');
@@ -169,8 +169,8 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
         await tx.wallet.update({
           where: { id: wallet.id },
           data: {
-            pendingWithdrawalBalance: nextPending,
-            availableBalance: nextAvailable,
+            fiatPendingWithdrawalBalance: nextPending,
+            fiatAvailableBalance: nextAvailable,
           },
         });
 
@@ -192,13 +192,13 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
             reason: 'Solicitação cancelada pelo usuário.',
             previous: JSON.stringify({
               status: withdrawal.status,
-              availableBalance: wallet.availableBalance.toString(),
-              pendingWithdrawalBalance: wallet.pendingWithdrawalBalance.toString(),
+              fiatAvailableBalance: wallet.fiatAvailableBalance.toString(),
+              fiatPendingWithdrawalBalance: wallet.fiatPendingWithdrawalBalance.toString(),
             }),
             current: JSON.stringify({
               status: 'CANCELED',
-              availableBalance: nextAvailable.toString(),
-              pendingWithdrawalBalance: nextPending.toString(),
+              fiatAvailableBalance: nextAvailable.toString(),
+              fiatPendingWithdrawalBalance: nextPending.toString(),
             }),
             ip: request.ip,
             userAgent: request.headers['user-agent'] ?? null,
@@ -334,9 +334,9 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
         const walletMutation = await tx.wallet.updateMany({
           where: {
             id: wallet.id,
-            pendingWithdrawalBalance: { gte: withdrawal.amount },
+            fiatPendingWithdrawalBalance: { gte: withdrawal.amount },
           },
-          data: { pendingWithdrawalBalance: { decrement: withdrawal.amount } },
+          data: { fiatPendingWithdrawalBalance: { decrement: withdrawal.amount } },
         });
 
         if (walletMutation.count !== 1) {
@@ -354,8 +354,8 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
             action: 'WITHDRAWAL_COMPLETED',
             entity: 'WithdrawalRequest',
             reason: body.adminNote ?? 'Saque concluído no painel administrativo.',
-            previous: JSON.stringify({ status: withdrawal.status, pendingWithdrawalBalance: wallet.pendingWithdrawalBalance.toString() }),
-            current: JSON.stringify({ status: next.status, pendingWithdrawalBalance: updatedWallet.pendingWithdrawalBalance.toString() }),
+            previous: JSON.stringify({ status: withdrawal.status, fiatPendingWithdrawalBalance: wallet.fiatPendingWithdrawalBalance.toString() }),
+            current: JSON.stringify({ status: next.status, fiatPendingWithdrawalBalance: updatedWallet.fiatPendingWithdrawalBalance.toString() }),
             ip: request.ip,
             userAgent: request.headers['user-agent'] ?? null,
           },
@@ -407,11 +407,11 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
         const walletMutation = await tx.wallet.updateMany({
           where: {
             id: wallet.id,
-            pendingWithdrawalBalance: { gte: withdrawal.amount },
+            fiatPendingWithdrawalBalance: { gte: withdrawal.amount },
           },
           data: {
-            pendingWithdrawalBalance: { decrement: withdrawal.amount },
-            availableBalance: { increment: withdrawal.amount },
+            fiatPendingWithdrawalBalance: { decrement: withdrawal.amount },
+            fiatAvailableBalance: { increment: withdrawal.amount },
           },
         });
 
@@ -432,13 +432,13 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
             reason: body.adminNote ?? 'Saque rejeitado no painel administrativo.',
             previous: JSON.stringify({
               status: withdrawal.status,
-              availableBalance: wallet.availableBalance.toString(),
-              pendingWithdrawalBalance: wallet.pendingWithdrawalBalance.toString(),
+              fiatAvailableBalance: wallet.fiatAvailableBalance.toString(),
+              fiatPendingWithdrawalBalance: wallet.fiatPendingWithdrawalBalance.toString(),
             }),
             current: JSON.stringify({
               status: next.status,
-              availableBalance: updatedWallet.availableBalance.toString(),
-              pendingWithdrawalBalance: updatedWallet.pendingWithdrawalBalance.toString(),
+              fiatAvailableBalance: updatedWallet.fiatAvailableBalance.toString(),
+              fiatPendingWithdrawalBalance: updatedWallet.fiatPendingWithdrawalBalance.toString(),
             }),
             ip: request.ip,
             userAgent: request.headers['user-agent'] ?? null,

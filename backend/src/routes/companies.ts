@@ -383,17 +383,17 @@ export async function companyRoutes(app: FastifyInstance) {
         const feeAmount = grossAmount.mul(company.buyFeePercent).div(100);
         const totalAmount = grossAmount.add(feeAmount);
 
-        if (wallet.availableBalance.lessThan(totalAmount)) {
-          throw new Error('Saldo insuficiente para esta compra.');
+        if (wallet.rpcAvailableBalance.lessThan(totalAmount)) {
+          throw new Error('Saldo RPC insuficiente para comprar no lançamento.');
         }
 
-        const walletNext = wallet.availableBalance.sub(totalAmount);
+        const walletNext = wallet.rpcAvailableBalance.sub(totalAmount);
         const priceBefore = company.currentPrice;
         const priceIncrease = grossAmount.div(new Decimal(company.totalShares));
         const priceAfter = priceBefore.add(priceIncrease);
         const nextMarketCap = priceAfter.mul(new Decimal(company.totalShares));
 
-        await tx.wallet.update({ where: { id: wallet.id }, data: { availableBalance: walletNext } });
+        await tx.wallet.update({ where: { id: wallet.id }, data: { rpcAvailableBalance: walletNext } });
 
         const currentHolding = await tx.companyHolding.findUnique({ where: { userId_companyId: { userId: authRequest.user.sub, companyId: company.id } } });
 
@@ -466,7 +466,7 @@ export async function companyRoutes(app: FastifyInstance) {
             action: 'COMPANY_INITIAL_OFFER_BUY',
             entity: 'CompanyOperation',
             reason: `Compra de ${body.quantity} tokens (${company.ticker})`,
-            previous: JSON.stringify({ wallet: wallet.availableBalance.toString(), availableOfferShares: offer.availableShares }),
+            previous: JSON.stringify({ wallet: wallet.rpcAvailableBalance.toString(), availableOfferShares: offer.availableShares }),
             current: JSON.stringify({ wallet: walletNext.toString(), availableOfferShares: offer.availableShares - body.quantity, totalAmount: totalAmount.toString(), priceBefore: priceBefore.toString(), priceAfter: priceAfter.toString() }),
             ip: request.ip,
             userAgent: request.headers['user-agent'] ?? null,
@@ -526,6 +526,11 @@ export async function companyRoutes(app: FastifyInstance) {
 
     return {
       wallet: {
+        fiatAvailableBalance: wallet?.fiatAvailableBalance ?? new Decimal(0),
+        fiatLockedBalance: wallet?.fiatLockedBalance ?? new Decimal(0),
+        fiatPendingWithdrawalBalance: wallet?.fiatPendingWithdrawalBalance ?? new Decimal(0),
+        rpcAvailableBalance: wallet?.rpcAvailableBalance ?? new Decimal(0),
+        rpcLockedBalance: wallet?.rpcLockedBalance ?? new Decimal(0),
         availableBalance: wallet?.availableBalance ?? new Decimal(0),
         lockedBalance: wallet?.lockedBalance ?? new Decimal(0),
         pendingWithdrawalBalance: wallet?.pendingWithdrawalBalance ?? new Decimal(0),

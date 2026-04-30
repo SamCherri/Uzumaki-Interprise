@@ -4,9 +4,10 @@ import { translateWithdrawalStatus } from '../utils/labels';
 
 type HoldingsResponse = {
   wallet: {
-    availableBalance: string;
-    lockedBalance: string;
-    pendingWithdrawalBalance: string;
+    fiatAvailableBalance: string;
+    fiatPendingWithdrawalBalance: string;
+    rpcAvailableBalance: string;
+    rpcLockedBalance: string;
   };
 };
 
@@ -79,21 +80,21 @@ export function WithdrawalsPage() {
 
   return (
     <section className="card">
-      <h2>🏧 Saque</h2>
-      <p className="info-text">Solicite a retirada de RPC para receber dentro do RP.</p>
+      <h2>🏧 Sacar R$</h2>
+      <p className="info-text">Para sacar, venda seus RPC por R$ e solicite o saque do saldo em R$.</p>
       {error && <p className="status-message error">{error}</p>}
       {message && <p className="status-message">{message}</p>}
 
       {wallet && (
         <div className="summary-grid nested-card">
-          <div className="summary-item"><span className="summary-label">Saldo disponível RPC</span><strong className="summary-value">{moeda(Number(wallet.availableBalance))}</strong></div>
-          <div className="summary-item"><span className="summary-label">Pendente de saque RPC</span><strong className="summary-value">{moeda(Number(wallet.pendingWithdrawalBalance))}</strong></div>
-          <div className="summary-item"><span className="summary-label">Bloqueado em ordens RPC</span><strong className="summary-value">{moeda(Number(wallet.lockedBalance))}</strong></div>
+          <div className="summary-item"><span className="summary-label">Saldo disponível R$</span><strong className="summary-value">{moeda(Number(wallet.fiatAvailableBalance))}</strong></div>
+          <div className="summary-item"><span className="summary-label">Pendente de saque R$</span><strong className="summary-value">{moeda(Number(wallet.fiatPendingWithdrawalBalance))}</strong></div>
+          <div className="summary-item"><span className="summary-label">Saldo RPC disponível</span><strong className="summary-value">{moeda(Number(wallet.rpcAvailableBalance))}</strong></div>
         </div>
       )}
 
       <form onSubmit={submit} className="form-grid nested-card">
-        <input value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Quantidade RPC" required />
+        <input value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Valor em R$" required />
         <input value={userNote} onChange={(event) => setUserNote(event.target.value)} placeholder="Observação" />
         <p className="info-text">O valor solicitado ficará pendente até o ADM concluir a entrega dentro do RP.</p>
         <button className="button-primary" type="submit">Solicitar saque</button>
@@ -105,7 +106,7 @@ export function WithdrawalsPage() {
         {withdrawals.map((item) => (
           <article key={item.id} className="summary-item compact-card">
             <p><strong>Código:</strong> {item.code}</p>
-            <p><strong>Valor:</strong> {moeda(Number(item.amount))} RPC</p>
+            <p><strong>Valor:</strong> {moeda(Number(item.amount))} R$</p>
             <p><strong>Status:</strong> {translateWithdrawalStatus(item.status)}</p>
             <p><strong>Data:</strong> {new Date(item.createdAt).toLocaleString('pt-BR')}</p>
             <p><strong>Observação:</strong> {item.userNote || 'Sem observação'}</p>

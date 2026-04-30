@@ -80,8 +80,8 @@ export async function cancelOrderWithRelease(
     await tx.wallet.update({
       where: { id: wallet.id },
       data: {
-        lockedBalance: wallet.lockedBalance.sub(order.lockedCash),
-        availableBalance: wallet.availableBalance.add(order.lockedCash),
+        rpcLockedBalance: wallet.rpcLockedBalance.sub(order.lockedCash),
+        rpcAvailableBalance: wallet.rpcAvailableBalance.add(order.lockedCash),
       },
     });
   }
@@ -273,27 +273,27 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
 
     if (buyerIsTaker) {
       if (taker.mode === 'LIMIT') {
-        const reserveCheck = await tx.wallet.findUnique({ where: { id: buyerWallet.id }, select: { lockedBalance: true } });
-        if (!reserveCheck || reserveCheck.lockedBalance.lessThan(buyerTotalPay)) {
+        const reserveCheck = await tx.wallet.findUnique({ where: { id: buyerWallet.id }, select: { rpcLockedBalance: true } });
+        if (!reserveCheck || reserveCheck.rpcLockedBalance.lessThan(buyerTotalPay)) {
           throw new Error('Saldo bloqueado insuficiente para concluir a ordem de compra.');
         }
         const debited = await tx.wallet.updateMany({
-          where: { id: buyerWallet.id, lockedBalance: { gte: buyerTotalPay } },
-          data: { lockedBalance: { decrement: buyerTotalPay } },
+          where: { id: buyerWallet.id, rpcLockedBalance: { gte: buyerTotalPay } },
+          data: { rpcLockedBalance: { decrement: buyerTotalPay } },
         });
         if (debited.count !== 1) throw new Error('Falha de consistência ao debitar saldo bloqueado do comprador.');
       } else {
-        const buyerCash = await tx.wallet.findUnique({ where: { id: buyerWallet.id }, select: { availableBalance: true } });
-        if (!buyerCash || buyerCash.availableBalance.lessThan(buyerTotalPay)) {
-          if (taker.remainingQuantity === taker.quantity) throw new Error('Saldo insuficiente para compra a mercado.');
+        const buyerCash = await tx.wallet.findUnique({ where: { id: buyerWallet.id }, select: { rpcAvailableBalance: true } });
+        if (!buyerCash || buyerCash.rpcAvailableBalance.lessThan(buyerTotalPay)) {
+          if (taker.remainingQuantity === taker.quantity) throw new Error('Saldo RPC insuficiente para compra a mercado.');
           break;
         }
         const debited = await tx.wallet.updateMany({
-          where: { id: buyerWallet.id, availableBalance: { gte: buyerTotalPay } },
-          data: { availableBalance: { decrement: buyerTotalPay } },
+          where: { id: buyerWallet.id, rpcAvailableBalance: { gte: buyerTotalPay } },
+          data: { rpcAvailableBalance: { decrement: buyerTotalPay } },
         });
         if (debited.count !== 1) {
-          if (taker.remainingQuantity === taker.quantity) throw new Error('Saldo insuficiente para compra a mercado.');
+          if (taker.remainingQuantity === taker.quantity) throw new Error('Saldo RPC insuficiente para compra a mercado.');
           break;
         }
       }
@@ -302,8 +302,8 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
         throw new Error('Saldo bloqueado do comprador em ordem limite está inconsistente.');
       }
       const debited = await tx.wallet.updateMany({
-        where: { id: buyerWallet.id, lockedBalance: { gte: buyerTotalPay } },
-        data: { lockedBalance: { decrement: buyerTotalPay } },
+        where: { id: buyerWallet.id, rpcLockedBalance: { gte: buyerTotalPay } },
+        data: { rpcLockedBalance: { decrement: buyerTotalPay } },
       });
       if (debited.count !== 1) throw new Error('Saldo bloqueado do comprador em ordem limite está inconsistente.');
     }
@@ -323,7 +323,7 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
 
     await tx.wallet.update({
       where: { id: sellerWallet.id },
-      data: { availableBalance: { increment: sellerNetReceive } },
+      data: { rpcAvailableBalance: { increment: sellerNetReceive } },
     });
 
     await addSharesToBuyer(tx, {
@@ -458,10 +458,10 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
   if (refreshed && refreshed.mode === 'LIMIT' && refreshed.type === 'BUY' && refreshed.remainingQuantity === 0 && refreshed.lockedCash.greaterThan(0)) {
     const buyerWallet = await ensureWallet(tx, refreshed.userId);
     const refunded = await tx.wallet.updateMany({
-      where: { id: buyerWallet.id, lockedBalance: { gte: refreshed.lockedCash } },
+      where: { id: buyerWallet.id, rpcLockedBalance: { gte: refreshed.lockedCash } },
       data: {
-        lockedBalance: { decrement: refreshed.lockedCash },
-        availableBalance: { increment: refreshed.lockedCash },
+        rpcLockedBalance: { decrement: refreshed.lockedCash },
+        rpcAvailableBalance: { increment: refreshed.lockedCash },
       },
     });
     if (refunded.count !== 1) throw new Error('Falha de consistência no reembolso de sobra da ordem limite de compra.');
@@ -490,15 +490,15 @@ export async function marketRoutes(app: FastifyInstance) {
           const fee = gross.mul(company.buyFeePercent).div(100);
           lockedCash = gross.add(fee);
 
-          if (wallet.availableBalance.lessThan(lockedCash)) {
+          if (wallet.rpcAvailableBalance.lessThan(lockedCash)) {
             throw new Error('Saldo insuficiente para bloquear ordem limitada de compra.');
           }
 
           await tx.wallet.update({
             where: { id: wallet.id },
             data: {
-              availableBalance: wallet.availableBalance.sub(lockedCash),
-              lockedBalance: wallet.lockedBalance.add(lockedCash),
+              rpcAvailableBalance: wallet.rpcAvailableBalance.sub(lockedCash),
+              rpcLockedBalance: wallet.rpcLockedBalance.add(lockedCash),
             },
           });
         }

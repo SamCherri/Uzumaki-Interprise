@@ -97,8 +97,8 @@ export async function brokerRoutes(app: FastifyInstance) {
 
       const brokerPrevious = broker.available;
       const brokerNext = broker.available.sub(amount);
-      const userPrevious = wallet.availableBalance;
-      const userNext = wallet.availableBalance.add(amount);
+      const userPrevious = wallet.fiatAvailableBalance;
+      const userNext = wallet.fiatAvailableBalance.add(amount);
 
       const transfer = await tx.coinTransfer.create({
         data: {
@@ -113,14 +113,14 @@ export async function brokerRoutes(app: FastifyInstance) {
       });
 
       await tx.brokerAccount.update({ where: { id: broker.id }, data: { available: brokerNext } });
-      await tx.wallet.update({ where: { id: wallet.id }, data: { availableBalance: userNext } });
+      await tx.wallet.update({ where: { id: wallet.id }, data: { fiatAvailableBalance: userNext } });
 
       await tx.transaction.create({
         data: {
           walletId: wallet.id,
-          type: 'BROKER_TRANSFER_IN',
+          type: 'BROKER_FIAT_TRANSFER_IN',
           amount,
-          description: `Recebido do corretor virtual (${authRequest.user.sub}) - ${body.reason}`,
+          description: `Recebido do corretor virtual em R$ (${authRequest.user.sub}) - ${body.reason}`,
         },
       });
 

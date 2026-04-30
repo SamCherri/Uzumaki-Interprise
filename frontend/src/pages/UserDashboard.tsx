@@ -13,7 +13,7 @@ type Holding = {
 };
 
 type HoldingsResponse = {
-  wallet: { availableBalance: string; lockedBalance: string; pendingWithdrawalBalance: string };
+  wallet: { fiatAvailableBalance: string; fiatPendingWithdrawalBalance: string; rpcAvailableBalance: string; rpcLockedBalance: string; };
   holdings: Holding[];
   totalCompanies: number;
 };
@@ -42,24 +42,24 @@ export function UserDashboard() {
         <>
           <div className="summary-grid nested-card">
             <div className="summary-item">
-              <span className="summary-label">Saldo disponível RPC</span>
-              <strong className="summary-value">{formatCurrency(Number(data.wallet.availableBalance))} RPC</strong>
+              <span className="summary-label">Saldo R$ disponível</span>
+              <strong className="summary-value">{formatCurrency(Number(data.wallet.fiatAvailableBalance))} R$</strong>
             </div>
             <div className="summary-item">
-              <span className="summary-label">Bloqueado em ordens RPC</span>
-              <strong className="summary-value">{formatCurrency(Number(data.wallet.lockedBalance))} RPC</strong>
+              <span className="summary-label">Pendente de saque R$</span>
+              <strong className="summary-value">{formatCurrency(Number(data.wallet.fiatPendingWithdrawalBalance))} R$</strong>
             </div>
             <div className="summary-item">
-              <span className="summary-label">Pendente de saque RPC</span>
-              <strong className="summary-value">{formatCurrency(Number(data.wallet.pendingWithdrawalBalance))} RPC</strong>
+              <span className="summary-label">Saldo RPC disponível</span>
+              <strong className="summary-value">{formatCurrency(Number(data.wallet.rpcAvailableBalance))} RPC</strong>
+            </div>
+            <div className="summary-item">
+              <span className="summary-label">RPC bloqueado em ordens</span>
+              <strong className="summary-value">{formatCurrency(Number(data.wallet.rpcLockedBalance))} RPC</strong>
             </div>
             <div className="summary-item">
               <span className="summary-label">Valor estimado em tokens</span>
               <strong className="summary-value">{formatCurrency(totalEstimado)} RPC</strong>
-            </div>
-            <div className="summary-item">
-              <span className="summary-label">Tokens investidos</span>
-              <strong className="summary-value">{data.totalCompanies}</strong>
             </div>
           </div>
 
@@ -68,6 +68,9 @@ export function UserDashboard() {
               Projetos desligados não aparecem na carteira comum. O histórico permanece registrado para auditoria.
             </p>
           )}
+
+          <p className="info-text">Use R$ para comprar RPC ou solicitar saque.</p>
+          <p className="info-text">Use RPC para negociar tokens/projetos.</p>
 
           <div className="mobile-card-list nested-card">
             {data.holdings.length === 0 && <p className="empty-state">Você ainda não possui tokens.</p>}

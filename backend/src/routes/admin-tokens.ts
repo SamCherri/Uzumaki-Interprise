@@ -7,6 +7,16 @@ import { cancelOrderWithRelease } from './market.js';
 
 type AuthRequest = FastifyRequest & { user: { sub: string; roles?: string[] } };
 const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN'] as const;
+const FORCE_DELETE_CONFIRMATION = 'EXCLUIR DEFINITIVAMENTE';
+
+function normalizeForceDeleteConfirmation(value: string) {
+  return value
+    .normalize('NFKC')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toUpperCase();
+}
+
 
 function ensureAdmin(reply: FastifyReply, roles: string[]) {
   if (!ADMIN_ROLES.some((role) => roles.includes(role))) {
@@ -469,7 +479,9 @@ export async function adminTokensRoutes(app: FastifyInstance) {
         reason: z.string().min(10, 'Motivo deve ter pelo menos 10 caracteres.'),
       }).parse(request.body);
 
-      if (body.confirmation !== 'EXCLUIR DEFINITIVAMENTE') {
+      const normalizedConfirmation = normalizeForceDeleteConfirmation(body.confirmation);
+
+      if (normalizedConfirmation !== FORCE_DELETE_CONFIRMATION) {
         return reply.code(400).send({ message: 'Confirmação inválida. Digite EXCLUIR DEFINITIVAMENTE.' });
       }
 
@@ -499,7 +511,12 @@ export async function adminTokensRoutes(app: FastifyInstance) {
         await tx.companyOperation.deleteMany({ where: { companyId: id } });
         await tx.companyInitialOffer.deleteMany({ where: { companyId: id } });
         await tx.companyHolding.deleteMany({ where: { companyId: id } });
-        await tx.company.delete({ where: { id } });
+
+        const remainingCounts = await getCompanyDeleteCounts(id, tx);
+        const hasRemainingDependencies = Object.values(remainingCounts).some((count) => count > 0);
+        if (hasRemainingDependencies) {
+          throw new Error(`Dependências restantes impedem exclusão: ${JSON.stringify(remainingCounts)}`);
+        }
 
         await tx.adminLog.create({
           data: {
@@ -521,11 +538,13 @@ export async function adminTokensRoutes(app: FastifyInstance) {
                 holdings: counts.holdings,
               },
             }),
-            current: JSON.stringify({ deleted: true, companyId: id, confirmation: body.confirmation }),
+            current: JSON.stringify({ deleted: true, companyId: id, confirmation: normalizedConfirmation }),
             ip: request.ip,
             userAgent: request.headers['user-agent'] ?? null,
           },
         });
+
+        await tx.company.delete({ where: { id } });
 
         return counts;
       });
@@ -546,7 +565,16 @@ export async function adminTokensRoutes(app: FastifyInstance) {
         },
       };
     } catch (error) {
-      return reply.code(400).send({ message: (error as Error).message });
+      request.log.error({ err: error }, 'company force delete failed');
+
+      const err = error as Error & { code?: string; meta?: unknown };
+
+      return reply.code(400).send({
+        code: 'COMPANY_FORCE_DELETE_FAILED',
+        message: err.message,
+        prismaCode: err.code ?? null,
+        meta: err.meta ?? null,
+      });
     }
   });
 
