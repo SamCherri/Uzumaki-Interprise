@@ -120,8 +120,8 @@ export function AdminUsersPanel({ onPermissionsUpdated, mode = 'users' }: AdminU
 
   return (
     <section className="nested-card">
-      <h3>{mode === 'brokers' ? 'Corretores' : 'Usuários'}</h3>
-      <p className="info-text">Alterações de permissões são registradas em auditoria.</p>
+      <h3>{mode === 'brokers' ? 'Corretores autorizados' : 'Usuários'}</h3>
+      <p className="info-text">{mode === 'brokers' ? 'Usuários com permissão de corretor virtual.' : 'Alterações de permissões são registradas em auditoria.'}</p>
 
       <form
         className="form-grid"
@@ -130,8 +130,8 @@ export function AdminUsersPanel({ onPermissionsUpdated, mode = 'users' }: AdminU
           loadUsers();
         }}
       >
-        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome/e-mail" />
-        <button className="button-primary" type="submit">Buscar usuários</button>
+        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={mode === 'brokers' ? 'Buscar corretor por nome/e-mail' : 'Buscar por nome/e-mail'} />
+        <button className="button-primary" type="submit">{mode === 'brokers' ? 'Buscar corretores' : 'Buscar usuários'}</button>
       </form>
 
       {error && <p className="status-message error">{error}</p>}
@@ -179,7 +179,7 @@ export function AdminUsersPanel({ onPermissionsUpdated, mode = 'users' }: AdminU
         </div>
       )}
 
-      <h3 className="nested-card">Corretores</h3>
+      {mode === 'users' && <h3 className="nested-card">Corretores</h3>}
       <div className="mobile-card-list">
         {brokers.map((broker) => (
           <article key={broker.id} className="summary-item compact-card">

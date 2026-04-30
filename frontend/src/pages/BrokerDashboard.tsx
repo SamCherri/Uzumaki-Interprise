@@ -1,9 +1,19 @@
-import { FormEvent, useMemo, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../services/api';
 import { translateTransferType } from '../utils/labels';
 
 type BrokerBalance = { available: string; receivedTotal: string };
-type BrokerHistory = { transfers: Array<{ id: string; type: string; amount: string; reason: string; createdAt: string }> };
+type BrokerTransfer = {
+  id: string;
+  type: string;
+  amount: string;
+  reason: string;
+  createdAt: string;
+  receiverId?: string | null;
+  receiverEmail?: string | null;
+  targetUserEmail?: string | null;
+};
+type BrokerHistory = { transfers: BrokerTransfer[] };
 
 export function BrokerDashboard() {
   const [balance, setBalance] = useState<BrokerBalance | null>(null);
@@ -31,15 +41,32 @@ export function BrokerDashboard() {
 
 
   const transfers = history?.transfers ?? [];
-  const totalTransfers = transfers.length;
+  const sentTransfers = useMemo(() => transfers.filter((item) => item.type === 'BROKER_TO_USER'), [transfers]);
+  const totalTransfers = sentTransfers.length;
+
   const servedUsers = useMemo(() => {
-    const unique = new Set(
-      transfers
-        .map((item) => item.reason?.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0]?.toLowerCase())
-        .filter((value): value is string => Boolean(value))
-    );
-    return unique.size;
-  }, [transfers]);
+    const uniqueTargets = new Set<string>();
+
+    for (const transfer of sentTransfers) {
+      if (transfer.receiverId) {
+        uniqueTargets.add(`id:${transfer.receiverId}`);
+        continue;
+      }
+
+      const receiverEmail = transfer.receiverEmail?.trim().toLowerCase();
+      if (receiverEmail) {
+        uniqueTargets.add(`email:${receiverEmail}`);
+        continue;
+      }
+
+      const targetUserEmail = transfer.targetUserEmail?.trim().toLowerCase();
+      if (targetUserEmail) {
+        uniqueTargets.add(`email:${targetUserEmail}`);
+      }
+    }
+
+    return uniqueTargets.size > 0 ? uniqueTargets.size : null;
+  }, [sentTransfers]);
 
   async function submitTransfer(event: FormEvent) {
     event.preventDefault();
@@ -71,7 +98,7 @@ export function BrokerDashboard() {
         <div className="summary-grid">
           <div className="summary-item"><span className="summary-label">Saldo RPC</span><strong className="summary-value">{balance.available}</strong></div>
           <div className="summary-item"><span className="summary-label">Total RPC recebido</span><strong className="summary-value">{balance.receivedTotal}</strong></div>
-          <div className="summary-item"><span className="summary-label">Usuários atendidos</span><strong className="summary-value">{servedUsers}</strong></div>
+          <div className="summary-item"><span className="summary-label">Usuários atendidos</span><strong className="summary-value">{servedUsers ?? 'Indisponível'}</strong></div>
           <div className="summary-item"><span className="summary-label">Total de envios</span><strong className="summary-value">{totalTransfers}</strong></div>
         </div>
       )}

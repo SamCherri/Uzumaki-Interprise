@@ -296,3 +296,22 @@ button { cursor: pointer; font-weight: 700; }
   white-space: normal;
   overflow-wrap: anywhere;
 }
+
+.favorite-market-button {
+  min-width: 36px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(148,163,184,.42);
+  background: rgba(15,23,42,.58);
+  color: #f8fafc;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 36px;
+}
+.favorite-market-button.active {
+  border-color: #f8fafc;
+  background: rgba(248,250,252,.15);
+}

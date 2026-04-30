@@ -417,8 +417,9 @@ export function CompaniesPage() {
               <span className="compact-status">{translateCompanyStatus(selected.status)}</span>
               <button
                 type="button"
-                className={favoriteMarketIds.includes(selected.id) ? 'quick-pill active' : 'quick-pill'}
+                className={favoriteMarketIds.includes(selected.id) ? 'favorite-market-button active' : 'favorite-market-button'}
                 title={favoriteMarketIds.includes(selected.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                aria-label={favoriteMarketIds.includes(selected.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
                 onClick={() => {
                   const isFavorite = favoriteMarketIds.includes(selected.id);
                   const next = isFavorite ? favoriteMarketIds.filter((id) => id !== selected.id) : [...favoriteMarketIds, selected.id];
@@ -426,7 +427,7 @@ export function CompaniesPage() {
                   localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(next));
                 }}
               >
-                {favoriteMarketIds.includes(selected.id) ? '★ Favorito' : '☆ Favoritar'}
+                {favoriteMarketIds.includes(selected.id) ? '★' : '☆'}
               </button>
             </div>
             <div className="market-price-overview market-compact-price">
