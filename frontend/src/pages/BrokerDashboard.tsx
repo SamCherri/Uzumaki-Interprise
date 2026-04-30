@@ -1,9 +1,19 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../services/api';
 import { translateTransferType } from '../utils/labels';
 
 type BrokerBalance = { available: string; receivedTotal: string };
-type BrokerHistory = { transfers: Array<{ id: string; type: string; amount: string; reason: string; createdAt: string }> };
+type BrokerTransfer = {
+  id: string;
+  type: string;
+  amount: string;
+  reason: string;
+  createdAt: string;
+  receiverId?: string | null;
+  receiverEmail?: string | null;
+  targetUserEmail?: string | null;
+};
+type BrokerHistory = { transfers: BrokerTransfer[] };
 
 export function BrokerDashboard() {
   const [balance, setBalance] = useState<BrokerBalance | null>(null);
@@ -28,6 +38,35 @@ export function BrokerDashboard() {
   }
 
   useEffect(() => { load(); }, []);
+
+
+  const transfers = history?.transfers ?? [];
+  const sentTransfers = useMemo(() => transfers.filter((item) => item.type === 'BROKER_TO_USER'), [transfers]);
+  const totalTransfers = sentTransfers.length;
+
+  const servedUsers = useMemo(() => {
+    const uniqueTargets = new Set<string>();
+
+    for (const transfer of sentTransfers) {
+      if (transfer.receiverId) {
+        uniqueTargets.add(`id:${transfer.receiverId}`);
+        continue;
+      }
+
+      const receiverEmail = transfer.receiverEmail?.trim().toLowerCase();
+      if (receiverEmail) {
+        uniqueTargets.add(`email:${receiverEmail}`);
+        continue;
+      }
+
+      const targetUserEmail = transfer.targetUserEmail?.trim().toLowerCase();
+      if (targetUserEmail) {
+        uniqueTargets.add(`email:${targetUserEmail}`);
+      }
+    }
+
+    return uniqueTargets.size > 0 ? uniqueTargets.size : null;
+  }, [sentTransfers]);
 
   async function submitTransfer(event: FormEvent) {
     event.preventDefault();
@@ -59,11 +98,14 @@ export function BrokerDashboard() {
         <div className="summary-grid">
           <div className="summary-item"><span className="summary-label">Saldo RPC</span><strong className="summary-value">{balance.available}</strong></div>
           <div className="summary-item"><span className="summary-label">Total RPC recebido</span><strong className="summary-value">{balance.receivedTotal}</strong></div>
+          <div className="summary-item"><span className="summary-label">Usuários atendidos</span><strong className="summary-value">{servedUsers ?? 'Indisponível'}</strong></div>
+          <div className="summary-item"><span className="summary-label">Total de envios</span><strong className="summary-value">{totalTransfers}</strong></div>
         </div>
       )}
 
       <h3 className="nested-card">Enviar RPC para usuário</h3>
       <p className="info-text">Use após vender RPC ao jogador dentro do RP.</p>
+      <p className="info-text">Limites não configurados.</p>
       <form onSubmit={submitTransfer} className="form-grid">
         <input value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="E-mail do usuário" type="email" required />
         <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Quantidade RPC" required />
@@ -72,9 +114,9 @@ export function BrokerDashboard() {
       </form>
 
       <h3 className="nested-card">Histórico de envios</h3>
-      {history?.transfers.length === 0 && <p className="empty-state">Sem envios registrados.</p>}
+      {transfers.length === 0 && <p className="empty-state">Sem envios registrados.</p>}
       <div className="mobile-card-list">
-        {history?.transfers.slice(0, 8).map((item) => (
+        {transfers.slice(0, 8).map((item) => (
           <article key={item.id} className="summary-item compact-card">
             <p><strong>{translateTransferType(item.type)}</strong></p>
             <p>RPC: {item.amount}</p>

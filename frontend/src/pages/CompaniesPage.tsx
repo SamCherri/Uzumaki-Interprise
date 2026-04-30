@@ -40,6 +40,7 @@ type MarketListTab = 'mercado' | 'destaques';
 type TradeFlow = 'buy' | 'sell' | null;
 type BuyMode = 'initial' | 'limit' | 'market';
 type SellMode = 'limit' | 'market';
+type Timeframe = 'Time' | '15m' | '1h' | '4h' | '1D';
 
 
 type InitialOfferBuyResponse = {
@@ -129,6 +130,30 @@ function normalizeChartData(trades: Trade[], initialPrice: number, currentPrice:
   return { points, minPrice, maxPrice, initialPrice: safeInitialPrice, currentPrice: safeCurrentPrice, variationAbsolute, variationPercent, lastPrice: series[series.length - 1], note };
 }
 
+
+const FAVORITES_STORAGE_KEY = 'rpc-exchange-market-favorites';
+
+function readFavoriteMarketIds() {
+  if (typeof window === 'undefined') return [];
+  try {
+    const value = localStorage.getItem(FAVORITES_STORAGE_KEY);
+    if (!value) return [];
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item) => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function buildTimeframeStart(timeframe: Timeframe) {
+  const now = Date.now();
+  if (timeframe === '15m') return now - 15 * 60 * 1000;
+  if (timeframe === '1h') return now - 60 * 60 * 1000;
+  if (timeframe === '4h') return now - 4 * 60 * 60 * 1000;
+  if (timeframe === '1D') return now - 24 * 60 * 60 * 1000;
+  return null;
+}
+
 export function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selected, setSelected] = useState<Company | null>(null);
@@ -154,6 +179,8 @@ export function CompaniesPage() {
   const [marketSellSlip, setMarketSellSlip] = useState('5');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [activeTimeframe, setActiveTimeframe] = useState<Timeframe>('Time');
+  const [favoriteMarketIds, setFavoriteMarketIds] = useState<string[]>(() => readFavoriteMarketIds());
   
   async function loadCompanies() {
     const response = await api<{ companies: Omit<Company, 'description'>[] }>('/companies');
@@ -198,9 +225,14 @@ export function CompaniesPage() {
 
 
 
-  async function refreshSelected(companyId?: string) {
+  async function refreshMarketScreen(companyId?: string) {
     if (!companyId) return;
-    await Promise.all([loadCompanyDetails(companyId), loadWalletAndHolding(companyId)]);
+    await Promise.all([
+      loadCompanyDetails(companyId),
+      loadWalletAndHolding(companyId),
+      loadCompanies(),
+      loadMarket(companyId),
+    ]);
   }
 
   useEffect(() => {
@@ -226,7 +258,7 @@ export function CompaniesPage() {
       setMessage('');
       setTradeFlow(null);
       setActiveTab('preco');
-      await refreshSelected(id);
+      await refreshMarketScreen(id);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -258,7 +290,7 @@ export function CompaniesPage() {
       }
 
       setError('');
-      await Promise.all([refreshSelected(selected.id), loadCompanies(), loadMarket(selected.id)]);
+      await refreshMarketScreen(selected.id);
     } catch (err) {
       setError(`Não foi possível comprar tokens: ${(err as Error).message}`);
     }
@@ -277,7 +309,7 @@ export function CompaniesPage() {
       setLimitPrice('');
       setMessage(type === 'BUY' ? 'Ordem de compra criada no livro de ofertas.' : 'Ordem de venda criada no livro de ofertas.');
       setError('');
-      await refreshSelected(selected.id);
+      await refreshMarketScreen(selected.id);
     } catch (err) {
       setError(`Não foi possível criar ordem: ${(err as Error).message}`);
     }
@@ -297,7 +329,7 @@ export function CompaniesPage() {
       if (type === 'SELL') setMarketSellQty('');
       setMessage(type === 'BUY' ? 'Compra realizada com sucesso.' : 'Venda realizada com sucesso.');
       setError('');
-      await refreshSelected(selected.id);
+      await refreshMarketScreen(selected.id);
     } catch (err) {
       setError(`Não foi possível enviar ordem agora: ${(err as Error).message}`);
     }
@@ -308,7 +340,7 @@ export function CompaniesPage() {
     try {
       await api(`/market/orders/${orderId}/cancel`, { method: 'POST' });
       setMessage('Ordem cancelada com sucesso.');
-      await refreshSelected(selected.id);
+      await refreshMarketScreen(selected.id);
     } catch (err) {
       setError(`Falha ao cancelar ordem: ${(err as Error).message}`);
     }
@@ -324,9 +356,14 @@ export function CompaniesPage() {
   const bestBid = useMemo(() => (book.buyOrders.length > 0 ? Number(book.buyOrders[0].limitPrice ?? 0) : Number(selected?.currentPrice ?? 0)), [book.buyOrders, selected?.currentPrice]);
   const maxBuyVolume = useMemo(() => Math.max(0, ...book.buyOrders.map((order) => order.remainingQuantity)), [book.buyOrders]);
   const maxSellVolume = useMemo(() => Math.max(0, ...book.sellOrders.map((order) => order.remainingQuantity)), [book.sellOrders]);
+  const filteredTrades = useMemo(() => {
+    const start = buildTimeframeStart(activeTimeframe);
+    if (!start) return trades;
+    return trades.filter((trade) => new Date(trade.createdAt).getTime() >= start);
+  }, [activeTimeframe, trades]);
   const chartData = useMemo(
-    () => normalizeChartData(trades, Number(selected?.initialPrice ?? 1), Number(selected?.currentPrice ?? selected?.initialPrice ?? 1)),
-    [trades, selected?.currentPrice, selected?.initialPrice]
+    () => normalizeChartData(filteredTrades, Number(selected?.initialPrice ?? 1), Number(selected?.currentPrice ?? selected?.initialPrice ?? 1)),
+    [filteredTrades, selected?.currentPrice, selected?.initialPrice]
   );
   const priceTicks = useMemo(() => buildPriceTicks(chartData.minPrice, chartData.maxPrice, 3), [chartData.minPrice, chartData.maxPrice]);
   const totalBuyStrength = useMemo(() => book.buyOrders.reduce((sum, order) => sum + order.remainingQuantity, 0), [book.buyOrders]);
@@ -334,7 +371,7 @@ export function CompaniesPage() {
   const totalStrength = totalBuyStrength + totalSellStrength;
   const buyStrengthPercent = totalStrength > 0 ? (totalBuyStrength / totalStrength) * 100 : 0;
   const sellStrengthPercent = totalStrength > 0 ? (totalSellStrength / totalStrength) * 100 : 0;
-  const totalTradeVolume = useMemo(() => trades.reduce((sum, trade) => sum + trade.quantity, 0), [trades]);
+  const totalTradeVolume = useMemo(() => filteredTrades.reduce((sum, trade) => sum + trade.quantity, 0), [filteredTrades]);
 
   const visibleCompanies = useMemo(() => companies.filter((company) => `${company.name} ${company.ticker}`.toLowerCase().includes(search.toLowerCase())), [companies, search]);
   const featuredCompanies = useMemo(() => companies.slice(0, 3), [companies]);
@@ -378,7 +415,20 @@ export function CompaniesPage() {
               <button className="back-button" onClick={() => setSelected(null)}>←</button>
               <strong>{selected.ticker}/RPC</strong>
               <span className="compact-status">{translateCompanyStatus(selected.status)}</span>
-              <span title="Favorito (visual)">☆</span>
+              <button
+                type="button"
+                className={favoriteMarketIds.includes(selected.id) ? 'favorite-market-button active' : 'favorite-market-button'}
+                title={favoriteMarketIds.includes(selected.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                aria-label={favoriteMarketIds.includes(selected.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                onClick={() => {
+                  const isFavorite = favoriteMarketIds.includes(selected.id);
+                  const next = isFavorite ? favoriteMarketIds.filter((id) => id !== selected.id) : [...favoriteMarketIds, selected.id];
+                  setFavoriteMarketIds(next);
+                  localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(next));
+                }}
+              >
+                {favoriteMarketIds.includes(selected.id) ? '★' : '☆'}
+              </button>
             </div>
             <div className="market-price-overview market-compact-price">
               <p className="trade-price-big">{formatPrice(Number(selected.currentPrice))} RPC</p>
@@ -412,7 +462,16 @@ export function CompaniesPage() {
             <section className="card nested-card market-price-tab">
               <h4>📈 Gráfico</h4>
               <div className="chart-timeframes">
-                {['Time', '15m', '1h', '4h', '1D'].map((tf) => <button key={tf} className="quick-pill">{tf}</button>)}
+                {(['Time', '15m', '1h', '4h', '1D'] as Timeframe[]).map((tf) => (
+                  <button
+                    key={tf}
+                    className={activeTimeframe === tf ? 'quick-pill active' : 'quick-pill'}
+                    onClick={() => setActiveTimeframe(tf)}
+                    type="button"
+                  >
+                    {tf}
+                  </button>
+                ))}
               </div>
               <div className="chart-wrap chart-wrap-highlight modern-chart-shell">
                 <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="line-chart">
@@ -435,15 +494,15 @@ export function CompaniesPage() {
               </div>
               <div className="chart-meta"><div><span>Atual</span><strong>{formatPrice(chartData.lastPrice)}</strong></div><div><span>Máximo</span><strong>{formatPrice(chartData.maxPrice)}</strong></div><div><span>Mínimo</span><strong>{formatPrice(chartData.minPrice)}</strong></div></div>
               <div className="volume-mini-chart">
-                {trades.length === 0 && <p className="empty-state volume-empty-state">Sem volume ainda</p>}
-                {trades.length > 0 && <div className="volume-bars">{trades.map((trade) => {
-                  const max = Math.max(...trades.map((item) => item.quantity));
+                {filteredTrades.length === 0 && <p className="empty-state volume-empty-state">Sem volume ainda neste intervalo</p>}
+                {filteredTrades.length > 0 && <div className="volume-bars">{filteredTrades.map((trade) => {
+                  const max = Math.max(...filteredTrades.map((item) => item.quantity));
                   const height = max > 0 ? Math.max(6, (trade.quantity / max) * 60) : 6;
                   return <div key={trade.id} style={{ height: `${height}px` }} title={`Qtd ${trade.quantity}`} />;
                 })}</div>}
               </div>
               {chartData.note && <p className="info-text chart-empty-note">{chartData.note}</p>}
-              {trades.length === 0 && <div className="chart-empty-elegant"><strong>Aguardando primeiras negociações</strong><span>O gráfico será formado conforme os jogadores negociarem.</span></div>}
+              {filteredTrades.length === 0 && <div className="chart-empty-elegant"><strong>Aguardando negociações no período</strong><span>Altere o intervalo para visualizar trades mais antigos.</span></div>}
             </section>
           )}
           {activeTab === 'livro' && (
@@ -500,8 +559,8 @@ export function CompaniesPage() {
           {activeTab === 'trades' && (
             <section className="card nested-card">
               <h4>🕒 Negociações recentes</h4>
-              {trades.length === 0 && <p className="empty-state">Sem histórico de negociações para este mercado.</p>}
-              <div className="mobile-card-list">{trades.map((trade) => (<article key={trade.id} className="summary-item compact-card"><p><strong>Preço:</strong> {formatPrice(Number(trade.unitPrice))}</p><p><strong>Quantidade:</strong> {trade.quantity}</p><p><strong>Data/hora:</strong> {new Date(trade.createdAt).toLocaleString('pt-BR')}</p></article>))}</div>
+              {filteredTrades.length === 0 && <p className="empty-state">Sem histórico de negociações para este intervalo.</p>}
+              <div className="mobile-card-list">{filteredTrades.map((trade) => (<article key={trade.id} className="summary-item compact-card"><p><strong>Preço:</strong> {formatPrice(Number(trade.unitPrice))}</p><p><strong>Quantidade:</strong> {trade.quantity}</p><p><strong>Data/hora:</strong> {new Date(trade.createdAt).toLocaleString('pt-BR')}</p></article>))}</div>
             </section>
           )}
 
