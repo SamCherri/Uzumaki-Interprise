@@ -203,7 +203,8 @@ export async function adminAuditRoutes(app: FastifyInstance) {
         const items = await prisma.transaction.findMany({ where, orderBy: { createdAt: 'desc' }, take });
         const walletIds = [...new Set(items.map((item: { walletId: string }) => item.walletId))];
         const wallets = await prisma.wallet.findMany({ where: { id: { in: walletIds } }, include: { user: { select: { id: true, name: true, email: true } } } });
-        const walletMap = new Map(wallets.map((wallet: any) => [wallet.id, wallet] as const));
+        type WalletWithUser = { id: string; user: { id: string; name: string; email: string } | null };
+        const walletMap = new Map<string, WalletWithUser>(wallets.map((wallet: WalletWithUser) => [wallet.id, wallet]));
         headers = ['id', 'walletId', 'userId', 'userName', 'userEmail', 'type', 'amount', 'description', 'createdAt'];
         rows = items.map((item: { id: string; walletId: string; type: string; amount: unknown; description: unknown; createdAt: Date }) => {
           const wallet = walletMap.get(item.walletId);
