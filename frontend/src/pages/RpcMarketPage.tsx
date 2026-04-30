@@ -53,8 +53,35 @@ export function RpcMarketPage() {
     if (!trades.length) return 0; const last = trades[0]; const before = Number(last.priceBefore); const after = Number(last.priceAfter); if (!before) return 0; return ((after - before) / before) * 100;
   }, [trades]);
 
-  async function onBuy(event: FormEvent) { event.preventDefault(); setError(''); const response = await api<{ message: string }>('/rpc-market/buy', { method: 'POST', body: JSON.stringify({ fiatAmount }) }); setMessage(response.message); setFiatAmount(''); await load(); }
-  async function onSell(event: FormEvent) { event.preventDefault(); setError(''); const response = await api<{ message: string }>('/rpc-market/sell', { method: 'POST', body: JSON.stringify({ rpcAmount }) }); setMessage(response.message); setRpcAmount(''); await load(); }
+  async function onBuy(event: FormEvent) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+    try {
+      const response = await api<{ message: string }>('/rpc-market/buy', { method: 'POST', body: JSON.stringify({ fiatAmount }) });
+      setMessage(response.message);
+      setFiatAmount('');
+      setBuyQuote(null);
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function onSell(event: FormEvent) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+    try {
+      const response = await api<{ message: string }>('/rpc-market/sell', { method: 'POST', body: JSON.stringify({ rpcAmount }) });
+      setMessage(response.message);
+      setRpcAmount('');
+      setSellQuote(null);
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
 
   return (
     <section className="card">
@@ -76,7 +103,7 @@ export function RpcMarketPage() {
           <input value={fiatAmount} onChange={(e) => setFiatAmount(e.target.value)} placeholder="Valor em R$" required />
           <p className="info-text">Você receberá aproximadamente {Number(buyQuote?.estimatedRpcAmount ?? 0).toFixed(2)} RPC</p>
           <p className="info-text">Preço médio estimado: R$ {Number(buyQuote?.effectiveUnitPrice ?? 0).toFixed(8)}</p>
-          <button className="button-primary" type="submit">Comprar RPC</button>
+          <button className="button-primary" type="submit" disabled={!buyQuote || Number(fiatAmount) < 0.01}>Comprar RPC</button>
         </form>
 
         <form onSubmit={onSell} className="form-grid">
@@ -84,7 +111,7 @@ export function RpcMarketPage() {
           <input value={rpcAmount} onChange={(e) => setRpcAmount(e.target.value)} placeholder="Quantidade RPC" required />
           <p className="info-text">Você receberá aproximadamente R$ {Number(sellQuote?.estimatedFiatAmount ?? 0).toFixed(2)}</p>
           <p className="info-text">Preço médio estimado: R$ {Number(sellQuote?.effectiveUnitPrice ?? 0).toFixed(8)}</p>
-          <button className="button-primary" type="submit">Vender RPC</button>
+          <button className="button-primary" type="submit" disabled={!sellQuote || Number(rpcAmount) < 0.01}>Vender RPC</button>
         </form>
       </div>
 
