@@ -81,7 +81,7 @@ export function WithdrawalsPage() {
   return (
     <section className="card">
       <h2>🏧 Sacar R$</h2>
-      <p className="info-text">Para sacar, venda seus RPC por R$ e solicite o saque do saldo em R$.</p>
+      <p className="info-text">Seu saldo para saque é em R$. Para transformar RPC em R$, venda RPC no mercado RPC/R$.</p>
       {error && <p className="status-message error">{error}</p>}
       {message && <p className="status-message">{message}</p>}
 

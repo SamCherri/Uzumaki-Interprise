@@ -8,11 +8,12 @@ import { CompanyRequestPage } from './pages/CompanyRequestPage';
 import { CompaniesPage } from './pages/CompaniesPage';
 import { WithdrawalsPage } from './pages/WithdrawalsPage';
 import { ProjectOwnerPanel } from './pages/ProjectOwnerPanel';
+import { RpcMarketPage } from './pages/RpcMarketPage';
 import { api, getCurrentUser, CurrentUserResponse } from './services/api';
 import { SideDrawer, SideDrawerItem } from './components/SideDrawer';
 
 type PublicTab = 'login' | 'register';
-type PrivateScreen = 'home' | 'markets' | 'wallet' | 'withdrawals' | 'company-request' | 'admin' | 'broker' | 'my-projects';
+type PrivateScreen = 'home' | 'markets' | 'wallet' | 'rpc-market' | 'withdrawals' | 'company-request' | 'admin' | 'broker' | 'my-projects';
 
 type ViewerRoles = {
   canSeeAdmin: boolean;
@@ -191,6 +192,7 @@ export function App() {
       { key: 'home', label: 'Início', icon: '🏠', active: screen === 'home', onClick: () => setScreen('home'), section: 'main' },
       { key: 'markets', label: 'Mercados', icon: '🪙', active: screen === 'markets', onClick: () => setScreen('markets'), section: 'main' },
       { key: 'wallet', label: 'Carteira', icon: '💼', active: screen === 'wallet', onClick: () => setScreen('wallet'), section: 'main' },
+      { key: 'rpc-market', label: 'RPC/R$', icon: '💴', active: screen === 'rpc-market', onClick: () => setScreen('rpc-market'), section: 'main' },
       { key: 'withdrawals', label: 'Saque', icon: '🏧', active: screen === 'withdrawals', onClick: () => setScreen('withdrawals'), section: 'secondary' },
       { key: 'company-request', label: 'Criar token', icon: '🚀', active: screen === 'company-request', onClick: () => setScreen('company-request'), section: 'secondary' },
     ];
@@ -359,7 +361,8 @@ export function App() {
       )}
 
       {screen === 'markets' && <CompaniesPage />}
-      {screen === 'wallet' && <UserDashboard />}
+      {screen === 'wallet' && <UserDashboard onOpenRpcMarket={() => setScreen('rpc-market')} />}
+      {screen === 'rpc-market' && <RpcMarketPage />}
       {screen === 'withdrawals' && <WithdrawalsPage />}
       {screen === 'company-request' && <CompanyRequestPage />}
       {screen === 'my-projects' && canSeeMyProjects && <ProjectOwnerPanel />}

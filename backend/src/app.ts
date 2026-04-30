@@ -14,6 +14,7 @@ import { adminUsersRoutes } from './routes/admin-users.js';
 import { adminTokensRoutes } from './routes/admin-tokens.js';
 import { adminAuditRoutes } from './routes/admin-audit.js';
 import { projectBoostRoutes } from './routes/project-boosts.js';
+import { rpcMarketRoutes } from './routes/rpc-market.js';
 
 export function buildApp() {
   const app = Fastify({ logger: true });
@@ -50,6 +51,7 @@ export function buildApp() {
   app.register(adminTokensRoutes, { prefix: '/api/admin' });
   app.register(adminAuditRoutes, { prefix: '/api/admin' });
   app.register(projectBoostRoutes, { prefix: '/api' });
+  app.register(rpcMarketRoutes, { prefix: '/api' });
 
   return app;
 }

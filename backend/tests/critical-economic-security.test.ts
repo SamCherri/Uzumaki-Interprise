@@ -15,6 +15,8 @@ const app = buildApp();
 
 async function resetDb() {
   await prisma.$transaction([
+    prisma.rpcExchangeTrade.deleteMany(),
+    prisma.rpcMarketState.deleteMany(),
     prisma.feeDistribution.deleteMany(),
     prisma.trade.deleteMany(),
     prisma.marketOrder.deleteMany(),
@@ -548,4 +550,51 @@ test('force delete de projeto de teste só para SUPER_ADMIN e apaga histórico v
     boostInjections: 0,
     forceDeleteLogs: 1,
   });
+});
+
+
+
+test('mercado RPC/R$ mantém singleton, cotação e integridade econômica', async () => {
+  await resetDb();
+
+  const rUser = await mkRole('USER');
+  const user = await mkUser('rpcmarket@test.local', 'Rpc Trader');
+  await prisma.userRole.create({ data: { userId: user.id, roleId: rUser.id } });
+  await prisma.wallet.update({ where: { userId: user.id }, data: { fiatAvailableBalance: 1000, rpcAvailableBalance: 100 } });
+
+  const firstState = await app.inject({ method: 'GET', url: '/api/rpc-market' });
+  assert.equal(firstState.statusCode, 200);
+  const secondState = await app.inject({ method: 'GET', url: '/api/rpc-market' });
+  assert.equal(secondState.statusCode, 200);
+  assert.equal(await prisma.rpcMarketState.count(), 1);
+
+  const tk = await token(user.id, ['USER']);
+  const walletBeforeQuote = await prisma.wallet.findUniqueOrThrow({ where: { userId: user.id } });
+  const quoteBuy = await app.inject({ method: 'GET', url: '/api/rpc-market/quote-buy?fiatAmount=100' });
+  assert.equal(quoteBuy.statusCode, 200, quoteBuy.body);
+  const quoteSell = await app.inject({ method: 'GET', url: '/api/rpc-market/quote-sell?rpcAmount=10' });
+  assert.equal(quoteSell.statusCode, 200, quoteSell.body);
+  const walletAfterQuote = await prisma.wallet.findUniqueOrThrow({ where: { userId: user.id } });
+  assert.equal(String(walletBeforeQuote.fiatAvailableBalance), String(walletAfterQuote.fiatAvailableBalance));
+  assert.equal(String(walletBeforeQuote.rpcAvailableBalance), String(walletAfterQuote.rpcAvailableBalance));
+
+  const buy = await app.inject({ method: 'POST', url: '/api/rpc-market/buy', headers: { authorization: `Bearer ${tk}` }, payload: { fiatAmount: 100 } });
+  assert.equal(buy.statusCode, 200, buy.body);
+  assert.equal(await prisma.rpcMarketState.count(), 1);
+
+  const sell = await app.inject({ method: 'POST', url: '/api/rpc-market/sell', headers: { authorization: `Bearer ${tk}` }, payload: { rpcAmount: 10 } });
+  assert.equal(sell.statusCode, 200, sell.body);
+  assert.equal(await prisma.rpcMarketState.count(), 1);
+
+  const walletAfter = await prisma.wallet.findUniqueOrThrow({ where: { userId: user.id } });
+  assert.ok(Number(walletAfter.fiatAvailableBalance) > Number(walletBeforeQuote.fiatAvailableBalance) - 100);
+  assert.ok(Number(walletAfter.rpcAvailableBalance) > Number(walletBeforeQuote.rpcAvailableBalance) - 10);
+  assert.equal(Number(walletAfter.availableBalance), 0);
+
+  const trades = await prisma.rpcExchangeTrade.findMany({ where: { userId: user.id }, orderBy: { createdAt: 'asc' } });
+  assert.equal(trades.length, 2);
+  for (const trade of trades) {
+    const expected = Number(trade.fiatAmount) / Number(trade.rpcAmount);
+    assert.equal(Number(trade.unitPrice).toFixed(8), expected.toFixed(8));
+  }
 });
