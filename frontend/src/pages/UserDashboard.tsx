@@ -18,7 +18,7 @@ type HoldingsResponse = {
   totalCompanies: number;
 };
 
-export function UserDashboard() {
+export function UserDashboard({ onOpenRpcMarket }: { onOpenRpcMarket?: () => void }) {
   const [data, setData] = useState<HoldingsResponse | null>(null);
   const [error, setError] = useState('');
 
@@ -70,6 +70,11 @@ export function UserDashboard() {
           )}
 
           <p className="info-text">Use R$ para comprar RPC ou solicitar saque.</p>
+          <p className="info-text">Para sacar, venda seus RPC por R$ e solicite o saque.</p>
+          <div className="home-grid nested-card">
+            <button className="button-primary" type="button" onClick={onOpenRpcMarket}>Comprar RPC com R$</button>
+            <button className="button-primary" type="button" onClick={onOpenRpcMarket}>Vender RPC por R$</button>
+          </div>
           <p className="info-text">Use RPC para negociar tokens/projetos.</p>
 
           <div className="mobile-card-list nested-card">

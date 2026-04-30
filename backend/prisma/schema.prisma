@@ -75,6 +75,11 @@ enum FeeSourceType {
   MARKET_TRADE_TOTAL_FEE
 }
 
+enum RpcExchangeSide {
+  BUY_RPC
+  SELL_RPC
+}
+
 model User {
   id           String           @id @default(cuid())
   name         String
@@ -98,6 +103,7 @@ model User {
   withdrawalRequests WithdrawalRequest[] @relation("withdrawal_request_user")
   reviewedWithdrawalRequests WithdrawalRequest[] @relation("withdrawal_request_reviewer")
   boostInjections CompanyBoostInjection[]
+  rpcExchangeTrades RpcExchangeTrade[]
 }
 
 model Role {
@@ -441,4 +447,34 @@ model AdminLog {
   userAgent  String?
   createdAt  DateTime @default(now())
   user       User?    @relation(fields: [userId], references: [id])
+}
+
+
+model RpcMarketState {
+  id              String   @id @default(cuid())
+  currentPrice    Decimal  @default(1) @db.Decimal(24, 8)
+  fiatReserve     Decimal  @default(1000000) @db.Decimal(18, 2)
+  rpcReserve      Decimal  @default(1000000) @db.Decimal(18, 2)
+  totalFiatVolume Decimal  @default(0) @db.Decimal(18, 2)
+  totalRpcVolume  Decimal  @default(0) @db.Decimal(18, 2)
+  totalBuys       Int      @default(0)
+  totalSells      Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model RpcExchangeTrade {
+  id          String          @id @default(cuid())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id])
+  side        RpcExchangeSide
+  fiatAmount  Decimal         @db.Decimal(18, 2)
+  rpcAmount   Decimal         @db.Decimal(18, 2)
+  unitPrice   Decimal         @db.Decimal(24, 8)
+  priceBefore Decimal         @db.Decimal(24, 8)
+  priceAfter  Decimal         @db.Decimal(24, 8)
+  createdAt   DateTime        @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
 }
