@@ -84,6 +84,14 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
     reports: 'Relatórios',
   };
 
+
+
+  function formatNumberPtBr(value: string | number) {
+    const parsed = typeof value === 'number' ? value : Number(String(value).replace(',', '.'));
+    if (!Number.isFinite(parsed)) return String(value);
+    return parsed.toLocaleString('pt-BR');
+  }
+
   const adminDrawerItems: SideDrawerItem[] = [
     { key: 'overview', label: 'Visão geral', active: tab === 'overview', onClick: () => setTab('overview') },
     { key: 'users', label: 'Usuários', active: tab === 'users', onClick: () => setTab('users') },
@@ -220,12 +228,39 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
       </nav>
 
       {tab === 'overview' && data && (
-        <div className="summary-grid nested-card">
-          <div className="summary-item"><span className="summary-label">Usuários</span><strong className="summary-value">{data.users}</strong></div>
-          <div className="summary-item"><span className="summary-label">Mercados listados</span><strong className="summary-value">{data.companies}</strong></div>
-          <div className="summary-item"><span className="summary-label">Logs</span><strong className="summary-value">{data.logs}</strong></div>
-          <div className="summary-item"><span className="summary-label">Tesouraria RPC</span><strong className="summary-value">{data.treasuryBalance}</strong></div>
-          <button className="home-tile" type="button" onClick={() => setTab('treasury')}><span>🪙</span><strong>Tesouraria / Emitir RPC</strong><small>Acessar emissão e transferências administrativas.</small></button>
+        <div className="admin-overview-grid nested-card">
+          <article className="admin-metric-card">
+            <span className="admin-metric-icon" aria-hidden="true">👥</span>
+            <span className="admin-metric-label">Usuários</span>
+            <strong className="admin-metric-value">{formatNumberPtBr(data.users)}</strong>
+            <small className="admin-metric-description">Contas cadastradas</small>
+          </article>
+          <article className="admin-metric-card">
+            <span className="admin-metric-icon" aria-hidden="true">🪙</span>
+            <span className="admin-metric-label">Mercados</span>
+            <strong className="admin-metric-value">{formatNumberPtBr(data.companies)}</strong>
+            <small className="admin-metric-description">Tokens listados</small>
+          </article>
+          <article className="admin-metric-card">
+            <span className="admin-metric-icon" aria-hidden="true">📜</span>
+            <span className="admin-metric-label">Logs</span>
+            <strong className="admin-metric-value">{formatNumberPtBr(data.logs)}</strong>
+            <small className="admin-metric-description">Eventos registrados</small>
+          </article>
+          <article className="admin-metric-card">
+            <span className="admin-metric-icon" aria-hidden="true">🏦</span>
+            <span className="admin-metric-label">Tesouraria</span>
+            <strong className="admin-metric-value">{formatNumberPtBr(data.treasuryBalance)} RPC</strong>
+            <small className="admin-metric-description">Saldo administrativo</small>
+          </article>
+          <button className="admin-quick-action-card" type="button" onClick={() => setTab('treasury')}>
+            <span className="admin-quick-action-icon" aria-hidden="true">🪙</span>
+            <span className="admin-quick-action-content">
+              <strong>Tesouraria / Emitir RPC</strong>
+              <small>Acessar emissão e transferências administrativas.</small>
+            </span>
+            <span className="admin-quick-action-arrow" aria-hidden="true">→</span>
+          </button>
         </div>
       )}
 
