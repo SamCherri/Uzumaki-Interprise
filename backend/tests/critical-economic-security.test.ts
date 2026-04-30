@@ -464,12 +464,36 @@ test('force delete de projeto de teste só para SUPER_ADMIN e apaga histórico v
   await prisma.companyInitialOffer.create({ data: { companyId: company.id, totalShares: 600, availableShares: 500 } });
   await prisma.companyRevenueAccount.create({ data: { companyId: company.id, balance: 5, totalReceivedFees: 5 } });
   await prisma.companyBoostAccount.create({ data: { companyId: company.id } });
-  await prisma.companyBoostInjection.create({ data: { companyId: company.id, amount: 3, reason: 'teste' } });
-  const buyOrder = await prisma.marketOrder.create({ data: { userId: user.id, companyId: company.id, type: 'BUY', mode: 'LIMIT', quantity: 5, remainingQuantity: 0, limitPrice: 10, status: 'FILLED', executedQuantity: 5 } });
-  const sellOrder = await prisma.marketOrder.create({ data: { userId: user.id, companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 5, remainingQuantity: 0, limitPrice: 10, status: 'FILLED', executedQuantity: 5 } });
-  const op = await prisma.companyOperation.create({ data: { companyId: company.id, userId: user.id, type: 'TRADE_BUY', description: 'op' } });
-  const trade = await prisma.trade.create({ data: { companyId: company.id, buyOrderId: buyOrder.id, sellOrderId: sellOrder.id, buyerUserId: user.id, sellerUserId: user.id, quantity: 5, unitPrice: 10, totalPrice: 50, buyerFee: 1, sellerFee: 1 } });
-  await prisma.feeDistribution.create({ data: { companyId: company.id, tradeId: trade.id, operationId: op.id, platformAmount: 1, companyAmount: 1, grossAmount: 2 } });
+  await prisma.companyBoostInjection.create({
+    data: {
+      companyId: company.id,
+      source: 'ADMIN_ADJUSTMENT',
+      amountRpc: 3,
+      priceBefore: 10,
+      priceAfter: 12,
+      marketCapBefore: 10000,
+      marketCapAfter: 12000,
+      reason: 'teste',
+    },
+  });
+  const buyOrder = await prisma.marketOrder.create({ data: { userId: user.id, companyId: company.id, type: 'BUY', mode: 'LIMIT', quantity: 5, remainingQuantity: 0, limitPrice: 10, status: 'FILLED' } });
+  const sellOrder = await prisma.marketOrder.create({ data: { userId: user.id, companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 5, remainingQuantity: 0, limitPrice: 10, status: 'FILLED' } });
+  const op = await prisma.companyOperation.create({ data: { companyId: company.id, userId: user.id, type: 'MARKET_TRADE_EXECUTED', description: 'op' } });
+  const trade = await prisma.trade.create({ data: { companyId: company.id, buyOrderId: buyOrder.id, sellOrderId: sellOrder.id, buyerId: user.id, sellerId: user.id, quantity: 5, unitPrice: 10, grossAmount: 50, buyFeeAmount: 1, sellFeeAmount: 1 } });
+  await prisma.feeDistribution.create({
+    data: {
+      companyId: company.id,
+      tradeId: trade.id,
+      operationId: op.id,
+      payerUserId: user.id,
+      sourceType: 'MARKET_TRADE_TOTAL_FEE',
+      totalFeeAmount: 2,
+      platformAmount: 1,
+      companyAmount: 1,
+      platformSharePercent: 50,
+      companySharePercent: 50,
+    },
+  });
 
   const userToken = await token(user.id, ['USER']);
   const adminToken = await token(admin.id, ['ADMIN']);
