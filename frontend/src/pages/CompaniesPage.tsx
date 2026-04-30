@@ -328,7 +328,7 @@ export function CompaniesPage() {
     () => normalizeChartData(trades, Number(selected?.initialPrice ?? 1), Number(selected?.currentPrice ?? selected?.initialPrice ?? 1)),
     [trades, selected?.currentPrice, selected?.initialPrice]
   );
-  const priceTicks = useMemo(() => buildPriceTicks(chartData.minPrice, chartData.maxPrice, 4), [chartData.minPrice, chartData.maxPrice]);
+  const priceTicks = useMemo(() => buildPriceTicks(chartData.minPrice, chartData.maxPrice, 3), [chartData.minPrice, chartData.maxPrice]);
   const totalBuyStrength = useMemo(() => book.buyOrders.reduce((sum, order) => sum + order.remainingQuantity, 0), [book.buyOrders]);
   const totalSellStrength = useMemo(() => book.sellOrders.reduce((sum, order) => sum + order.remainingQuantity, 0), [book.sellOrders]);
   const totalStrength = totalBuyStrength + totalSellStrength;
@@ -418,7 +418,7 @@ export function CompaniesPage() {
                 <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="line-chart">
                   <defs>
                     <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-                      <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#d7e2ff" strokeWidth="0.4" />
+                      <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(148,163,184,.22)" strokeWidth="0.32" />
                     </pattern>
                   </defs>
                   <rect x="0" y="0" width="100" height="100" fill="url(#grid)" />
@@ -429,8 +429,8 @@ export function CompaniesPage() {
                     const y = 100 - (((tick - (chartData.minPrice - Math.max((chartData.maxPrice - chartData.minPrice) * 0.2, 0.01))) / ((chartData.maxPrice + Math.max((chartData.maxPrice - chartData.minPrice) * 0.2, 0.01)) - (chartData.minPrice - Math.max((chartData.maxPrice - chartData.minPrice) * 0.2, 0.01)))) * 100);
                     return <text key={tick} x="86" y={Math.max(3, Math.min(97, y))} className="price-scale-label">{formatPrice(tick)}</text>;
                   })}
-                  <rect x="86" y={chartData.points[chartData.points.length - 1].y - 3} width="13" height="6" rx="1.2" className="current-price-badge" />
-                  <text x="92.5" y={chartData.points[chartData.points.length - 1].y + 1.2} textAnchor="middle" fontSize="2.1" fill="#0f172a">{formatPrice(chartData.currentPrice)}</text>
+                  <rect x="85.5" y={chartData.points[chartData.points.length - 1].y - 3.6} width="14" height="7.2" rx="1.6" className="current-price-badge" />
+                  <text x="92.5" y={chartData.points[chartData.points.length - 1].y + 1.3} textAnchor="middle" className="current-price-badge-text">{formatPrice(chartData.currentPrice)}</text>
                 </svg>
               </div>
               <div className="chart-meta"><div><span>Atual</span><strong>{formatPrice(chartData.lastPrice)}</strong></div><div><span>Máximo</span><strong>{formatPrice(chartData.maxPrice)}</strong></div><div><span>Mínimo</span><strong>{formatPrice(chartData.minPrice)}</strong></div></div>
