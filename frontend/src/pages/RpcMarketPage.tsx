@@ -24,7 +24,8 @@ export function RpcMarketPage() {
   const [rpcAmount, setRpcAmount] = useState('');
   const [buyQuote, setBuyQuote] = useState<BuyQuote | null>(null);
   const [sellQuote, setSellQuote] = useState<SellQuote | null>(null);
-  const [quoteError, setQuoteError] = useState('');
+  const [buyQuoteError, setBuyQuoteError] = useState('');
+  const [sellQuoteError, setSellQuoteError] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -51,8 +52,8 @@ export function RpcMarketPage() {
       if (!fiatAmount || Number(fiatAmount) < 0.01) return setBuyQuote(null);
       try {
         const quote = await api<BuyQuote>(`/rpc-market/quote-buy?fiatAmount=${encodeURIComponent(fiatAmount)}`);
-        setBuyQuote(quote); setQuoteError('');
-      } catch (err) { setBuyQuote(null); setQuoteError((err as Error).message); }
+        setBuyQuote(quote); setBuyQuoteError('');
+      } catch (err) { setBuyQuote(null); setBuyQuoteError((err as Error).message); }
     }, 250);
     return () => clearTimeout(id);
   }, [fiatAmount]);
@@ -62,8 +63,8 @@ export function RpcMarketPage() {
       if (!rpcAmount || Number(rpcAmount) < 0.01) return setSellQuote(null);
       try {
         const quote = await api<SellQuote>(`/rpc-market/quote-sell?rpcAmount=${encodeURIComponent(rpcAmount)}`);
-        setSellQuote(quote); setQuoteError('');
-      } catch (err) { setSellQuote(null); setQuoteError((err as Error).message); }
+        setSellQuote(quote); setSellQuoteError('');
+      } catch (err) { setSellQuote(null); setSellQuoteError((err as Error).message); }
     }, 250);
     return () => clearTimeout(id);
   }, [rpcAmount]);
@@ -114,7 +115,7 @@ export function RpcMarketPage() {
         <header className="card trade-header market-pair-header market-compact-header market-asset-header">
           <div className="market-pair-title">
             <p className="company-emoji">💴 RPC/R$</p>
-            <h3 className="trade-price-big">R$ {formatPrice(Number(market?.currentPrice ?? 0))}</h3>
+            <h3 className="trade-price-big">{`R$ ${formatPrice(Number(market?.currentPrice ?? 0))}`}</h3>
             <p className={variationPercent >= 0 ? 'positive-change' : 'negative-change'}>
               {variationPercent >= 0 ? '▲' : '▼'} {formatPercent(Math.abs(variationPercent))}% ({formatSignedPrice(variationAbs)})
             </p>
@@ -129,7 +130,6 @@ export function RpcMarketPage() {
 
         {error && <p className="status-message error">{error}</p>}
         {message && <p className="status-message success">{message}</p>}
-        {quoteError && <p className="info-text">Cotação momentaneamente indisponível: {quoteError}</p>}
 
         <section className="card nested-card market-price-tab market-tab-panel">
           <h4>Preço RPC/R$</h4>
@@ -157,19 +157,21 @@ export function RpcMarketPage() {
           {activeSide === 'buy' ? (
             <form onSubmit={onBuy} className="form-grid nested-card buy-side">
               <input value={fiatAmount} onChange={(e) => setFiatAmount(e.target.value)} placeholder="Entrada em R$" required />
-              <p className="info-text">Saída estimada: {formatCurrency(Number(buyQuote?.estimatedRpcAmount ?? 0))} RPC</p>
-              <p className="info-text">Preço médio estimado: R$ {formatPrice(Number(buyQuote?.effectiveUnitPrice ?? 0))}</p>
+              {buyQuoteError && <p className="info-text">Não foi possível atualizar a cotação de compra: {buyQuoteError}</p>}
+              <p className="info-text">Saída estimada: {`${formatCurrency(Number(buyQuote?.estimatedRpcAmount ?? 0))} RPC`}</p>
+              <p className="info-text">Preço médio estimado: {`R$ ${formatPrice(Number(buyQuote?.effectiveUnitPrice ?? 0))}`}</p>
               <p className="info-text">Taxa aplicada: 0%</p>
-              <p className="info-text">Total final: {formatCurrency(Number(fiatAmount || 0))} R$</p>
+              <p className="info-text">Total final: {`R$ ${formatCurrency(Number(fiatAmount || 0))}`}</p>
               <button className="button-success" type="submit" disabled={!buyQuote || Number(fiatAmount) < 0.01}>Comprar RPC</button>
             </form>
           ) : (
             <form onSubmit={onSell} className="form-grid nested-card sell-side">
               <input value={rpcAmount} onChange={(e) => setRpcAmount(e.target.value)} placeholder="Entrada em RPC" required />
-              <p className="info-text">Saída estimada: R$ {formatCurrency(Number(sellQuote?.estimatedFiatAmount ?? 0))}</p>
-              <p className="info-text">Preço médio estimado: R$ {formatPrice(Number(sellQuote?.effectiveUnitPrice ?? 0))}</p>
+              {sellQuoteError && <p className="info-text">Não foi possível atualizar a cotação de venda: {sellQuoteError}</p>}
+              <p className="info-text">Saída estimada: {`R$ ${formatCurrency(Number(sellQuote?.estimatedFiatAmount ?? 0))}`}</p>
+              <p className="info-text">Preço médio estimado: {`R$ ${formatPrice(Number(sellQuote?.effectiveUnitPrice ?? 0))}`}</p>
               <p className="info-text">Taxa aplicada: 0%</p>
-              <p className="info-text">Total final: {formatCurrency(Number(sellQuote?.estimatedFiatAmount ?? 0))} R$</p>
+              <p className="info-text">Total final: {`R$ ${formatCurrency(Number(sellQuote?.estimatedFiatAmount ?? 0))}`}</p>
               <button className="button-danger" type="submit" disabled={!sellQuote || Number(rpcAmount) < 0.01}>Vender RPC</button>
             </form>
           )}
@@ -178,8 +180,8 @@ export function RpcMarketPage() {
         <section className="card nested-card market-book-tab market-tab-panel">
           <h4>Profundidade baseada em liquidez real</h4>
           <div className="order-book-grid">
-            <div className="summary-item buy-side"><span className="summary-label">Reserva RPC</span><strong>{formatCurrency(Number(market?.rpcReserve ?? 0))} RPC</strong></div>
-            <div className="summary-item sell-side"><span className="summary-label">Reserva R$</span><strong>{formatCurrency(Number(market?.fiatReserve ?? 0))} R$</strong></div>
+            <div className="summary-item buy-side"><span className="summary-label">Reserva RPC</span><strong>{`${formatCurrency(Number(market?.rpcReserve ?? 0))} RPC`}</strong></div>
+            <div className="summary-item sell-side"><span className="summary-label">Reserva R$</span><strong>{`R$ ${formatCurrency(Number(market?.fiatReserve ?? 0))}`}</strong></div>
           </div>
         </section>
 
@@ -187,7 +189,7 @@ export function RpcMarketPage() {
           <h4>Últimos trades</h4>
           <div className="mobile-card-list">
             {trades.length === 0 && <p className="empty-state">Sem negociações ainda.</p>}
-            {trades.slice(0, 20).map((trade) => (<article key={trade.id} className="summary-item compact-card market-order-card"><p><strong>{trade.side === 'BUY_RPC' ? 'COMPRA' : 'VENDA'}</strong> · {new Date(trade.createdAt).toLocaleTimeString('pt-BR')}</p><p>Preço: R$ {formatPrice(Number(trade.unitPrice))}</p><p>Quantidade: {formatCurrency(Number(trade.rpcAmount))} RPC</p><p>Total: R$ {formatCurrency(Number(trade.fiatAmount))}</p></article>))}
+            {trades.slice(0, 20).map((trade) => (<article key={trade.id} className="summary-item compact-card market-order-card"><p><strong>{trade.side === 'BUY_RPC' ? 'COMPRA' : 'VENDA'}</strong> · {new Date(trade.createdAt).toLocaleTimeString('pt-BR')}</p><p>Preço: {`R$ ${formatPrice(Number(trade.unitPrice))}`}</p><p>Quantidade: {`${formatCurrency(Number(trade.rpcAmount))} RPC`}</p><p>Total: {`R$ ${formatCurrency(Number(trade.fiatAmount))}`}</p></article>))}
           </div>
         </section>
       </div>
