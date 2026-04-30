@@ -4,6 +4,7 @@ export type SideDrawerItem = {
   key: string;
   label: string;
   icon?: string;
+  section?: 'main' | 'secondary' | 'danger';
   active?: boolean;
   danger?: boolean;
   onClick: () => void;
@@ -18,6 +19,10 @@ type SideDrawerProps = {
 };
 
 export function SideDrawer({ title, subtitle, open, onClose, items }: SideDrawerProps) {
+  const mainItems = items.filter((item) => (item.section ?? 'main') === 'main');
+  const secondaryItems = items.filter((item) => item.section === 'secondary');
+  const dangerItems = items.filter((item) => item.section === 'danger' || item.danger);
+
   useEffect(() => {
     if (!open) return;
 
@@ -51,7 +56,37 @@ export function SideDrawer({ title, subtitle, open, onClose, items }: SideDrawer
         </header>
 
         <nav className="side-drawer-list" aria-label={`Navegação de ${title}`}>
-          {items.map((item) => (
+          {mainItems.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              className={`side-drawer-item${item.active ? ' active' : ''}${item.danger ? ' danger' : ''}`}
+              onClick={() => {
+                item.onClick();
+                onClose();
+              }}
+            >
+              {item.icon ? <span aria-hidden="true">{item.icon}</span> : null}
+              <span>{item.label}</span>
+            </button>
+          ))}
+          {secondaryItems.length > 0 && <p className="side-drawer-section-label">Acessos extras</p>}
+          {secondaryItems.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              className={`side-drawer-item${item.active ? ' active' : ''}`}
+              onClick={() => {
+                item.onClick();
+                onClose();
+              }}
+            >
+              {item.icon ? <span aria-hidden="true">{item.icon}</span> : null}
+              <span>{item.label}</span>
+            </button>
+          ))}
+          {dangerItems.length > 0 && <p className="side-drawer-section-label danger">Sessão</p>}
+          {dangerItems.map((item) => (
             <button
               key={item.key}
               type="button"
