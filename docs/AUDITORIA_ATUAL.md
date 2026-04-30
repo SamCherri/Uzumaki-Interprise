@@ -192,7 +192,7 @@ Regras:
 ## Testes automatizados críticos
 
 Regras:
-- Testes críticos cobrem saldos, matching, tesouraria, corretor, admin, projetos desligados e CSV.
+- Testes críticos cobrem matching multi-fill, exportação CSV/permissões, compra inicial (com ajuste de preço sem Trade), tesouraria→corretor→jogador, depósito ADM direto em jogador, retirada do lucro da Exchange e bloqueio de rotas públicas para projeto desligado.
 - Testes de integração devem usar `TEST_DATABASE_URL`.
 - Testes nunca devem rodar contra banco de produção.
 - Nenhuma regra econômica deve ser alterada apenas para facilitar teste.
