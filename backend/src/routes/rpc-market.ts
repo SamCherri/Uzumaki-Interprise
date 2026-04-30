@@ -1,4 +1,5 @@
 import { Decimal } from '@prisma/client/runtime/library';
+import { Prisma } from '@prisma/client';
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
@@ -111,7 +112,7 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
       const fiatAmount = toDecimal(body.fiatAmount).toDecimalPlaces(2);
       if (fiatAmount.lt(MIN_AMOUNT)) return reply.status(400).send({ message: 'Valor mínimo para compra é R$ 0,01.' });
 
-      const result = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const wallet = await tx.wallet.findUnique({ where: { userId: (request.user as { sub: string }).sub } });
         if (!wallet) throw new Error('Carteira não encontrada.');
 
@@ -143,7 +144,7 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
       const rpcAmount = toDecimal(body.rpcAmount).toDecimalPlaces(2);
       if (rpcAmount.lt(MIN_AMOUNT)) return reply.status(400).send({ message: 'Valor mínimo para venda é 0,01 RPC.' });
 
-      const result = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const wallet = await tx.wallet.findUnique({ where: { userId: (request.user as { sub: string }).sub } });
         if (!wallet) throw new Error('Carteira não encontrada.');
 
