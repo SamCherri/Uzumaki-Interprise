@@ -9,6 +9,7 @@ import { CompaniesPage } from './pages/CompaniesPage';
 import { WithdrawalsPage } from './pages/WithdrawalsPage';
 import { ProjectOwnerPanel } from './pages/ProjectOwnerPanel';
 import { api, getCurrentUser, CurrentUserResponse } from './services/api';
+import { SideDrawer, SideDrawerItem } from './components/SideDrawer';
 
 type PublicTab = 'login' | 'register';
 type PrivateScreen = 'home' | 'markets' | 'wallet' | 'withdrawals' | 'company-request' | 'admin' | 'broker' | 'my-projects';
@@ -69,6 +70,7 @@ export function App() {
   const [installHint, setInstallHint] = useState('');
   const [hasOwnedProjects, setHasOwnedProjects] = useState(false);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [isGlobalDrawerOpen, setIsGlobalDrawerOpen] = useState(false);
 
   const tokenRoles = useMemo(() => decodeRolesFromToken(token), [token]);
   const roles = useMemo(() => {
@@ -184,6 +186,23 @@ export function App() {
 
   const showInstallCard = !isInstalled;
 
+  const globalDrawerItems = useMemo<SideDrawerItem[]>(() => {
+    const items: SideDrawerItem[] = [
+      { key: 'home', label: 'Início', icon: '🏠', active: screen === 'home', onClick: () => setScreen('home') },
+      { key: 'markets', label: 'Mercados', icon: '🪙', active: screen === 'markets', onClick: () => setScreen('markets') },
+      { key: 'wallet', label: 'Carteira', icon: '💼', active: screen === 'wallet', onClick: () => setScreen('wallet') },
+      { key: 'withdrawals', label: 'Saque', icon: '🏧', active: screen === 'withdrawals', onClick: () => setScreen('withdrawals') },
+      { key: 'company-request', label: 'Criar token', icon: '🚀', active: screen === 'company-request', onClick: () => setScreen('company-request') },
+    ];
+
+    if (canSeeMyProjects) items.push({ key: 'my-projects', label: 'Meus Projetos', icon: '📊', active: screen === 'my-projects', onClick: () => setScreen('my-projects') });
+    if (roles.canSeeAdmin) items.push({ key: 'admin', label: 'Admin', icon: '🛠️', active: screen === 'admin', onClick: () => setScreen('admin') });
+    if (roles.canSeeBroker) items.push({ key: 'broker', label: 'Corretor', icon: '🤝', active: screen === 'broker', onClick: () => setScreen('broker') });
+
+    items.push({ key: 'logout', label: 'Sair', icon: '🚪', danger: true, onClick: handleLogout });
+    return items;
+  }, [canSeeMyProjects, roles.canSeeAdmin, roles.canSeeBroker, screen]);
+
   if (!token) {
     return (
       <main className="container auth-shell">
@@ -239,7 +258,15 @@ export function App() {
   return (
     <main className="container mobile-app-shell">
       <header className="card app-mobile-topbar">
-        <div className="topbar-row">
+        <div className="mobile-topbar-layout mobile-only">
+          <button className="hamburger-button" type="button" aria-label="Abrir menu" onClick={() => setIsGlobalDrawerOpen(true)}>☰</button>
+          <div className="mobile-topbar-title">
+            <h1>RPC Exchange</h1>
+            <p className="subtitle">Ambiente de simulação econômica</p>
+          </div>
+        </div>
+
+        <div className="topbar-row desktop-only">
           {canGoBack ? (
             <button className="back-button" onClick={() => setScreen('home')}>
               ← Voltar
@@ -256,6 +283,14 @@ export function App() {
           </button>
         </div>
       </header>
+
+      <SideDrawer
+        title="Menu principal"
+        subtitle="Navegação rápida da RPC Exchange"
+        open={isGlobalDrawerOpen}
+        onClose={() => setIsGlobalDrawerOpen(false)}
+        items={globalDrawerItems}
+      />
 
       {screen === 'home' && (
         <section className="card">
@@ -278,10 +313,10 @@ export function App() {
             <button className="home-tile" onClick={() => setScreen('wallet')}><span>💼</span><strong>Carteira</strong><small>Acompanhe seu saldo e seus ativos.</small></button>
             <button className="home-tile" onClick={() => setScreen('withdrawals')}><span>🏧</span><strong>Saque</strong><small>Solicite a retirada de RPC para receber dentro do RP.</small></button>
             <button className="home-tile" onClick={() => setScreen('company-request')}><span>🚀</span><strong>Criar token</strong><small>Crie seu projeto e solicite listagem no mercado.</small></button>
-            {canSeeMyProjects && <button className="home-tile" onClick={() => setScreen('my-projects')}><span>📊</span><strong>Meus Projetos</strong><small>Gerencie impulsões da sua moeda.</small></button>}
-            {roles.canSeeAdmin && <button className="home-tile" onClick={() => setScreen('admin')}><span>🛠️</span><strong>Admin</strong><small>Painel administrativo</small></button>}
-            {roles.canSeeBroker && <button className="home-tile" onClick={() => setScreen('broker')}><span>🤝</span><strong>Corretor</strong><small>Painel corretor</small></button>}
-            <button className="home-tile home-tile-danger" onClick={handleLogout}><span>🚪</span><strong>Sair</strong><small>Encerrar sessão</small></button>
+            {canSeeMyProjects && <button className="home-tile desktop-only" onClick={() => setScreen('my-projects')}><span>📊</span><strong>Meus Projetos</strong><small>Gerencie impulsões da sua moeda.</small></button>}
+            {roles.canSeeAdmin && <button className="home-tile desktop-only" onClick={() => setScreen('admin')}><span>🛠️</span><strong>Admin</strong><small>Painel administrativo</small></button>}
+            {roles.canSeeBroker && <button className="home-tile desktop-only" onClick={() => setScreen('broker')}><span>🤝</span><strong>Corretor</strong><small>Painel corretor</small></button>}
+            <button className="home-tile home-tile-danger desktop-only" onClick={handleLogout}><span>🚪</span><strong>Sair</strong><small>Encerrar sessão</small></button>
           </div>
         </section>
       )}

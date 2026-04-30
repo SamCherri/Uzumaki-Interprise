@@ -161,7 +161,7 @@ export function AdminUsersPanel({ onPermissionsUpdated, mode = 'users' }: AdminU
             {editingUserId === user.id && (
               <form className="nested-card" onSubmit={saveRoles}>
                 {ALL_ROLES.map((role) => (
-                  <label key={role}>
+                  <label key={role} className="role-checkbox-label">
                     <input
                       type="checkbox"
                       checked={editingRoles.includes(role)}
