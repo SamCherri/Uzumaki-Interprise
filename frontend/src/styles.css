@@ -704,3 +704,7 @@ input[type="checkbox"] {
   .market-open-cta { min-height: 40px; padding: 8px 10px; }
   .market-sheet-balance-row { grid-template-columns: 1fr; }
 }
+
+.rpc-chart-shell { position: relative; }
+.rpc-chart-shell::before { content: 'Preço (R$)'; position: absolute; left: 8px; top: 6px; font-size: .72rem; color: #94a3b8; }
+.rpc-chart-shell::after { content: 'Tempo'; position: absolute; right: 10px; bottom: 6px; font-size: .72rem; color: #94a3b8; }
