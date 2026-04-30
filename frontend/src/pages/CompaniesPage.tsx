@@ -417,12 +417,17 @@ export function CompaniesPage() {
               <div className="chart-wrap chart-wrap-highlight modern-chart-shell">
                 <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="line-chart">
                   <defs>
-                    <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-                      <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(148,163,184,.22)" strokeWidth="0.32" />
+                    <linearGradient id="chartBgGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="rgba(79,70,229,.12)" />
+                      <stop offset="100%" stopColor="rgba(15,23,42,.02)" />
+                    </linearGradient>
+                    <pattern id="grid" width="20" height="16" patternUnits="userSpaceOnUse">
+                      <path className="chart-grid-line" d="M 20 0 L 0 0 0 16" fill="none" stroke="rgba(148,163,184,.10)" strokeWidth="0.22" />
                     </pattern>
                   </defs>
+                  <rect x="0" y="0" width="100" height="100" fill="url(#chartBgGradient)" />
                   <rect x="0" y="0" width="100" height="100" fill="url(#grid)" />
-                  <polyline points={chartData.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" stroke="#4f46e5" strokeWidth="2.6" vectorEffect="non-scaling-stroke" />
+                  <polyline points={chartData.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" className="chart-main-line" stroke="#4f46e5" strokeWidth="2.6" vectorEffect="non-scaling-stroke" />
                   <line className="current-price-line" x1="0" x2="84" y1={chartData.points[chartData.points.length - 1].y} y2={chartData.points[chartData.points.length - 1].y} />
                   <circle cx={chartData.points[chartData.points.length - 1].x} cy={chartData.points[chartData.points.length - 1].y} r="1.4" fill="#f8fafc" />
                   {priceTicks.map((tick) => {
@@ -433,9 +438,15 @@ export function CompaniesPage() {
                   <text x="92.5" y={chartData.points[chartData.points.length - 1].y + 1.3} textAnchor="middle" className="current-price-badge-text">{formatPrice(chartData.currentPrice)}</text>
                 </svg>
               </div>
+              {trades.length === 0 && (
+                <div className="chart-empty-state">
+                  <p><strong>Aguardando primeiras negociações</strong></p>
+                  <p>O gráfico será formado conforme os jogadores negociarem.</p>
+                </div>
+              )}
               <div className="chart-meta"><div><span>Atual</span><strong>{formatPrice(chartData.lastPrice)}</strong></div><div><span>Máximo</span><strong>{formatPrice(chartData.maxPrice)}</strong></div><div><span>Mínimo</span><strong>{formatPrice(chartData.minPrice)}</strong></div></div>
               <div className="volume-mini-chart">
-                {trades.length === 0 && <p className="empty-state">Sem volume de negociações ainda.</p>}
+                {trades.length === 0 && <p className="empty-state compact-empty-state">Sem volume ainda</p>}
                 {trades.length > 0 && <div className="volume-bars">{trades.map((trade) => {
                   const max = Math.max(...trades.map((item) => item.quantity));
                   const height = max > 0 ? Math.max(6, (trade.quantity / max) * 60) : 6;
