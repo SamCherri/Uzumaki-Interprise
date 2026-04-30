@@ -61,6 +61,11 @@ type ChartData = {
   note: string;
 };
 
+function getBookVolumeWeight(order: MarketOrder, maxVolume: number) {
+  if (maxVolume <= 0) return 0;
+  return Math.max(8, Math.round((order.remainingQuantity / maxVolume) * 100));
+}
+
 
 function getPriceChangePercent(company: Company) {
   const initial = Number(company.initialPrice);
@@ -95,7 +100,8 @@ function normalizeChartData(trades: Trade[], initialPrice: number, currentPrice:
   const maxPrice = Math.max(...series);
   const range = maxPrice - minPrice;
   const hasRange = range !== 0;
-  const padding = hasRange ? range * 0.15 : 0;
+  const minimalPadding = Math.max(safeCurrentPrice * 0.01, 0.01);
+  const padding = hasRange ? Math.max(range * 0.2, minimalPadding) : minimalPadding;
   const chartMin = minPrice - padding;
   const chartMax = maxPrice + padding;
   const chartRange = chartMax - chartMin;
@@ -305,6 +311,8 @@ export function CompaniesPage() {
 
   const bestAsk = useMemo(() => (book.sellOrders.length > 0 ? Number(book.sellOrders[0].limitPrice ?? 0) : Number(selected?.currentPrice ?? 0)), [book.sellOrders, selected?.currentPrice]);
   const bestBid = useMemo(() => (book.buyOrders.length > 0 ? Number(book.buyOrders[0].limitPrice ?? 0) : Number(selected?.currentPrice ?? 0)), [book.buyOrders, selected?.currentPrice]);
+  const maxBuyVolume = useMemo(() => Math.max(0, ...book.buyOrders.map((order) => order.remainingQuantity)), [book.buyOrders]);
+  const maxSellVolume = useMemo(() => Math.max(0, ...book.sellOrders.map((order) => order.remainingQuantity)), [book.sellOrders]);
   const chartData = useMemo(
     () => normalizeChartData(trades, Number(selected?.initialPrice ?? 1), Number(selected?.currentPrice ?? selected?.initialPrice ?? 1)),
     [trades, selected?.currentPrice, selected?.initialPrice]
@@ -438,9 +446,39 @@ export function CompaniesPage() {
           {activeTab === 'livro' && (
             <section className="card nested-card">
               <h4>📊 Livro de ofertas</h4>
-              <div className="summary-item sell-side"><strong>Vendas</strong>{book.sellOrders.length === 0 && <p className="empty-state">Nenhuma oferta disponível ainda.</p>}{book.sellOrders.map((order) => { const price = Number(order.limitPrice ?? 0); return <p key={order.id}>{formatPrice(price)} | {order.remainingQuantity} | {formatCurrency(price * order.remainingQuantity)}</p>; })}</div>
+              <div className="summary-grid order-book-grid">
+                <div className="summary-item buy-side">
+                  <strong>Compras</strong>
+                  {book.buyOrders.length === 0 && <p className="empty-state">Sem ordens de compra no momento.</p>}
+                  {book.buyOrders.map((order) => {
+                    const price = Number(order.limitPrice ?? 0);
+                    const total = price * order.remainingQuantity;
+                    const barWidth = getBookVolumeWeight(order, maxBuyVolume);
+                    return (
+                      <div key={order.id} className="order-book-row">
+                        <div className="order-book-bar buy" style={{ width: `${barWidth}%` }} />
+                        <p>{formatPrice(price)} | Qtd: {order.remainingQuantity} | Total: {formatCurrency(total)}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="summary-item sell-side">
+                  <strong>Vendas</strong>
+                  {book.sellOrders.length === 0 && <p className="empty-state">Sem ordens de venda no momento.</p>}
+                  {book.sellOrders.map((order) => {
+                    const price = Number(order.limitPrice ?? 0);
+                    const total = price * order.remainingQuantity;
+                    const barWidth = getBookVolumeWeight(order, maxSellVolume);
+                    return (
+                      <div key={order.id} className="order-book-row">
+                        <div className="order-book-bar sell" style={{ width: `${barWidth}%` }} />
+                        <p>{formatPrice(price)} | Qtd: {order.remainingQuantity} | Total: {formatCurrency(total)}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
               <div className="summary-item nested-card"><strong>Preço atual: {formatPrice(Number(selected.currentPrice))}</strong></div>
-              <div className="summary-item buy-side nested-card"><strong>Compras</strong>{book.buyOrders.length === 0 && <p className="empty-state">Nenhuma oferta disponível ainda.</p>}{book.buyOrders.map((order) => { const price = Number(order.limitPrice ?? 0); return <p key={order.id}>{formatPrice(price)} | {order.remainingQuantity} | {formatCurrency(price * order.remainingQuantity)}</p>; })}</div>
             </section>
           )}
 

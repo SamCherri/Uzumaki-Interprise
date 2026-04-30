@@ -211,3 +211,13 @@ Regras de segurança:
 - Nunca usar banco de produção nos testes.
 - O workflow falha com mensagem clara se `TEST_DATABASE_URL` não estiver configurado.
 - O workflow roda somente manualmente (`workflow_dispatch`) para evitar execução acidental.
+
+## Mercado mobile-first
+
+Regras:
+- Tela de mercado deve priorizar uso em celular.
+- Gráfico deve melhorar leitura de pequenas variações sem alterar valores reais.
+- Livro de ofertas deve mostrar compra/venda de forma clara.
+- Compra/venda devem exibir estimativas de total e taxa antes da ação.
+- Estados vazios e erros devem ser amigáveis.
+- Nenhuma regra econômica deve ser alterada pelo frontend.
