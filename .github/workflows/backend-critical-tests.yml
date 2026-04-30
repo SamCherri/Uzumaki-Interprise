@@ -1,0 +1,41 @@
+name: Backend Critical Tests
+
+on:
+  workflow_dispatch:
+
+jobs:
+  backend-critical-tests:
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+      TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validar TEST_DATABASE_URL
+        run: |
+          if [ -z "${{ secrets.TEST_DATABASE_URL }}" ]; then
+            echo "Configure o secret TEST_DATABASE_URL no GitHub antes de rodar os testes."
+            exit 1
+          fi
+
+      - name: Prisma generate
+        run: npm run prisma:generate --workspace backend
+
+      - name: Prisma migrate deploy
+        run: npx prisma migrate deploy --schema backend/prisma/schema.prisma
+
+      - name: Run backend critical tests
+        run: npm run test:critical --workspace backend

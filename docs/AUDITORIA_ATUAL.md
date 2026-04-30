@@ -197,3 +197,17 @@ Regras:
 - Testes nunca devem rodar contra banco de produção.
 - Nenhuma regra econômica deve ser alterada apenas para facilitar teste.
 - Matching multi-fill deve continuar protegido contra saldos negativos.
+
+## Como rodar testes críticos pelo GitHub Actions
+
+1. No GitHub do repositório, abra **Settings > Secrets and variables > Actions**.
+2. Crie o secret **`TEST_DATABASE_URL`** com a URL de um **banco de teste** (nunca produção).
+3. Vá para a aba **Actions**.
+4. Selecione o workflow **Backend Critical Tests**.
+5. Clique em **Run workflow** para executar manualmente.
+6. Abra os logs para validar `prisma generate`, `migrate deploy` e os testes críticos.
+
+Regras de segurança:
+- Nunca usar banco de produção nos testes.
+- O workflow falha com mensagem clara se `TEST_DATABASE_URL` não estiver configurado.
+- O workflow roda somente manualmente (`workflow_dispatch`) para evitar execução acidental.

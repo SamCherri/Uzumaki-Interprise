@@ -13,7 +13,9 @@
     "prisma:migrate:dev": "prisma migrate dev --name init",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:seed:demo": "SEED_DEMO_DATA=true tsx prisma/seed.ts",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "test:critical": "tsx --test tests/*.test.ts",
+    "test:critical:ci": "npm run prisma:generate && prisma migrate deploy && npm run test:critical"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",
