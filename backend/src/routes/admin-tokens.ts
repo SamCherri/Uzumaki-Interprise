@@ -565,7 +565,16 @@ export async function adminTokensRoutes(app: FastifyInstance) {
         },
       };
     } catch (error) {
-      return reply.code(400).send({ message: (error as Error).message });
+      request.log.error({ err: error }, 'company force delete failed');
+
+      const err = error as Error & { code?: string; meta?: unknown };
+
+      return reply.code(400).send({
+        code: 'COMPANY_FORCE_DELETE_FAILED',
+        message: err.message,
+        prismaCode: err.code ?? null,
+        meta: err.meta ?? null,
+      });
     }
   });
 

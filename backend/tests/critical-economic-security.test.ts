@@ -515,6 +515,13 @@ test('force delete de projeto de teste só para SUPER_ADMIN e apaga histórico v
   assert.equal(invalidConfirmation.statusCode, 400, invalidConfirmation.body);
 
   const forceDelete = await app.inject({ method: 'DELETE', url: `/api/admin/companies/${company.id}/force-delete`, headers: { authorization: `Bearer ${superToken}`, 'content-type': 'application/json' }, payload: { reason: 'limpeza de teste completa', confirmation: 'EXCLUIR DEFINITIVAMENTE' } });
+  console.log('FORCE_DELETE_STATUS:', forceDelete.statusCode);
+  console.log('FORCE_DELETE_BODY:', forceDelete.body);
+  try {
+    console.log('FORCE_DELETE_JSON:', forceDelete.json());
+  } catch (error) {
+    console.log('FORCE_DELETE_JSON_PARSE_ERROR:', (error as Error).message);
+  }
   const forceDeletePayload = forceDelete.json();
   assert.equal(forceDelete.statusCode, 200, forceDelete.body);
   assert.equal(forceDeletePayload.company?.id, company.id);
