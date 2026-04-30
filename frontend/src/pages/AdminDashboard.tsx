@@ -194,8 +194,15 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
       {message && <p className="status-message success">{message}</p>}
 
       <div className="admin-mobile-menu-row mobile-only">
-        <button className="hamburger-button mobile-only" type="button" onClick={() => setIsAdminDrawerOpen(true)} aria-label="Abrir menu admin">☰ Menu Admin</button>
-        <strong>{adminTabLabels[tab]}</strong>
+        <button className="admin-menu-trigger" type="button" onClick={() => setIsAdminDrawerOpen(true)} aria-label="Abrir menu admin">
+          <span className="menu-icon">☰</span>
+          <span>Menu Admin</span>
+        </button>
+
+        <div className="admin-current-tab">
+          <small>Aba atual</small>
+          <strong>{adminTabLabels[tab]}</strong>
+        </div>
       </div>
 
       <SideDrawer title="Menu Admin" subtitle="Acesso rápido às abas" open={isAdminDrawerOpen} onClose={() => setIsAdminDrawerOpen(false)} items={adminDrawerItems} />

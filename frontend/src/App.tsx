@@ -258,7 +258,7 @@ export function App() {
   return (
     <main className="container mobile-app-shell">
       <header className="card app-mobile-topbar">
-        <div className="topbar-row">
+        <div className="topbar-row mobile-topbar-layout">
           {canGoBack ? (
             <button className="back-button desktop-only" onClick={() => setScreen('home')}>
               ← Voltar
@@ -266,11 +266,11 @@ export function App() {
           ) : (
             <span className="back-placeholder desktop-only" />
           )}
+          <button className="hamburger-button mobile-only" type="button" aria-label="Abrir menu" onClick={() => setIsGlobalDrawerOpen(true)}>☰</button>
           <div>
             <h1>RPC Exchange</h1>
             <p className="subtitle">Ambiente de simulação econômica</p>
           </div>
-          <button className="hamburger-button mobile-only" type="button" aria-label="Abrir menu" onClick={() => setIsGlobalDrawerOpen(true)}>☰</button>
           <button className="button-danger small-button desktop-only" onClick={handleLogout}>
             Sair
           </button>
@@ -301,7 +301,20 @@ export function App() {
             </article>
           )}
 
-          <div className="home-grid home-grid-actions nested-card">
+          <section className="card mobile-home-summary mobile-only">
+            <h2>Bem-vindo</h2>
+            <p className="info-text">
+              Use o menu ☰ para navegar pela RPC Exchange.
+            </p>
+
+            <div className="mobile-primary-actions">
+              <button onClick={() => setScreen('markets')}>Mercados</button>
+              <button onClick={() => setScreen('wallet')}>Carteira</button>
+              {roles.canSeeAdmin && <button onClick={() => setScreen('admin')}>Admin</button>}
+            </div>
+          </section>
+
+          <div className="home-grid home-grid-actions nested-card desktop-home-actions desktop-only">
             <button className="home-tile" onClick={() => setScreen('markets')}><span>🪙</span><strong>Mercados</strong><small>Veja ativos disponíveis para negociar.</small></button>
             <button className="home-tile" onClick={() => setScreen('wallet')}><span>💼</span><strong>Carteira</strong><small>Acompanhe seu saldo e seus ativos.</small></button>
             <button className="home-tile" onClick={() => setScreen('withdrawals')}><span>🏧</span><strong>Saque</strong><small>Solicite a retirada de RPC para receber dentro do RP.</small></button>

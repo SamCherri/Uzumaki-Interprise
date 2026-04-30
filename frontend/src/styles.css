@@ -364,6 +364,43 @@ input[type="checkbox"] {
 .side-drawer-item.active { border-color:#93c5fd; background: rgba(37,99,235,.25); }
 .side-drawer-item.danger { border-color:#ef4444; color:#fecaca; }
 
+
+.mobile-home-summary {
+  display: grid;
+  gap: 12px;
+}
+
+.mobile-primary-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.mobile-primary-actions button:last-child:nth-child(3) {
+  grid-column: 1 / -1;
+}
+
+.desktop-home-actions {
+  display: grid;
+}
+
+.mobile-topbar-layout {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-menu-trigger {
+  width: auto;
+  min-width: auto;
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .hamburger-button {
   width: 44px;
   min-width: 44px;
