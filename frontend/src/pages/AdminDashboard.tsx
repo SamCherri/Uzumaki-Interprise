@@ -5,6 +5,7 @@ import { AdminUsersPanel } from './AdminUsersPanel';
 import { AdminTokensPanel } from './AdminTokensPanel';
 import { AdminAuditPanel } from './AdminAuditPanel';
 import { AdminReportsPanel } from './AdminReportsPanel';
+import { SideDrawer, SideDrawerItem } from '../components/SideDrawer';
 
 type Overview = { users: number; companies: number; logs: number; treasuryBalance: string | number };
 type PlatformAccount = { balance: string | number; totalReceivedFees: string | number; totalWithdrawn: string | number; updatedAt: string | null };
@@ -46,6 +47,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
   const [platformWithdrawAmount, setPlatformWithdrawAmount] = useState('');
   const [platformWithdrawReason, setPlatformWithdrawReason] = useState('');
   const [isSubmittingPlatformWithdraw, setIsSubmittingPlatformWithdraw] = useState(false);
+  const [isAdminDrawerOpen, setIsAdminDrawerOpen] = useState(false);
 
   async function load() {
     try {
@@ -68,6 +70,31 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
 
   const roles = currentUserRoles.map((role) => role.toUpperCase());
   const canWithdrawPlatformProfit = roles.includes('SUPER_ADMIN') || roles.includes('COIN_CHIEF_ADMIN');
+  const canIssueRpc = roles.includes('SUPER_ADMIN') || roles.includes('COIN_CHIEF_ADMIN');
+
+  const adminTabLabels: Record<ActiveTab, string> = {
+    overview: 'Visão geral',
+    users: 'Usuários',
+    brokers: 'Corretores',
+    tokens: 'Tokens/Mercados',
+    withdrawals: 'Saques',
+    treasury: 'Tesouraria / Emitir RPC',
+    revenues: 'Receitas',
+    audit: 'Auditoria',
+    reports: 'Relatórios',
+  };
+
+  const adminDrawerItems: SideDrawerItem[] = [
+    { key: 'overview', label: 'Visão geral', active: tab === 'overview', onClick: () => setTab('overview') },
+    { key: 'users', label: 'Usuários', active: tab === 'users', onClick: () => setTab('users') },
+    { key: 'brokers', label: 'Corretores', active: tab === 'brokers', onClick: () => setTab('brokers') },
+    { key: 'tokens', label: 'Tokens/Mercados', active: tab === 'tokens', onClick: () => setTab('tokens') },
+    { key: 'withdrawals', label: 'Saques', active: tab === 'withdrawals', onClick: () => setTab('withdrawals') },
+    { key: 'treasury', label: 'Tesouraria / Emitir RPC', active: tab === 'treasury', onClick: () => setTab('treasury') },
+    { key: 'revenues', label: 'Receitas', active: tab === 'revenues', onClick: () => setTab('revenues') },
+    { key: 'audit', label: 'Auditoria', active: tab === 'audit', onClick: () => setTab('audit') },
+    { key: 'reports', label: 'Relatórios', active: tab === 'reports', onClick: () => setTab('reports') },
+  ];
 
   async function submitIssuance(event: FormEvent) {
     event.preventDefault();
@@ -166,7 +193,14 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
       {error && <p className="status-message error">{error}</p>}
       {message && <p className="status-message success">{message}</p>}
 
-      <nav className="pill-nav nested-card">
+      <div className="admin-mobile-menu-row mobile-only">
+        <button className="hamburger-button mobile-only" type="button" onClick={() => setIsAdminDrawerOpen(true)} aria-label="Abrir menu admin">☰ Menu Admin</button>
+        <strong>{adminTabLabels[tab]}</strong>
+      </div>
+
+      <SideDrawer title="Menu Admin" subtitle="Acesso rápido às abas" open={isAdminDrawerOpen} onClose={() => setIsAdminDrawerOpen(false)} items={adminDrawerItems} />
+
+      <nav className="pill-nav nested-card admin-nav desktop-only">
         <button className={tab === 'overview' ? 'pill active' : 'pill'} onClick={() => setTab('overview')}>Visão geral</button>
         <button className={tab === 'users' ? 'pill active' : 'pill'} onClick={() => setTab('users')}>Usuários</button>
         <button className={tab === 'brokers' ? 'pill active' : 'pill'} onClick={() => setTab('brokers')}>Corretores</button>
@@ -184,6 +218,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
           <div className="summary-item"><span className="summary-label">Mercados listados</span><strong className="summary-value">{data.companies}</strong></div>
           <div className="summary-item"><span className="summary-label">Logs</span><strong className="summary-value">{data.logs}</strong></div>
           <div className="summary-item"><span className="summary-label">Tesouraria RPC</span><strong className="summary-value">{data.treasuryBalance}</strong></div>
+          <button className="home-tile" type="button" onClick={() => setTab('treasury')}><span>🪙</span><strong>Tesouraria / Emitir RPC</strong><small>Acessar emissão e transferências administrativas.</small></button>
         </div>
       )}
 
@@ -194,12 +229,17 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
 
       {tab === 'treasury' && (
         <>
-          <h3 className="nested-card">Emitir RPC</h3>
+          <h3 className="nested-card">Emitir RPC na Tesouraria</h3>
+          <p className="info-text">Cria nova moeda RPC fictícia na tesouraria do sistema. Use apenas para controle administrativo do RP.</p>
+          {canIssueRpc ? (
           <form onSubmit={submitIssuance} className="form-grid">
             <input value={issuanceAmount} onChange={(e) => setIssuanceAmount(e.target.value)} placeholder="Quantidade" required />
             <input value={issuanceReason} onChange={(e) => setIssuanceReason(e.target.value)} placeholder="Motivo" required />
             <button className="button-primary" type="submit" disabled={isSubmittingIssuance}>{isSubmittingIssuance ? 'Processando...' : 'Emitir RPC'}</button>
           </form>
+          ) : (
+            <p className="status-message error">Você pode acessar a tesouraria, mas apenas SUPER_ADMIN ou ADM Chefe da Moeda pode emitir RPC.</p>
+          )}
 
           <h3 className="nested-card">Enviar RPC para corretor</h3>
           <form onSubmit={submitBrokerTransfer} className="form-grid">

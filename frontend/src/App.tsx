@@ -9,6 +9,7 @@ import { CompaniesPage } from './pages/CompaniesPage';
 import { WithdrawalsPage } from './pages/WithdrawalsPage';
 import { ProjectOwnerPanel } from './pages/ProjectOwnerPanel';
 import { api, getCurrentUser, CurrentUserResponse } from './services/api';
+import { SideDrawer, SideDrawerItem } from './components/SideDrawer';
 
 type PublicTab = 'login' | 'register';
 type PrivateScreen = 'home' | 'markets' | 'wallet' | 'withdrawals' | 'company-request' | 'admin' | 'broker' | 'my-projects';
@@ -69,6 +70,7 @@ export function App() {
   const [installHint, setInstallHint] = useState('');
   const [hasOwnedProjects, setHasOwnedProjects] = useState(false);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [isGlobalDrawerOpen, setIsGlobalDrawerOpen] = useState(false);
 
   const tokenRoles = useMemo(() => decodeRolesFromToken(token), [token]);
   const roles = useMemo(() => {
@@ -184,6 +186,23 @@ export function App() {
 
   const showInstallCard = !isInstalled;
 
+  const globalDrawerItems = useMemo<SideDrawerItem[]>(() => {
+    const items: SideDrawerItem[] = [
+      { key: 'home', label: 'Início', icon: '🏠', active: screen === 'home', onClick: () => setScreen('home') },
+      { key: 'markets', label: 'Mercados', icon: '🪙', active: screen === 'markets', onClick: () => setScreen('markets') },
+      { key: 'wallet', label: 'Carteira', icon: '💼', active: screen === 'wallet', onClick: () => setScreen('wallet') },
+      { key: 'withdrawals', label: 'Saque', icon: '🏧', active: screen === 'withdrawals', onClick: () => setScreen('withdrawals') },
+      { key: 'company-request', label: 'Criar token', icon: '🚀', active: screen === 'company-request', onClick: () => setScreen('company-request') },
+    ];
+
+    if (canSeeMyProjects) items.push({ key: 'my-projects', label: 'Meus Projetos', icon: '📊', active: screen === 'my-projects', onClick: () => setScreen('my-projects') });
+    if (roles.canSeeAdmin) items.push({ key: 'admin', label: 'Admin', icon: '🛠️', active: screen === 'admin', onClick: () => setScreen('admin') });
+    if (roles.canSeeBroker) items.push({ key: 'broker', label: 'Corretor', icon: '🤝', active: screen === 'broker', onClick: () => setScreen('broker') });
+
+    items.push({ key: 'logout', label: 'Sair', icon: '🚪', danger: true, onClick: handleLogout });
+    return items;
+  }, [canSeeMyProjects, roles.canSeeAdmin, roles.canSeeBroker, screen]);
+
   if (!token) {
     return (
       <main className="container auth-shell">
@@ -241,21 +260,30 @@ export function App() {
       <header className="card app-mobile-topbar">
         <div className="topbar-row">
           {canGoBack ? (
-            <button className="back-button" onClick={() => setScreen('home')}>
+            <button className="back-button desktop-only" onClick={() => setScreen('home')}>
               ← Voltar
             </button>
           ) : (
-            <span className="back-placeholder" />
+            <span className="back-placeholder desktop-only" />
           )}
           <div>
             <h1>RPC Exchange</h1>
             <p className="subtitle">Ambiente de simulação econômica</p>
           </div>
-          <button className="button-danger small-button" onClick={handleLogout}>
+          <button className="hamburger-button mobile-only" type="button" aria-label="Abrir menu" onClick={() => setIsGlobalDrawerOpen(true)}>☰</button>
+          <button className="button-danger small-button desktop-only" onClick={handleLogout}>
             Sair
           </button>
         </div>
       </header>
+
+      <SideDrawer
+        title="Menu principal"
+        subtitle="Navegação rápida da RPC Exchange"
+        open={isGlobalDrawerOpen}
+        onClose={() => setIsGlobalDrawerOpen(false)}
+        items={globalDrawerItems}
+      />
 
       {screen === 'home' && (
         <section className="card">
