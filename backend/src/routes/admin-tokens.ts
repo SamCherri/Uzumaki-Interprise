@@ -23,6 +23,28 @@ function splitShares(totalTokens: number, ownerPercent: number) {
   return { ownerShares, publicOfferShares };
 }
 
+
+
+function isSuperAdmin(roles: string[]) {
+  return roles.includes('SUPER_ADMIN');
+}
+
+async function getCompanyDeleteCounts(companyId: string, tx: Prisma.TransactionClient | typeof prisma = prisma) {
+  const [holdings, operations, initialOffer, marketOrders, trades, feeDistributions, revenueAccounts, boostAccounts, boostInjections] = await Promise.all([
+    tx.companyHolding.count({ where: { companyId } }),
+    tx.companyOperation.count({ where: { companyId } }),
+    tx.companyInitialOffer.count({ where: { companyId } }),
+    tx.marketOrder.count({ where: { companyId } }),
+    tx.trade.count({ where: { companyId } }),
+    tx.feeDistribution.count({ where: { companyId } }),
+    tx.companyRevenueAccount.count({ where: { companyId } }),
+    tx.companyBoostAccount.count({ where: { companyId } }),
+    tx.companyBoostInjection.count({ where: { companyId } }),
+  ]);
+
+  return { holdings, operations, initialOffer, marketOrders, trades, feeDistributions, revenueAccounts, boostAccounts, boostInjections };
+}
+
 function hasEconomicHistory(company: {
   trades: number;
   orders: number;
@@ -413,6 +435,116 @@ export async function adminTokensRoutes(app: FastifyInstance) {
       });
 
       return { message: 'Mercado encerrado com cancelamento de ordens abertas.' };
+    } catch (error) {
+      return reply.code(400).send({ message: (error as Error).message });
+    }
+  });
+
+  app.get('/companies/:id/delete-summary', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authRequest = request as AuthRequest;
+    const roles = authRequest.user.roles ?? [];
+    if (!isSuperAdmin(roles)) {
+      return reply.code(403).send({ message: 'Somente SUPER_ADMIN pode executar exclusão definitiva forçada.' });
+    }
+
+    const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+    const company = await prisma.company.findUnique({ where: { id }, select: { id: true, ticker: true, name: true, status: true } });
+    if (!company) return reply.code(404).send({ message: 'Mercado não encontrado.' });
+
+    const counts = await getCompanyDeleteCounts(id);
+    return { company, counts };
+  });
+
+  app.delete('/companies/:id/force-delete', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authRequest = request as AuthRequest;
+    const roles = authRequest.user.roles ?? [];
+    if (!isSuperAdmin(roles)) {
+      return reply.code(403).send({ message: 'Somente SUPER_ADMIN pode executar exclusão definitiva forçada.' });
+    }
+
+    try {
+      const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+      const body = z.object({
+        confirmation: z.string(),
+        reason: z.string().min(10, 'Motivo deve ter pelo menos 10 caracteres.'),
+      }).parse(request.body);
+
+      if (body.confirmation !== 'EXCLUIR DEFINITIVAMENTE') {
+        return reply.code(400).send({ message: 'Confirmação inválida. Digite EXCLUIR DEFINITIVAMENTE.' });
+      }
+
+      const company = await prisma.company.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          ticker: true,
+          name: true,
+          status: true,
+          founderUserId: true,
+          currentPrice: true,
+          totalShares: true,
+        },
+      });
+      if (!company) return reply.code(404).send({ message: 'Mercado não encontrado.' });
+
+      const deletedCounts = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const counts = await getCompanyDeleteCounts(id, tx);
+
+        await tx.feeDistribution.deleteMany({ where: { companyId: id } });
+        await tx.companyBoostInjection.deleteMany({ where: { companyId: id } });
+        await tx.companyBoostAccount.deleteMany({ where: { companyId: id } });
+        await tx.companyRevenueAccount.deleteMany({ where: { companyId: id } });
+        await tx.trade.deleteMany({ where: { companyId: id } });
+        await tx.marketOrder.deleteMany({ where: { companyId: id } });
+        await tx.companyOperation.deleteMany({ where: { companyId: id } });
+        await tx.companyInitialOffer.deleteMany({ where: { companyId: id } });
+        await tx.companyHolding.deleteMany({ where: { companyId: id } });
+        await tx.company.delete({ where: { id } });
+
+        await tx.adminLog.create({
+          data: {
+            userId: authRequest.user.sub,
+            action: 'COMPANY_FORCE_DELETED',
+            entity: 'Company',
+            reason: body.reason,
+            previous: JSON.stringify({
+              company,
+              deletedCounts: {
+                feeDistributions: counts.feeDistributions,
+                boostInjections: counts.boostInjections,
+                boostAccounts: counts.boostAccounts,
+                revenueAccounts: counts.revenueAccounts,
+                trades: counts.trades,
+                marketOrders: counts.marketOrders,
+                operations: counts.operations,
+                initialOffers: counts.initialOffer,
+                holdings: counts.holdings,
+              },
+            }),
+            current: JSON.stringify({ deleted: true, companyId: id, confirmation: body.confirmation }),
+            ip: request.ip,
+            userAgent: request.headers['user-agent'] ?? null,
+          },
+        });
+
+        return counts;
+      });
+
+      return {
+        message: 'Projeto/token excluído definitivamente.',
+        company: { id: company.id, ticker: company.ticker, name: company.name },
+        deletedCounts: {
+          holdings: deletedCounts.holdings,
+          operations: deletedCounts.operations,
+          initialOffer: deletedCounts.initialOffer,
+          marketOrders: deletedCounts.marketOrders,
+          trades: deletedCounts.trades,
+          feeDistributions: deletedCounts.feeDistributions,
+          revenueAccount: deletedCounts.revenueAccounts,
+          boostAccount: deletedCounts.boostAccounts,
+          boostInjections: deletedCounts.boostInjections,
+        },
+      };
     } catch (error) {
       return reply.code(400).send({ message: (error as Error).message });
     }
