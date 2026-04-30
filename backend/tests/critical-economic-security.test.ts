@@ -431,3 +431,70 @@ test('projeto desligado bloqueia rotas públicas de mercado sem apagar históric
   assert.ok(ordersCount >= 0);
   assert.ok(tradesCount >= 0);
 });
+
+test('force delete de projeto de teste só para SUPER_ADMIN e apaga histórico vinculado', async () => {
+  await resetDb();
+
+  const rSuper = await mkRole('SUPER_ADMIN');
+  const rAdmin = await mkRole('ADMIN');
+  const rChief = await mkRole('COIN_CHIEF_ADMIN');
+  const rUser = await mkRole('USER');
+
+  const superAdmin = await mkUser('super-force@test.local');
+  const admin = await mkUser('admin-force@test.local');
+  const chief = await mkUser('chief-force@test.local');
+  const user = await mkUser('user-force@test.local');
+
+  await prisma.userRole.createMany({ data: [
+    { userId: superAdmin.id, roleId: rSuper.id },
+    { userId: admin.id, roleId: rAdmin.id },
+    { userId: chief.id, roleId: rChief.id },
+    { userId: user.id, roleId: rUser.id },
+  ] });
+
+  const company = await prisma.company.create({
+    data: {
+      name: 'Projeto Teste', ticker: 'FORCE1', description: 'desc', sector: 'setor', founderUserId: user.id, status: 'CLOSED', totalShares: 1000,
+      circulatingShares: 100, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 500,
+      initialPrice: 10, currentPrice: 12, buyFeePercent: 2, sellFeePercent: 1, fictitiousMarketCap: 12000, approvedAt: new Date(),
+    },
+  });
+
+  await prisma.companyHolding.create({ data: { userId: user.id, companyId: company.id, shares: 10, averageBuyPrice: 10, estimatedValue: 120 } });
+  await prisma.companyInitialOffer.create({ data: { companyId: company.id, totalShares: 600, availableShares: 500 } });
+  await prisma.companyRevenueAccount.create({ data: { companyId: company.id, balance: 5, totalReceivedFees: 5 } });
+  await prisma.companyBoostAccount.create({ data: { companyId: company.id } });
+  await prisma.companyBoostInjection.create({ data: { companyId: company.id, amount: 3, reason: 'teste' } });
+  const buyOrder = await prisma.marketOrder.create({ data: { userId: user.id, companyId: company.id, type: 'BUY', mode: 'LIMIT', quantity: 5, remainingQuantity: 0, limitPrice: 10, status: 'FILLED', executedQuantity: 5 } });
+  const sellOrder = await prisma.marketOrder.create({ data: { userId: user.id, companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 5, remainingQuantity: 0, limitPrice: 10, status: 'FILLED', executedQuantity: 5 } });
+  const op = await prisma.companyOperation.create({ data: { companyId: company.id, userId: user.id, type: 'TRADE_BUY', description: 'op' } });
+  const trade = await prisma.trade.create({ data: { companyId: company.id, buyOrderId: buyOrder.id, sellOrderId: sellOrder.id, buyerUserId: user.id, sellerUserId: user.id, quantity: 5, unitPrice: 10, totalPrice: 50, buyerFee: 1, sellerFee: 1 } });
+  await prisma.feeDistribution.create({ data: { companyId: company.id, tradeId: trade.id, operationId: op.id, platformAmount: 1, companyAmount: 1, grossAmount: 2 } });
+
+  const userToken = await token(user.id, ['USER']);
+  const adminToken = await token(admin.id, ['ADMIN']);
+  const chiefToken = await token(chief.id, ['COIN_CHIEF_ADMIN']);
+  const superToken = await token(superAdmin.id, ['SUPER_ADMIN']);
+
+  for (const tk of [userToken, adminToken, chiefToken]) {
+    const forbidden = await app.inject({ method: 'DELETE', url: `/api/admin/companies/${company.id}/force-delete`, headers: { authorization: `Bearer ${tk}` }, payload: { reason: 'limpeza de teste completa', confirmation: 'EXCLUIR DEFINITIVAMENTE' } });
+    assert.equal(forbidden.statusCode, 403, forbidden.body);
+  }
+
+  const invalidConfirmation = await app.inject({ method: 'DELETE', url: `/api/admin/companies/${company.id}/force-delete`, headers: { authorization: `Bearer ${superToken}` }, payload: { reason: 'limpeza de teste completa', confirmation: 'ERRADO' } });
+  assert.equal(invalidConfirmation.statusCode, 400, invalidConfirmation.body);
+
+  const forceDelete = await app.inject({ method: 'DELETE', url: `/api/admin/companies/${company.id}/force-delete`, headers: { authorization: `Bearer ${superToken}` }, payload: { reason: 'limpeza de teste completa', confirmation: 'EXCLUIR DEFINITIVAMENTE' } });
+  assert.equal(forceDelete.statusCode, 200, forceDelete.body);
+
+  assert.equal(await prisma.company.count({ where: { id: company.id } }), 0);
+  assert.equal(await prisma.companyHolding.count({ where: { companyId: company.id } }), 0);
+  assert.equal(await prisma.companyOperation.count({ where: { companyId: company.id } }), 0);
+  assert.equal(await prisma.companyInitialOffer.count({ where: { companyId: company.id } }), 0);
+  assert.equal(await prisma.marketOrder.count({ where: { companyId: company.id } }), 0);
+  assert.equal(await prisma.trade.count({ where: { companyId: company.id } }), 0);
+  assert.equal(await prisma.feeDistribution.count({ where: { companyId: company.id } }), 0);
+
+  const forceLog = await prisma.adminLog.findFirst({ where: { action: 'COMPANY_FORCE_DELETED' } });
+  assert.ok(forceLog);
+});

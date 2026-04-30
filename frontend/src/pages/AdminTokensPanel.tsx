@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { AdminActionModal } from '../components/AdminActionModal';
 import { api } from '../services/api';
 import { translateCompanyStatus } from '../utils/labels';
@@ -18,9 +18,10 @@ type TokenRow = {
 type TokenModalState =
   | { type: 'suspend' | 'reactivate' | 'close'; tokenId: string }
   | { type: 'owner'; tokenId: string }
+  | { type: 'forceDelete'; token: TokenRow }
   | null;
 
-export function AdminTokensPanel() {
+export function AdminTokensPanel({ currentUserRoles }: { currentUserRoles: string[] }) {
   const [tokens, setTokens] = useState<TokenRow[]>([]);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
@@ -28,6 +29,7 @@ export function AdminTokensPanel() {
   const [message, setMessage] = useState('');
   const [modalState, setModalState] = useState<TokenModalState>(null);
   const [isSubmittingModal, setIsSubmittingModal] = useState(false);
+  const isSuperAdmin = useMemo(() => currentUserRoles.map((role) => role.toUpperCase()).includes('SUPER_ADMIN'), [currentUserRoles]);
 
   const emptyForm = { founderEmail: '', name: '', ticker: '', description: '', sector: '', totalTokens: '', ownerSharePercent: '', publicOfferPercent: '', initialPrice: '', buyFeePercent: '', sellFeePercent: '' };
   const [form, setForm] = useState(emptyForm);
@@ -66,6 +68,12 @@ export function AdminTokensPanel() {
       if (modalState.type === 'owner') {
         await api(`/admin/tokens/${modalState.tokenId}/owner`, { method: 'PATCH', body: JSON.stringify({ founderEmail: values.founderEmail, reason: values.reason }) });
         setMessage('Dono alterado com sucesso.');
+      } else if (modalState.type === 'forceDelete') {
+        await api(`/admin/companies/${modalState.token.id}/force-delete`, {
+          method: 'DELETE',
+          body: JSON.stringify({ reason: values.reason, confirmation: values.confirmation }),
+        });
+        setMessage('Projeto/token excluído definitivamente.');
       } else {
         await api(`/admin/tokens/${modalState.tokenId}/${modalState.type}`, { method: 'PATCH', body: JSON.stringify({ reason: values.reason }) });
         setMessage('Ação executada com sucesso.');
@@ -113,14 +121,14 @@ export function AdminTokensPanel() {
         <button className="button-success" type="submit">Criar token</button>
       </form>
 
-      <div className="mobile-card-list nested-card">{tokens.map((token) => (<article key={token.id} className="summary-item compact-card"><strong>{token.name} ({token.ticker})</strong><p>Status: {translateCompanyStatus(token.status)}</p><p>Dono: {token.founder.name} ({token.founder.email})</p><p>Preço atual: {token.currentPrice}</p><p>Total tokens: {token.totalTokens} · Disponível: {token.availableTokens}</p><div className="action-grid">{token.status === 'PENDING' && <><button className="button-success" type="button" onClick={() => approveOrRejectToken(token.id, 'approve')}>Aprovar listagem</button><button className="button-danger" type="button" onClick={() => approveOrRejectToken(token.id, 'reject')}>Rejeitar listagem</button></>}{token.status === 'ACTIVE' && <><button className="button-primary" type="button" onClick={() => setModalState({ type: 'suspend', tokenId: token.id })}>Pausar mercado</button><button className="button-danger" type="button" onClick={() => setModalState({ type: 'close', tokenId: token.id })}>Encerrar mercado</button><button className="button-primary" type="button" onClick={() => setModalState({ type: 'owner', tokenId: token.id })}>Trocar dono</button></>}{token.status === 'SUSPENDED' && <><button className="button-success" type="button" onClick={() => setModalState({ type: 'reactivate', tokenId: token.id })}>Reativar mercado</button><button className="button-danger" type="button" onClick={() => setModalState({ type: 'close', tokenId: token.id })}>Encerrar mercado</button><button className="button-primary" type="button" onClick={() => setModalState({ type: 'owner', tokenId: token.id })}>Trocar dono</button></>}{token.status === 'CLOSED' && <><button className="button-danger" type="button" onClick={() => deleteToken(token.id)}>Excluir definitivamente</button><p className="info-text">A exclusão só é permitida se o backend confirmar ausência de histórico econômico.</p></>}</div></article>))}</div>
+      <div className="mobile-card-list nested-card">{tokens.map((token) => (<article key={token.id} className="summary-item compact-card"><strong>{token.name} ({token.ticker})</strong><p>Status: {translateCompanyStatus(token.status)}</p><p>Dono: {token.founder.name} ({token.founder.email})</p><p>Preço atual: {token.currentPrice}</p><p>Total tokens: {token.totalTokens} · Disponível: {token.availableTokens}</p><div className="action-grid">{token.status === 'PENDING' && <><button className="button-success" type="button" onClick={() => approveOrRejectToken(token.id, 'approve')}>Aprovar listagem</button><button className="button-danger" type="button" onClick={() => approveOrRejectToken(token.id, 'reject')}>Rejeitar listagem</button></>}{token.status === 'ACTIVE' && <><button className="button-primary" type="button" onClick={() => setModalState({ type: 'suspend', tokenId: token.id })}>Pausar mercado</button><button className="button-danger" type="button" onClick={() => setModalState({ type: 'close', tokenId: token.id })}>Encerrar mercado</button><button className="button-primary" type="button" onClick={() => setModalState({ type: 'owner', tokenId: token.id })}>Trocar dono</button></>}{token.status === 'SUSPENDED' && <><button className="button-success" type="button" onClick={() => setModalState({ type: 'reactivate', tokenId: token.id })}>Reativar mercado</button><button className="button-danger" type="button" onClick={() => setModalState({ type: 'close', tokenId: token.id })}>Encerrar mercado</button><button className="button-primary" type="button" onClick={() => setModalState({ type: 'owner', tokenId: token.id })}>Trocar dono</button></>}{token.status === 'CLOSED' && <><button className="button-danger" type="button" onClick={() => deleteToken(token.id)}>Excluir definitivamente</button><p className="info-text">A exclusão só é permitida se o backend confirmar ausência de histórico econômico.</p>{isSuperAdmin && <><button className="button-danger" type="button" onClick={() => setModalState({ type: 'forceDelete', token })}>Excluir teste definitivamente</button><p className="info-text">Ação irreversível para limpeza de dados de teste com histórico.</p></>}</>}</div></article>))}</div>
       {modalState && (
         <AdminActionModal
-          title={modalState.type === 'suspend' ? 'Suspender projeto' : modalState.type === 'reactivate' ? 'Reativar projeto' : modalState.type === 'close' ? 'Encerrar projeto' : 'Trocar dono do projeto'}
-          description={modalState.type === 'suspend' ? 'Informe o motivo da suspensão. O projeto sairá das telas comuns.' : modalState.type === 'reactivate' ? 'Informe o motivo da reativação. O projeto voltará às telas comuns se estiver ativo.' : modalState.type === 'close' ? 'Esta ação encerra o mercado/projeto. Confirme com um motivo claro.' : 'Informe o e-mail do novo dono e o motivo da alteração.'}
-          confirmLabel={modalState.type === 'owner' ? 'Trocar dono' : modalState.type === 'suspend' ? 'Suspender projeto' : modalState.type === 'reactivate' ? 'Reativar projeto' : 'Encerrar projeto'}
-          danger={modalState.type === 'close'}
-          fields={modalState.type === 'owner' ? [{ name: 'founderEmail', label: 'E-mail do novo dono', type: 'email', required: true, placeholder: 'email@projeto.com' }, { name: 'reason', label: 'Motivo', type: 'textarea', required: true, placeholder: 'Descreva o motivo da alteração' }] : [{ name: 'reason', label: 'Motivo', type: 'textarea', required: true, placeholder: 'Descreva o motivo' }]}
+          title={modalState.type === 'suspend' ? 'Suspender projeto' : modalState.type === 'reactivate' ? 'Reativar projeto' : modalState.type === 'close' ? 'Encerrar projeto' : modalState.type === 'forceDelete' ? 'Excluir teste definitivamente' : 'Trocar dono do projeto'}
+          description={modalState.type === 'suspend' ? 'Informe o motivo da suspensão. O projeto sairá das telas comuns.' : modalState.type === 'reactivate' ? 'Informe o motivo da reativação. O projeto voltará às telas comuns se estiver ativo.' : modalState.type === 'close' ? 'Esta ação encerra o mercado/projeto. Confirme com um motivo claro.' : modalState.type === 'forceDelete' ? `Esta ação apagará o projeto ${modalState.token.name} (${modalState.token.ticker}) e todo histórico vinculado. Use apenas para dados de teste.` : 'Informe o e-mail do novo dono e o motivo da alteração.'}
+          confirmLabel={modalState.type === 'owner' ? 'Trocar dono' : modalState.type === 'suspend' ? 'Suspender projeto' : modalState.type === 'reactivate' ? 'Reativar projeto' : modalState.type === 'forceDelete' ? 'Excluir teste definitivamente' : 'Encerrar projeto'}
+          danger={modalState.type === 'close' || modalState.type === 'forceDelete'}
+          fields={modalState.type === 'owner' ? [{ name: 'founderEmail', label: 'E-mail do novo dono', type: 'email', required: true, placeholder: 'email@projeto.com' }, { name: 'reason', label: 'Motivo', type: 'textarea', required: true, placeholder: 'Descreva o motivo da alteração' }] : modalState.type === 'forceDelete' ? [{ name: 'reason', label: 'Motivo (mínimo 10 caracteres)', type: 'textarea', required: true, placeholder: 'Descreva detalhadamente o motivo da exclusão de teste', minLength: 10 }, { name: 'confirmation', label: 'Confirmação', type: 'text', required: true, placeholder: 'Digite EXCLUIR DEFINITIVAMENTE', pattern: '^EXCLUIR DEFINITIVAMENTE$' }] : [{ name: 'reason', label: 'Motivo', type: 'textarea', required: true, placeholder: 'Descreva o motivo' }]}
           onCancel={() => setModalState(null)}
           onConfirm={submitTokenAction}
           isSubmitting={isSubmittingModal}

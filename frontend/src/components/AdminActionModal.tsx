@@ -6,6 +6,8 @@ type Field = {
   type?: 'text' | 'email' | 'number' | 'textarea';
   required?: boolean;
   placeholder?: string;
+  minLength?: number;
+  pattern?: string;
 };
 
 type Props = {
@@ -49,6 +51,14 @@ export function AdminActionModal({
     setError('');
   }, [initialState]);
 
+  const hasInvalidRequiredField = fields.some((field) => {
+    const value = (values[field.name] ?? '').trim();
+    if (field.required && !value) return true;
+    if (field.minLength && value.length < field.minLength) return true;
+    if (field.pattern && !(new RegExp(field.pattern).test(value))) return true;
+    return false;
+  });
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError('');
@@ -79,6 +89,7 @@ export function AdminActionModal({
                     placeholder={field.placeholder}
                     required={field.required}
                     disabled={isSubmitting}
+                    minLength={field.minLength}
                   />
                 ) : (
                   <input
@@ -88,6 +99,8 @@ export function AdminActionModal({
                     placeholder={field.placeholder}
                     required={field.required}
                     disabled={isSubmitting}
+                    minLength={field.minLength}
+                    pattern={field.pattern}
                   />
                 )}
               </label>
@@ -97,7 +110,7 @@ export function AdminActionModal({
         </div>
         <footer className="admin-modal-footer">
           <button type="button" onClick={onCancel} disabled={isSubmitting}>{cancelLabel}</button>
-          <button type="submit" className={danger ? 'button-danger' : 'button-primary'} disabled={isSubmitting}>{isSubmitting ? 'Enviando...' : confirmLabel}</button>
+          <button type="submit" className={danger ? 'button-danger' : 'button-primary'} disabled={isSubmitting || hasInvalidRequiredField}>{isSubmitting ? 'Enviando...' : confirmLabel}</button>
         </footer>
       </form>
     </div>
