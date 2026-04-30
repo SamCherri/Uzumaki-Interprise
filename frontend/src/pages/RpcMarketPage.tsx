@@ -34,18 +34,25 @@ export function RpcMarketPage() {
 
   async function load() {
     setIsLoading(true);
-    const [marketData, tradesData, me] = await Promise.all([
-      api<MarketState>('/rpc-market'),
-      api<{ trades: Trade[] }>('/rpc-market/trades?limit=200'),
-      api<{ wallet: { fiatAvailableBalance: string; rpcAvailableBalance: string } }>('/auth/me'),
-    ]);
-    setMarket(marketData);
-    setTrades(tradesData.trades);
-    setWallet(me.wallet);
-    setIsLoading(false);
+    try {
+      const [marketData, tradesData, me] = await Promise.all([
+        api<MarketState>('/rpc-market'),
+        api<{ trades: Trade[] }>('/rpc-market/trades?limit=200'),
+        api<{ wallet: { fiatAvailableBalance: string; rpcAvailableBalance: string } }>('/auth/me'),
+      ]);
+      setMarket(marketData);
+      setTrades(tradesData.trades);
+      setWallet(me.wallet);
+      return true;
+    } catch (err) {
+      setError((err as Error).message);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
   }
 
-  useEffect(() => { load().catch((err: Error) => { setError(err.message); setIsLoading(false); }); }, []);
+  useEffect(() => { void load(); }, []);
 
   useEffect(() => {
     const id = setTimeout(async () => {
@@ -106,8 +113,37 @@ export function RpcMarketPage() {
   const variationAbs = chart.last - chart.first;
   const variationPercent = chart.first > 0 ? (variationAbs / chart.first) * 100 : 0;
 
-  async function onBuy(event: FormEvent) { event.preventDefault(); setError(''); setMessage(''); try { const response = await api<{ message: string }>('/rpc-market/buy', { method: 'POST', body: JSON.stringify({ fiatAmount }) }); setMessage(response.message); setFiatAmount(''); setBuyQuote(null); await load(); } catch (err) { setError((err as Error).message); } }
-  async function onSell(event: FormEvent) { event.preventDefault(); setError(''); setMessage(''); try { const response = await api<{ message: string }>('/rpc-market/sell', { method: 'POST', body: JSON.stringify({ rpcAmount }) }); setMessage(response.message); setRpcAmount(''); setSellQuote(null); await load(); } catch (err) { setError((err as Error).message); } }
+  async function onBuy(event: FormEvent) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+    try {
+      const response = await api<{ message: string }>('/rpc-market/buy', { method: 'POST', body: JSON.stringify({ fiatAmount }) });
+      setMessage(response.message);
+      setFiatAmount('');
+      setBuyQuote(null);
+      const refreshed = await load();
+      if (!refreshed) setError((prev) => prev || 'Compra concluída, mas não foi possível atualizar os dados do mercado.');
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function onSell(event: FormEvent) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+    try {
+      const response = await api<{ message: string }>('/rpc-market/sell', { method: 'POST', body: JSON.stringify({ rpcAmount }) });
+      setMessage(response.message);
+      setRpcAmount('');
+      setSellQuote(null);
+      const refreshed = await load();
+      if (!refreshed) setError((prev) => prev || 'Venda concluída, mas não foi possível atualizar os dados do mercado.');
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
 
   return (
     <section className="card market-page market-shell">
