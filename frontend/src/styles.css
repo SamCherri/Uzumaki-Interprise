@@ -107,7 +107,9 @@ button { cursor: pointer; font-weight: 700; }
 .chart-wrap { border: 1px solid #334155; border-radius: 12px; padding: 8px; min-height: 220px; background: linear-gradient(180deg, #0f172a, #1e293b); }
 .line-chart { width: 100%; height: 220px; display: block; }
 .chart-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
-.chart-meta span { color: #94a3b8; font-size: 0.8rem; }
+.chart-meta div { min-width: 0; border: 1px solid #334155; border-radius: 12px; padding: 8px; background: rgba(15,23,42,.55); }
+.chart-meta span { display:block; color: #94a3b8; font-size: .72rem; }
+.chart-meta strong { display:block; font-size:.86rem; word-break: break-word; line-height:1.25; }
 
 .sell-side { border-color: #f97316; background: rgba(249, 115, 22, 0.12); }
 .buy-side { border-color: #22c55e; background: rgba(34, 197, 94, 0.12); }
@@ -219,9 +221,10 @@ button { cursor: pointer; font-weight: 700; }
 .market-top-tabs, .chart-timeframes, .indicator-tabs, .chart-action-bar { display:flex; gap:8px; overflow-x:auto; }
 .market-mobile-tabs .quick-pill, .chart-timeframes .quick-pill, .indicator-tabs .quick-pill { min-width: 0; }
 .modern-chart-shell { padding-right: 8px; width: 100%; max-width: 100%; overflow-x: hidden; }
-.price-scale-label { font-size:2.2px; fill:#94a3b8; }
+.price-scale-label { font-size:2.6px; fill:#cbd5e1; dominant-baseline: middle; }
 .current-price-line { stroke:#fbbf24; stroke-width:.7; stroke-dasharray:2 2; }
-.current-price-badge { fill:#fbbf24; }
+.current-price-badge { fill:#fbbf24; opacity:.96; }
+.current-price-badge-text { font-size:2.05px; fill:#0f172a; font-weight:700; }
 .volume-mini-chart .volume-bars { display:flex; align-items:flex-end; gap:4px; min-height:64px; }
 .volume-mini-chart .volume-bars div { flex:1; background:rgba(34,197,94,.55); border-radius:4px 4px 0 0; }
 .book-strength-bar { display:flex; border:1px solid #334155; border-radius:999px; overflow:hidden; margin:10px 0; font-size:.78rem; }
@@ -252,10 +255,14 @@ button { cursor: pointer; font-weight: 700; }
   .market-mobile-tabs .quick-pill { min-width: 0; width: 100%; padding: 8px 6px; font-size: .82rem; }
   .chart-timeframes { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; overflow-x: visible; }
   .chart-timeframes .quick-pill { min-width: 0; width: 100%; padding: 8px 4px; font-size: .8rem; }
-  .market-price-tab .chart-wrap { min-height: 260px; max-height: 320px; width: 100%; }
-  .line-chart { width: 100%; max-width: 100%; }
+  .market-price-tab .chart-wrap { min-height: 240px; max-height: 280px; width: 100%; }
+  .line-chart { width: 100%; max-width: 100%; height: 248px; }
   .modern-chart-shell { padding-right: 8px; }
-  .price-scale-label { font-size: 2.8px; }
+  .price-scale-label { font-size: 3px; }
+  .current-price-badge-text { display:none; }
+  .chart-meta { gap: 8px; margin-top: 12px; }
+  .chart-meta div { padding: 8px; }
+  .market-price-tab .info-text { margin-top: 10px; font-size: .78rem; line-height: 1.35; }
   .current-price-badge { opacity: .95; }
   .mobile-trade-actions { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; background: rgba(2,6,23,.95); border-top: 1px solid #334155; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 100%; overflow-x: hidden; }
   .mobile-trade-actions button { min-height: 50px; }
