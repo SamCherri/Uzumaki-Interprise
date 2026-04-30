@@ -267,9 +267,9 @@ export function App() {
             <span className="back-placeholder desktop-only" />
           )}
           <button className="hamburger-button mobile-only" type="button" aria-label="Abrir menu" onClick={() => setIsGlobalDrawerOpen(true)}>☰</button>
-          <div>
+          <div className="mobile-topbar-title">
             <h1>RPC Exchange</h1>
-            <p className="subtitle">Ambiente de simulação econômica</p>
+            <p className="subtitle">Simulação econômica RP</p>
           </div>
           <button className="button-danger small-button desktop-only" onClick={handleLogout}>
             Sair
@@ -287,11 +287,8 @@ export function App() {
 
       {screen === 'home' && (
         <section className="card">
-          <h2>Bem-vindo à RPC Exchange</h2>
-          <p className="info-text">Negocie tokens criados por usuários com RPC.</p>
-
           {showInstallCard && (
-            <article className="summary-item install-card nested-card">
+            <article className="summary-item install-card">
               <h3>📲 Instalar aplicativo</h3>
               <p className="info-text">Use a RPC Exchange como app no celular.</p>
               <button className="button-primary" onClick={handleInstallClick} type="button">
@@ -301,18 +298,41 @@ export function App() {
             </article>
           )}
 
-          <section className="card mobile-home-summary mobile-only">
-            <h2>Bem-vindo</h2>
-            <p className="info-text">
-              Use o menu ☰ para navegar pela RPC Exchange.
-            </p>
+          <section className="mobile-home-summary mobile-only">
+            <div className="mobile-hero-card">
+              <span className="mobile-hero-kicker">Painel principal</span>
+              <h2>Bem-vindo à RPC Exchange</h2>
+              <p>Negocie tokens, acompanhe sua carteira e acesse seus painéis pelo menu.</p>
+            </div>
 
             <div className="mobile-primary-actions">
-              <button onClick={() => setScreen('markets')}>Mercados</button>
-              <button onClick={() => setScreen('wallet')}>Carteira</button>
-              {roles.canSeeAdmin && <button onClick={() => setScreen('admin')}>Admin</button>}
+              <button className="mobile-action-card" onClick={() => setScreen('markets')}>
+                <span>🪙</span>
+                <strong>Mercados</strong>
+                <small>Comprar e vender tokens</small>
+              </button>
+              <button className="mobile-action-card" onClick={() => setScreen('wallet')}>
+                <span>💼</span>
+                <strong>Carteira</strong>
+                <small>Saldo e ativos</small>
+              </button>
+              {roles.canSeeAdmin && (
+                <button className="mobile-action-card mobile-action-wide" onClick={() => setScreen('admin')}>
+                  <span>🛠️</span>
+                  <strong>Admin</strong>
+                  <small>Tesouraria, usuários e auditoria</small>
+                </button>
+              )}
+            </div>
+
+            <div className="mobile-menu-hint">
+              <span>☰</span>
+              <p>Use o menu lateral para acessar Saque, Criar token, Projetos, Corretor e Sair.</p>
             </div>
           </section>
+
+          <h2 className="desktop-only">Bem-vindo à RPC Exchange</h2>
+          <p className="info-text desktop-only">Negocie tokens criados por usuários com RPC.</p>
 
           <div className="home-grid home-grid-actions nested-card desktop-home-actions desktop-only">
             <button className="home-tile" onClick={() => setScreen('markets')}><span>🪙</span><strong>Mercados</strong><small>Veja ativos disponíveis para negociar.</small></button>
