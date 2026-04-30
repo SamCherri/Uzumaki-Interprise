@@ -188,3 +188,12 @@ Regras:
 - Exportações são limitadas a 5000 registros por tipo para evitar arquivos gigantes.
 - Relatórios por usuário e corretor exigem userId.
 - CSV não expõe passwordHash nem dados sensíveis desnecessários.
+
+## Testes automatizados críticos
+
+Regras:
+- Testes críticos cobrem saldos, matching, tesouraria, corretor, admin, projetos desligados e CSV.
+- Testes de integração devem usar `TEST_DATABASE_URL`.
+- Testes nunca devem rodar contra banco de produção.
+- Nenhuma regra econômica deve ser alterada apenas para facilitar teste.
+- Matching multi-fill deve continuar protegido contra saldos negativos.
