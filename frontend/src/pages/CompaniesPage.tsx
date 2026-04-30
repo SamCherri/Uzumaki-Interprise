@@ -435,14 +435,15 @@ export function CompaniesPage() {
               </div>
               <div className="chart-meta"><div><span>Atual</span><strong>{formatPrice(chartData.lastPrice)}</strong></div><div><span>Máximo</span><strong>{formatPrice(chartData.maxPrice)}</strong></div><div><span>Mínimo</span><strong>{formatPrice(chartData.minPrice)}</strong></div></div>
               <div className="volume-mini-chart">
-                {trades.length === 0 && <p className="empty-state">Sem volume de negociações ainda.</p>}
+                {trades.length === 0 && <p className="empty-state volume-empty-state">Sem volume ainda</p>}
                 {trades.length > 0 && <div className="volume-bars">{trades.map((trade) => {
                   const max = Math.max(...trades.map((item) => item.quantity));
                   const height = max > 0 ? Math.max(6, (trade.quantity / max) * 60) : 6;
                   return <div key={trade.id} style={{ height: `${height}px` }} title={`Qtd ${trade.quantity}`} />;
                 })}</div>}
               </div>
-              {chartData.note && <p className="info-text">{chartData.note}</p>}
+              {chartData.note && <p className="info-text chart-empty-note">{chartData.note}</p>}
+              {trades.length === 0 && <div className="chart-empty-elegant"><strong>Aguardando primeiras negociações</strong><span>O gráfico será formado conforme os jogadores negociarem.</span></div>}
             </section>
           )}
           {activeTab === 'livro' && (

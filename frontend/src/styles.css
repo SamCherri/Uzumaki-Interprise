@@ -214,18 +214,18 @@ button { cursor: pointer; font-weight: 700; }
 @media (min-width: 920px) {
   .order-book-grid { grid-template-columns: 1fr 1fr; }
 }
-.market-pair-header { gap: 10px; }
+.market-pair-header { gap: 10px; border: 1px solid rgba(59,130,246,.25); box-shadow: 0 6px 24px rgba(37,99,235,.12); background: linear-gradient(180deg, rgba(15,23,42,.94), rgba(15,23,42,.86)); }
 .market-pair-title { display:flex; align-items:center; gap:8px; }
-.market-price-overview { display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px; }
-.market-stats-row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; font-size:.86rem; color:#cbd5e1; }
+.market-price-overview { display:flex; flex-wrap:wrap; align-items:flex-end; gap:8px; }
+.market-stats-row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; font-size:.78rem; color:#cbd5e1; }
 .market-top-tabs, .chart-timeframes, .indicator-tabs, .chart-action-bar { display:flex; gap:8px; overflow-x:auto; }
 .market-mobile-tabs .quick-pill, .chart-timeframes .quick-pill, .indicator-tabs .quick-pill { min-width: 0; }
-.modern-chart-shell { padding-right: 8px; width: 100%; max-width: 100%; overflow-x: hidden; }
+.modern-chart-shell { padding-right: 8px; width: 100%; max-width: 100%; overflow-x: hidden; background: linear-gradient(180deg, rgba(30,41,59,.22), rgba(15,23,42,.12)); border: 1px solid rgba(148,163,184,.16); border-radius: 14px; }
 .price-scale-label { font-size:2.6px; fill:#cbd5e1; dominant-baseline: middle; }
-.current-price-line { stroke:#fbbf24; stroke-width:.7; stroke-dasharray:2 2; }
+.current-price-line { stroke:#facc15; stroke-width:.6; stroke-dasharray:2 3; opacity:.85; }
 .current-price-badge { fill:#fbbf24; opacity:.96; }
 .current-price-badge-text { font-size:2.05px; fill:#0f172a; font-weight:700; }
-.chart-grid-line { opacity: .55; }
+.chart-grid-line { opacity: .2; }
 .volume-mini-chart .volume-bars { display:flex; align-items:flex-end; gap:4px; min-height:64px; }
 .volume-mini-chart .volume-bars div { flex:1; background:rgba(34,197,94,.55); border-radius:4px 4px 0 0; }
 .book-strength-bar { display:flex; border:1px solid #334155; border-radius:999px; overflow:hidden; margin:10px 0; font-size:.78rem; }
@@ -233,9 +233,25 @@ button { cursor: pointer; font-weight: 700; }
 .book-strength-sell { background:#b45309; padding:6px 8px; text-align:right; }
 .chart-action-bar button { min-height:52px; }
 .trade-panel-backdrop { position:fixed; inset:0; background:rgba(2,6,23,.7); display:flex; align-items:flex-end; z-index:1200; }
-.trade-bottom-sheet { width:100%; max-height:88vh; overflow:auto; background:#0f172a; border:1px solid #334155; border-radius:16px 16px 0 0; padding:14px; display:grid; gap:10px; }
-.trade-panel-header { display:flex; justify-content:space-between; align-items:center; }
+.trade-bottom-sheet { width:100%; max-height:88vh; overflow:auto; background:linear-gradient(180deg, rgba(15,23,42,.98), rgba(15,23,42,.93)); border:1px solid rgba(148,163,184,.24); border-radius:18px 18px 0 0; padding:14px; display:grid; gap:12px; box-shadow: 0 -10px 30px rgba(2,6,23,.35); }
+.trade-panel-header { display:flex; justify-content:space-between; align-items:center; position: relative; padding-top: 12px; }
+.trade-panel-header::before { content:""; width:44px; height:4px; border-radius:999px; background: rgba(148,163,184,.45); position:absolute; top:0; left:50%; transform:translateX(-50%); }
 @media (min-width:920px){ .market-stats-row{grid-template-columns:repeat(3,minmax(0,1fr));} .chart-action-bar button{max-width:220px;} }
+
+
+.market-price-tab { border: 1px solid rgba(148,163,184,.18); box-shadow: 0 10px 24px rgba(2,6,23,.2); }
+.market-price-tab .summary-item { background: rgba(15,23,42,.42); border: 1px solid rgba(148,163,184,.14); }
+.chart-meta { gap: 10px; }
+.chart-meta div { border: 1px solid rgba(148,163,184,.14); background: rgba(15,23,42,.45); border-radius: 10px; }
+.chart-empty-note { font-size: .8rem; color: #94a3b8; margin-top: 8px; }
+.chart-empty-elegant { margin-top: 6px; padding: 10px 12px; border-radius: 10px; background: rgba(30,41,59,.35); border: 1px dashed rgba(148,163,184,.26); display: grid; gap: 4px; }
+.chart-empty-elegant strong { font-size: .83rem; color: #e2e8f0; }
+.chart-empty-elegant span { font-size: .75rem; color: #94a3b8; line-height: 1.35; }
+.volume-empty-state { margin: 0; padding: 8px 10px; min-height: auto; font-size: .78rem; background: rgba(30,41,59,.28); border: 1px solid rgba(148,163,184,.2); border-radius: 8px; display: inline-flex; width: fit-content; }
+.market-mobile-tabs { border: 1px solid rgba(148,163,184,.18); border-radius: 12px; padding: 4px; background: rgba(15,23,42,.7); }
+.market-mobile-tabs .quick-pill { min-height: 34px; font-size: .8rem; }
+.mobile-trade-actions { backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); background: rgba(2,6,23,.82); border-top: 1px solid rgba(148,163,184,.26); box-shadow: 0 -8px 22px rgba(2,6,23,.24); }
+.mobile-trade-actions button { min-height: 46px; border-radius: 12px; box-shadow: 0 4px 12px rgba(2,6,23,.22); }
 
 @media (max-width: 719px) {
   .market-page,
@@ -247,17 +263,18 @@ button { cursor: pointer; font-weight: 700; }
   .modern-chart-shell,
   .chart-wrap { width: 100%; max-width: 100%; overflow-x: hidden; }
   .market-mobile-shell { padding-bottom: 84px; }
-  .market-compact-header { gap: 8px; padding: 14px 12px 12px; }
+  .market-compact-header { gap: 10px; padding: 12px 12px 10px; border-radius: 14px; }
   .market-compact-top { display: flex; align-items: center; gap: 8px; }
-  .market-compact-price { justify-content: space-between; }
-  .market-mini-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); font-size: .8rem; }
+.trade-price-big { font-size: clamp(2rem, 8vw, 2.35rem); line-height: 1.05; }
+  .market-compact-price { justify-content: space-between; align-items: baseline; }
+  .market-mini-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); font-size: .76rem; gap: 6px 10px; }
   .market-mini-stats span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .market-mobile-tabs { position: sticky; top: 0; z-index: 40; background: #0f172a; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; }
-  .market-mobile-tabs .quick-pill { min-width: 0; width: 100%; padding: 8px 6px; font-size: .82rem; }
+  .market-mobile-tabs .quick-pill { min-width: 0; width: 100%; padding: 7px 6px; font-size: .78rem; }
   .chart-timeframes { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; overflow-x: visible; }
   .chart-timeframes .quick-pill { min-width: 0; width: 100%; padding: 8px 4px; font-size: .8rem; }
-  .market-price-tab .chart-wrap { min-height: 240px; max-height: 280px; width: 100%; }
-  .line-chart { width: 100%; max-width: 100%; height: 248px; }
+  .market-price-tab .chart-wrap { min-height: 220px; max-height: 260px; width: 100%; }
+  .line-chart { width: 100%; max-width: 100%; height: 236px; }
   .modern-chart-shell { padding-right: 8px; }
   .price-scale-label { display: none; }
   .current-price-badge,
@@ -265,11 +282,11 @@ button { cursor: pointer; font-weight: 700; }
   .chart-meta { gap: 8px; margin-top: 12px; }
   .chart-meta div { padding: 8px; }
   .market-price-tab .info-text { margin-top: 10px; font-size: .78rem; line-height: 1.35; }
-  .chart-grid-line { opacity: .28; }
-  .mobile-trade-actions { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; background: rgba(2,6,23,.95); border-top: 1px solid #334155; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 100%; overflow-x: hidden; }
-  .mobile-trade-actions button { min-height: 50px; }
+  .chart-grid-line { opacity: .14; }
+  .mobile-trade-actions { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 100%; overflow-x: hidden; }
+  .mobile-trade-actions button { min-height: 44px; }
   .trade-panel-backdrop { padding-bottom: 0; }
-  .trade-bottom-sheet { max-height: 85vh; border-radius: 16px 16px 0 0; padding: 14px; gap: 12px; }
+  .trade-bottom-sheet { max-height: 85vh; border-radius: 18px 18px 0 0; padding: 14px 14px 16px; gap: 12px; }
   .market-book-tab .order-book-grid { grid-template-columns: 1fr; }
   .market-data-grid { display: grid; grid-template-columns: 1fr; gap: 6px; }
 }
