@@ -325,7 +325,7 @@ export async function adminRoutes(app: FastifyInstance) {
             walletId: userWallet.id,
             type: 'ADMIN_TREASURY_FIAT_TRANSFER_IN',
             amount,
-            description: parsed.reason,
+            description: `R$ recebido da tesouraria administrativa - ${parsed.reason}`,
           },
         });
 
@@ -443,10 +443,10 @@ export async function adminRoutes(app: FastifyInstance) {
           },
         });
 
-        const previousAdminWalletBalance = wallet.availableBalance;
+        const previousAdminWalletBalance = wallet.fiatAvailableBalance;
         const updatedWallet = await tx.wallet.update({
           where: { id: wallet.id },
-          data: { availableBalance: { increment: amount } },
+          data: { fiatAvailableBalance: { increment: amount } },
         });
 
         await tx.transaction.create({
@@ -470,14 +470,14 @@ export async function adminRoutes(app: FastifyInstance) {
             previous: JSON.stringify({
               platformBalance: previousPlatformBalance.toString(),
               platformTotalWithdrawn: previousPlatformWithdrawn.toString(),
-              adminWalletBalance: previousAdminWalletBalance.toString(),
+              adminFiatAvailableBalance: previousAdminWalletBalance.toString(),
               adminId: targetAdmin.id,
               adminEmail: targetAdmin.email,
             }),
             current: JSON.stringify({
               platformBalance: platformBalanceAfter.toString(),
               platformTotalWithdrawn: platformWithdrawnAfter.toString(),
-              adminWalletBalance: updatedWallet.availableBalance.toString(),
+              adminFiatAvailableBalance: updatedWallet.fiatAvailableBalance.toString(),
               adminId: targetAdmin.id,
               adminEmail: targetAdmin.email,
               amount: amount.toString(),
@@ -491,7 +491,7 @@ export async function adminRoutes(app: FastifyInstance) {
         return {
           message: 'Lucro da Exchange transferido para o administrador com sucesso.',
           platformBalance: platformBalanceAfter,
-          adminBalance: updatedWallet.availableBalance,
+          adminBalance: updatedWallet.fiatAvailableBalance,
         };
       });
 

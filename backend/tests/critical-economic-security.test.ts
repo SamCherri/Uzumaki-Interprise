@@ -365,7 +365,9 @@ test('super admin retira lucro da Exchange para carteira administrativa', async 
 
   assert.equal(Number(platform.balance), 700);
   assert.equal(Number(platform.totalWithdrawn), 300);
-  assert.equal(Number(adminWallet.availableBalance), 300);
+  assert.equal(Number(adminWallet.fiatAvailableBalance), 300);
+  assert.equal(Number(adminWallet.availableBalance), 0);
+  assert.equal(Number(adminWallet.rpcAvailableBalance), 0);
   assert.ok(tx);
   assert.ok(log);
 
@@ -385,7 +387,7 @@ test('projeto desligado bloqueia rotas públicas de mercado sem apagar históric
   await prisma.userRole.create({ data: { userId: user.id, roleId: rUser.id } });
   await prisma.platformAccount.create({ data: {} });
 
-  await prisma.wallet.update({ where: { userId: user.id }, data: { fiatAvailableBalance: 2000 } });
+  await prisma.wallet.update({ where: { userId: user.id }, data: { fiatAvailableBalance: 2000, rpcAvailableBalance: 2000 } });
 
   const company = await prisma.company.create({
     data: {
