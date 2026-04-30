@@ -515,25 +515,38 @@ test('force delete de projeto de teste só para SUPER_ADMIN e apaga histórico v
   assert.equal(invalidConfirmation.statusCode, 400, invalidConfirmation.body);
 
   const forceDelete = await app.inject({ method: 'DELETE', url: `/api/admin/companies/${company.id}/force-delete`, headers: { authorization: `Bearer ${superToken}`, 'content-type': 'application/json' }, payload: { reason: 'limpeza de teste completa', confirmation: 'EXCLUIR DEFINITIVAMENTE' } });
-  console.log('FORCE_DELETE_STATUS:', forceDelete.statusCode);
-  console.log('FORCE_DELETE_BODY:', forceDelete.body);
-  try {
-    console.log('FORCE_DELETE_JSON:', forceDelete.json());
-  } catch (error) {
-    console.log('FORCE_DELETE_JSON_PARSE_ERROR:', (error as Error).message);
-  }
-  const forceDeletePayload = forceDelete.json();
+  const forceDeletePayload = JSON.parse(forceDelete.body);
   assert.equal(forceDelete.statusCode, 200, forceDelete.body);
   assert.equal(forceDeletePayload.company?.id, company.id);
+  assert.ok(forceDeletePayload.deletedCounts);
 
-  assert.equal(await prisma.company.count({ where: { id: company.id } }), 0);
-  assert.equal(await prisma.companyHolding.count({ where: { companyId: company.id } }), 0);
-  assert.equal(await prisma.companyOperation.count({ where: { companyId: company.id } }), 0);
-  assert.equal(await prisma.companyInitialOffer.count({ where: { companyId: company.id } }), 0);
-  assert.equal(await prisma.marketOrder.count({ where: { companyId: company.id } }), 0);
-  assert.equal(await prisma.trade.count({ where: { companyId: company.id } }), 0);
-  assert.equal(await prisma.feeDistribution.count({ where: { companyId: company.id } }), 0);
+  const remainingAfterForceDelete = {
+    companies: await prisma.company.count({ where: { id: company.id } }),
+    holdings: await prisma.companyHolding.count({ where: { companyId: company.id } }),
+    operations: await prisma.companyOperation.count({ where: { companyId: company.id } }),
+    initialOffers: await prisma.companyInitialOffer.count({ where: { companyId: company.id } }),
+    marketOrders: await prisma.marketOrder.count({ where: { companyId: company.id } }),
+    trades: await prisma.trade.count({ where: { companyId: company.id } }),
+    feeDistributions: await prisma.feeDistribution.count({ where: { companyId: company.id } }),
+    revenueAccounts: await prisma.companyRevenueAccount.count({ where: { companyId: company.id } }),
+    boostAccounts: await prisma.companyBoostAccount.count({ where: { companyId: company.id } }),
+    boostInjections: await prisma.companyBoostInjection.count({ where: { companyId: company.id } }),
+    forceDeleteLogs: await prisma.adminLog.count({ where: { action: 'COMPANY_FORCE_DELETED' } }),
+  };
 
-  const forceLog = await prisma.adminLog.findFirst({ where: { action: 'COMPANY_FORCE_DELETED' } });
-  assert.ok(forceLog);
+  console.log('FORCE_DELETE_REMAINING:', remainingAfterForceDelete);
+
+  assert.deepEqual(remainingAfterForceDelete, {
+    companies: 0,
+    holdings: 0,
+    operations: 0,
+    initialOffers: 0,
+    marketOrders: 0,
+    trades: 0,
+    feeDistributions: 0,
+    revenueAccounts: 0,
+    boostAccounts: 0,
+    boostInjections: 0,
+    forceDeleteLogs: 1,
+  });
 });
