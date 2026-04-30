@@ -466,3 +466,22 @@ input[type="checkbox"] {
     font-size: .84rem;
   }
 }
+
+.mobile-home-summary {
+  display: grid;
+  gap: 12px;
+}
+
+.mobile-primary-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.mobile-primary-actions button:last-child:nth-child(3) {
+  grid-column: 1 / -1;
+}
+
+.desktop-home-actions {
+  display: grid;
+}

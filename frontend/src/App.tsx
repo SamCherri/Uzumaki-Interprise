@@ -293,32 +293,44 @@ export function App() {
       />
 
       {screen === 'home' && (
-        <section className="card">
-          <h2>Bem-vindo à RPC Exchange</h2>
-          <p className="info-text">Negocie tokens criados por usuários com RPC.</p>
+        <>
+          <section className="card mobile-home-summary mobile-only">
+            <h2>Bem-vindo</h2>
+            <p className="info-text">Use o menu ☰ para navegar pela RPC Exchange.</p>
+            <div className="mobile-primary-actions">
+              <button className="button-primary" onClick={() => setScreen('markets')}>Mercados</button>
+              <button className="button-primary" onClick={() => setScreen('wallet')}>Carteira</button>
+              {roles.canSeeAdmin && <button className="button-primary" onClick={() => setScreen('admin')}>Admin</button>}
+            </div>
+          </section>
 
-          {showInstallCard && (
-            <article className="summary-item install-card nested-card">
-              <h3>📲 Instalar aplicativo</h3>
-              <p className="info-text">Use a RPC Exchange como app no celular.</p>
-              <button className="button-primary" onClick={handleInstallClick} type="button">
-                Instalar aplicativo
-              </button>
-              {installHint && <p className="info-text">{installHint}</p>}
-            </article>
-          )}
+          <section className="card desktop-only">
+            <h2>Bem-vindo à RPC Exchange</h2>
+            <p className="info-text">Negocie tokens criados por usuários com RPC.</p>
 
-          <div className="home-grid home-grid-actions nested-card">
-            <button className="home-tile" onClick={() => setScreen('markets')}><span>🪙</span><strong>Mercados</strong><small>Veja ativos disponíveis para negociar.</small></button>
-            <button className="home-tile" onClick={() => setScreen('wallet')}><span>💼</span><strong>Carteira</strong><small>Acompanhe seu saldo e seus ativos.</small></button>
-            <button className="home-tile" onClick={() => setScreen('withdrawals')}><span>🏧</span><strong>Saque</strong><small>Solicite a retirada de RPC para receber dentro do RP.</small></button>
-            <button className="home-tile" onClick={() => setScreen('company-request')}><span>🚀</span><strong>Criar token</strong><small>Crie seu projeto e solicite listagem no mercado.</small></button>
-            {canSeeMyProjects && <button className="home-tile desktop-only" onClick={() => setScreen('my-projects')}><span>📊</span><strong>Meus Projetos</strong><small>Gerencie impulsões da sua moeda.</small></button>}
-            {roles.canSeeAdmin && <button className="home-tile desktop-only" onClick={() => setScreen('admin')}><span>🛠️</span><strong>Admin</strong><small>Painel administrativo</small></button>}
-            {roles.canSeeBroker && <button className="home-tile desktop-only" onClick={() => setScreen('broker')}><span>🤝</span><strong>Corretor</strong><small>Painel corretor</small></button>}
-            <button className="home-tile home-tile-danger desktop-only" onClick={handleLogout}><span>🚪</span><strong>Sair</strong><small>Encerrar sessão</small></button>
-          </div>
-        </section>
+            {showInstallCard && (
+              <article className="summary-item install-card nested-card">
+                <h3>📲 Instalar aplicativo</h3>
+                <p className="info-text">Use a RPC Exchange como app no celular.</p>
+                <button className="button-primary" onClick={handleInstallClick} type="button">
+                  Instalar aplicativo
+                </button>
+                {installHint && <p className="info-text">{installHint}</p>}
+              </article>
+            )}
+
+            <div className="home-grid home-grid-actions nested-card desktop-home-actions desktop-only">
+              <button className="home-tile" onClick={() => setScreen('markets')}><span>🪙</span><strong>Mercados</strong><small>Veja ativos disponíveis para negociar.</small></button>
+              <button className="home-tile" onClick={() => setScreen('wallet')}><span>💼</span><strong>Carteira</strong><small>Acompanhe seu saldo e seus ativos.</small></button>
+              <button className="home-tile" onClick={() => setScreen('withdrawals')}><span>🏧</span><strong>Saque</strong><small>Solicite a retirada de RPC para receber dentro do RP.</small></button>
+              <button className="home-tile" onClick={() => setScreen('company-request')}><span>🚀</span><strong>Criar token</strong><small>Crie seu projeto e solicite listagem no mercado.</small></button>
+              {canSeeMyProjects && <button className="home-tile" onClick={() => setScreen('my-projects')}><span>📊</span><strong>Meus Projetos</strong><small>Gerencie impulsões da sua moeda.</small></button>}
+              {roles.canSeeAdmin && <button className="home-tile" onClick={() => setScreen('admin')}><span>🛠️</span><strong>Admin</strong><small>Painel administrativo</small></button>}
+              {roles.canSeeBroker && <button className="home-tile" onClick={() => setScreen('broker')}><span>🤝</span><strong>Corretor</strong><small>Painel corretor</small></button>}
+              <button className="home-tile home-tile-danger" onClick={handleLogout}><span>🚪</span><strong>Sair</strong><small>Encerrar sessão</small></button>
+            </div>
+          </section>
+        </>
       )}
 
       {screen === 'markets' && <CompaniesPage />}
