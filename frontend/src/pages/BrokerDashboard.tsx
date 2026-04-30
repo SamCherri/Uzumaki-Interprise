@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useMemo, useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { translateTransferType } from '../utils/labels';
 
@@ -28,6 +28,18 @@ export function BrokerDashboard() {
   }
 
   useEffect(() => { load(); }, []);
+
+
+  const transfers = history?.transfers ?? [];
+  const totalTransfers = transfers.length;
+  const servedUsers = useMemo(() => {
+    const unique = new Set(
+      transfers
+        .map((item) => item.reason?.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0]?.toLowerCase())
+        .filter((value): value is string => Boolean(value))
+    );
+    return unique.size;
+  }, [transfers]);
 
   async function submitTransfer(event: FormEvent) {
     event.preventDefault();
@@ -59,11 +71,14 @@ export function BrokerDashboard() {
         <div className="summary-grid">
           <div className="summary-item"><span className="summary-label">Saldo RPC</span><strong className="summary-value">{balance.available}</strong></div>
           <div className="summary-item"><span className="summary-label">Total RPC recebido</span><strong className="summary-value">{balance.receivedTotal}</strong></div>
+          <div className="summary-item"><span className="summary-label">Usuários atendidos</span><strong className="summary-value">{servedUsers}</strong></div>
+          <div className="summary-item"><span className="summary-label">Total de envios</span><strong className="summary-value">{totalTransfers}</strong></div>
         </div>
       )}
 
       <h3 className="nested-card">Enviar RPC para usuário</h3>
       <p className="info-text">Use após vender RPC ao jogador dentro do RP.</p>
+      <p className="info-text">Limites não configurados.</p>
       <form onSubmit={submitTransfer} className="form-grid">
         <input value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="E-mail do usuário" type="email" required />
         <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Quantidade RPC" required />
@@ -72,9 +87,9 @@ export function BrokerDashboard() {
       </form>
 
       <h3 className="nested-card">Histórico de envios</h3>
-      {history?.transfers.length === 0 && <p className="empty-state">Sem envios registrados.</p>}
+      {transfers.length === 0 && <p className="empty-state">Sem envios registrados.</p>}
       <div className="mobile-card-list">
-        {history?.transfers.slice(0, 8).map((item) => (
+        {transfers.slice(0, 8).map((item) => (
           <article key={item.id} className="summary-item compact-card">
             <p><strong>{translateTransferType(item.type)}</strong></p>
             <p>RPC: {item.amount}</p>

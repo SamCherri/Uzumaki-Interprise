@@ -16,10 +16,11 @@ type UserRow = {
   createdAt: string;
 };
 
-const ALL_ROLES = ['USER', 'VIRTUAL_BROKER', 'BUSINESS_OWNER', 'ADMIN', 'SUPER_ADMIN'];
+const ALL_ROLES = ['USER', 'VIRTUAL_BROKER', 'BUSINESS_OWNER', 'AUDITOR', 'ADMIN', 'COIN_CHIEF_ADMIN', 'SUPER_ADMIN'];
 
 type AdminUsersPanelProps = {
   onPermissionsUpdated: () => Promise<void>;
+  mode?: 'users' | 'brokers';
 };
 
 function getCurrentUserIdFromToken(): string | null {
@@ -36,7 +37,7 @@ function getCurrentUserIdFromToken(): string | null {
   }
 }
 
-export function AdminUsersPanel({ onPermissionsUpdated }: AdminUsersPanelProps) {
+export function AdminUsersPanel({ onPermissionsUpdated, mode = 'users' }: AdminUsersPanelProps) {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
@@ -119,7 +120,7 @@ export function AdminUsersPanel({ onPermissionsUpdated }: AdminUsersPanelProps) 
 
   return (
     <section className="nested-card">
-      <h3>Usuários</h3>
+      <h3>{mode === 'brokers' ? 'Corretores' : 'Usuários'}</h3>
       <p className="info-text">Alterações de permissões são registradas em auditoria.</p>
 
       <form
@@ -137,8 +138,9 @@ export function AdminUsersPanel({ onPermissionsUpdated }: AdminUsersPanelProps) 
       {success && <p className="status-message success">{success}</p>}
       {loading && <p className="info-text">Carregando usuários...</p>}
 
-      <div className="mobile-card-list">
-        {users.map((user) => (
+      {mode === 'users' && (
+        <div className="mobile-card-list">
+          {users.map((user) => (
           <article key={user.id} className="summary-item compact-card">
             <strong>{user.name}</strong>
             <p>{user.email}</p>
@@ -173,8 +175,9 @@ export function AdminUsersPanel({ onPermissionsUpdated }: AdminUsersPanelProps) 
               </form>
             )}
           </article>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       <h3 className="nested-card">Corretores</h3>
       <div className="mobile-card-list">
