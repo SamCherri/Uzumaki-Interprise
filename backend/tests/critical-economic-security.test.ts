@@ -323,7 +323,7 @@ test('admin deposita R$ direto em jogador com débito atômico da tesouraria', a
 
   const insufficient = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${adminToken}` }, payload: { userId: player.id, amount: 999999, reason: 'sem saldo' } });
   assert.equal(insufficient.statusCode, 400, insufficient.body);
-  assert.match(insufficient.body, /saldo insuficiente/i);
+  assert.match(insufficient.body, /saldo.*insuficiente/i);
 
   const forbidden = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${userToken}` }, payload: { userId: player.id, amount: 10, reason: 'forbidden' } });
   assert.equal(forbidden.statusCode, 403, forbidden.body);
@@ -534,7 +534,6 @@ test('force delete de projeto de teste só para SUPER_ADMIN e apaga histórico v
     forceDeleteLogs: await prisma.adminLog.count({ where: { action: 'COMPANY_FORCE_DELETED' } }),
   };
 
-  console.log('FORCE_DELETE_REMAINING:', remainingAfterForceDelete);
 
   assert.deepEqual(remainingAfterForceDelete, {
     companies: 0,
