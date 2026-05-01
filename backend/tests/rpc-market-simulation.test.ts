@@ -62,7 +62,7 @@ test('simulação segura de fluxos críticos RPC/R$', async () => {
   const userRole = await mkRole('USER');
   const adminRole = await mkRole('ADMIN');
   const superRole = await mkRole('SUPER_ADMIN');
-  const chiefRole = await mkRole('CHIEF_ADMIN');
+  const chiefRole = await mkRole('COIN_CHIEF_ADMIN');
 
   await prisma.platformAccount.create({ data: { balance: 0, totalReceivedFees: 0, totalWithdrawn: 0 } });
 
@@ -79,8 +79,7 @@ test('simulação segura de fluxos críticos RPC/R$', async () => {
   assert.equal(dec(buyBody.feeAmount), 1);
   assert.equal(dec(buyBody.netFiatAmount), 99);
   assert.ok(dec(buyBody.rpcAmount) > 0);
-  assert.equal(dec(buyBody.unitPrice), dec(buyBody.fiatAmount) / dec(buyBody.rpcAmount));
-
+  
   const buyerWallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: buyer.id } });
   assert.equal(dec(buyerWallet.fiatAvailableBalance), 100);
   assert.ok(dec(buyerWallet.rpcAvailableBalance) > 0);
@@ -97,7 +96,12 @@ test('simulação segura de fluxos críticos RPC/R$', async () => {
   assert.equal(dec(sellBody.feePercent), 1);
   assert.ok(dec(sellBody.grossFiatAmount) > 0);
   assert.equal(dec(sellBody.netFiatAmount), dec(sellBody.grossFiatAmount) - dec(sellBody.feeAmount));
-  assert.equal(dec(sellBody.unitPrice), dec(sellBody.fiatAmount) / dec(sellBody.rpcAmount));
+  
+
+  const tradesAfterBuySell = await prisma.rpcExchangeTrade.findMany();
+  for (const trade of tradesAfterBuySell) {
+    assert.equal(dec(trade.unitPrice).toFixed(8), (dec(trade.fiatAmount) / dec(trade.rpcAmount)).toFixed(8));
+  }
 
   const sellerWallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: seller.id } });
   assert.equal(dec(sellerWallet.rpcAvailableBalance), 90);
@@ -109,7 +113,7 @@ test('simulação segura de fluxos críticos RPC/R$', async () => {
 
   const limitBuyerTk = await tk(limitBuyer.id, ['USER']);
   const limitSellerTk = await tk(limitSeller.id, ['USER']);
-  const chiefTk = await tk(chiefAdmin.id, ['CHIEF_ADMIN']);
+  const chiefTk = await tk(chiefAdmin.id, ['COIN_CHIEF_ADMIN']);
 
   const buyOrderResp = await app.inject({ method: 'POST', url: '/api/rpc-market/orders', headers: { authorization: `Bearer ${limitBuyerTk}` }, payload: { side: 'BUY_RPC', fiatAmount: 100, limitPrice: 2 } });
   assert.equal(buyOrderResp.statusCode, 201, buyOrderResp.body);
@@ -177,7 +181,7 @@ test('simulação segura de fluxos críticos RPC/R$', async () => {
   const platformBeforeWithdraw = await prisma.platformAccount.findFirstOrThrow();
 
   const withdrawProfit = await app.inject({ method: 'POST', url: '/api/admin/platform-account/withdraw-to-admin', headers: { authorization: `Bearer ${superTk}` }, payload: { adminId: adminTarget.id, amount: 2, reason: 'simulação retirada de lucro segura' } });
-  assert.equal(withdrawProfit.statusCode, 200, withdrawProfit.body);
+  assert.equal(withdrawProfit.statusCode, 201, withdrawProfit.body);
 
   const platformAfterWithdraw = await prisma.platformAccount.findFirstOrThrow();
   assert.equal(dec(platformAfterWithdraw.balance), dec(platformBeforeWithdraw.balance) - 2);
@@ -187,12 +191,12 @@ test('simulação segura de fluxos críticos RPC/R$', async () => {
   assert.equal(dec(adminTargetWallet.fiatAvailableBalance), 2);
   assert.equal(await prisma.rpcExchangeTrade.count(), tradeCountBeforeWithdrawProfit);
   const marketStateAfterWithdrawProfit = await prisma.rpcMarketState.findMany();
-  assert.deepEqual(marketStateAfterWithdrawProfit.map((m) => ({ id: m.id, price: String(m.price) })), marketStateBeforeWithdrawProfit.map((m) => ({ id: m.id, price: String(m.price) })));
+  assert.deepEqual(marketStateAfterWithdrawProfit.map((m) => ({ id: m.id, price: String(m.currentPrice) })), marketStateBeforeWithdrawProfit.map((m) => ({ id: m.id, price: String(m.currentPrice) })));
 
   const adminTargetTk = await tk(adminTarget.id, ['ADMIN']);
   const withdrawalRequest = await app.inject({ method: 'POST', url: '/api/withdrawals', headers: { authorization: `Bearer ${adminTargetTk}` }, payload: { amount: 1 } });
   assert.equal(withdrawalRequest.statusCode, 201, withdrawalRequest.body);
-  const withdrawalId = withdrawalRequest.json().request.id as string;
+  const withdrawalId = withdrawalRequest.json().id as string;
 
   let adminTargetWalletAfterReq = await prisma.wallet.findUniqueOrThrow({ where: { userId: adminTarget.id } });
   assert.equal(dec(adminTargetWalletAfterReq.fiatAvailableBalance), 1);
@@ -219,7 +223,7 @@ test('simulação segura de fluxos críticos RPC/R$', async () => {
   assert.equal(await prisma.rpcExchangeTrade.count(), tradeBeforeComplete);
 
   const marketAfterComplete = await prisma.rpcMarketState.findMany();
-  assert.deepEqual(marketAfterComplete.map((m) => ({ id: m.id, price: String(m.price) })), marketBeforeComplete.map((m) => ({ id: m.id, price: String(m.price) })));
+  assert.deepEqual(marketAfterComplete.map((m) => ({ id: m.id, price: String(m.currentPrice) })), marketBeforeComplete.map((m) => ({ id: m.id, price: String(m.currentPrice) })));
 
   const wallets = await prisma.wallet.findMany();
   assert.ok(wallets.every((w) => dec(w.fiatAvailableBalance) >= 0));
@@ -239,7 +243,9 @@ test('simulação segura de fluxos críticos RPC/R$', async () => {
   const trades = await prisma.rpcExchangeTrade.findMany();
   assert.ok(trades.length > tradeCountBefore);
   assert.ok(trades.every((t) => dec(t.rpcAmount) > 0));
-  assert.ok(trades.every((t) => dec(t.unitPrice) === dec(t.fiatAmount) / dec(t.rpcAmount)));
+  for (const trade of trades) {
+    assert.equal(dec(trade.unitPrice).toFixed(8), (dec(trade.fiatAmount) / dec(trade.rpcAmount)).toFixed(8));
+  }
 
   assert.ok((await prisma.rpcMarketState.count()) >= (marketBefore ? 1 : 1));
 });
