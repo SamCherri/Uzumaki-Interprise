@@ -6,9 +6,12 @@ type MarketState = { currentPrice: string; fiatReserve: string; rpcReserve: stri
 type Trade = { id: string; side: 'BUY_RPC' | 'SELL_RPC'; fiatAmount: string; rpcAmount: string; unitPrice: string; priceBefore: string; priceAfter: string; createdAt: string; };
 type BuyQuote = { estimatedRpcAmount: string; effectiveUnitPrice: string };
 type SellQuote = { estimatedFiatAmount: string; effectiveUnitPrice: string };
+type LimitOrder = { id: string; side: 'BUY_RPC' | 'SELL_RPC'; status: 'OPEN' | 'FILLED' | 'CANCELED' | 'REJECTED'; limitPrice: string; fiatAmount?: string; rpcAmount?: string; lockedFiatAmount: string; lockedRpcAmount: string; createdAt: string; executedAt?: string; canceledAt?: string };
+type OrderBook = { buyOrders: LimitOrder[]; sellOrders: LimitOrder[] };
 type Timeframe = '1H' | '24H' | '7D' | '30D' | 'ALL';
 type RpcMarketTab = 'preco' | 'livro' | 'ordens' | 'trades' | 'dados';
 type TradeFlow = 'buy' | 'sell' | null;
+type RpcTradeMode = 'market' | 'limit';
 type ChartPoint = { id: string; x: number; y: number; price: number; fiatAmount: number; rpcAmount: number; side: 'BUY_RPC' | 'SELL_RPC'; createdAt: string; };
 
 const timeframes: { key: Timeframe; label: string; hours: number | null }[] = [
@@ -38,20 +41,31 @@ export function RpcMarketPage() {
   const [activeTab, setActiveTab] = useState<RpcMarketTab>('preco');
   const [tradeFlow, setTradeFlow] = useState<TradeFlow>(null);
   const [activeTimeframe, setActiveTimeframe] = useState<Timeframe>('24H');
+  const [orderBook, setOrderBook] = useState<OrderBook>({ buyOrders: [], sellOrders: [] });
+  const [myOrders, setMyOrders] = useState<LimitOrder[]>([]);
+  const [tradeMode, setTradeMode] = useState<RpcTradeMode>('market');
+  const [limitFiatAmount, setLimitFiatAmount] = useState('');
+  const [limitRpcAmount, setLimitRpcAmount] = useState('');
+  const [limitPrice, setLimitPrice] = useState('');
+  const [favorite, setFavorite] = useState<boolean>(() => localStorage.getItem('rpc-exchange-rpc-market-favorite') === '1');
 
   async function load() {
     setIsLoading(true);
     setError('');
     try {
-      const [marketData, me, tradesResult] = await Promise.all([
+      const [marketData, me, tradesResult, orderBookData, myOrdersData] = await Promise.all([
         api<MarketState>('/rpc-market'),
         api<{ wallet: { fiatAvailableBalance: string; rpcAvailableBalance: string } }>('/auth/me'),
         api<{ trades: Trade[] }>(`/rpc-market/trades?limit=${RPC_MARKET_TRADES_LIMIT}`)
           .then((data) => ({ ok: true as const, data }))
           .catch(() => ({ ok: false as const })),
+        api<OrderBook>('/rpc-market/order-book'),
+        api<{ orders: LimitOrder[] }>('/rpc-market/orders/me'),
       ]);
       setMarket(marketData);
-      setWallet(me.wallet);
+      setWallet(me.wallet as any);
+      setOrderBook(orderBookData);
+      setMyOrders(myOrdersData.orders);
       if (tradesResult.ok) {
         setTrades(tradesResult.data.trades);
       } else {
@@ -206,7 +220,7 @@ export function RpcMarketPage() {
           <div className="market-compact-top">
                         <p className="company-emoji">💴 RPC/R$</p>
             <span className="summary-label">Ativo</span>
-            <button type="button" className="small-button">☆</button>
+            <button type="button" className="small-button" onClick={() => { const v=!favorite; setFavorite(v); localStorage.setItem('rpc-exchange-rpc-market-favorite', v ? '1' : '0'); }}>{favorite ? "★" : "☆"}</button>
           </div>
           <div className="market-price-overview">
             <h3 className="trade-price-big">R$ {formatPrice(Number(market?.currentPrice ?? 0))}</h3>
@@ -250,7 +264,7 @@ export function RpcMarketPage() {
           {!isLoading && chart.emptyReason && <p className="empty-state">{chart.emptyReason}</p>}
         </section>}
 
-        {activeTab === 'livro' && <section className="card nested-card market-tab-panel market-full-width"><h4>Liquidez automática</h4><p className="info-text">RPC/R$ usa liquidez automática por reserva. Livro de ofertas em breve.</p><p className="info-text">Este par ainda não usa livro de ofertas. O preço é calculado pela liquidez da reserva.</p><div className="order-book-grid"><div className="summary-item"><span className="summary-label">Reserva RPC</span><strong>{formatCurrency(Number(market?.rpcReserve ?? 0))} RPC</strong></div><div className="summary-item"><span className="summary-label">Reserva R$</span><strong>R$ {formatCurrency(Number(market?.fiatReserve ?? 0))}</strong></div><div className="summary-item"><span className="summary-label">Preço atual</span><strong>R$ {formatPrice(Number(market?.currentPrice ?? 0))}</strong></div><div className="summary-item"><span className="summary-label">Total buys</span><strong>{market?.totalBuys ?? 0}</strong></div><div className="summary-item"><span className="summary-label">Total sells</span><strong>{market?.totalSells ?? 0}</strong></div></div></section>}
+        {activeTab === 'livro' && <section className="card nested-card market-tab-panel market-full-width"><h4>Livro de ordens RPC/R$</h4><p className="info-text">RPC/R$ ainda usa liquidez automática para execução. O livro mostra ordens limite pendentes.</p><div className="order-book-grid"><div className="summary-item"><span className="summary-label">Reserva RPC</span><strong>{formatCurrency(Number(market?.rpcReserve ?? 0))} RPC</strong></div><div className="summary-item"><span className="summary-label">Reserva R$</span><strong>R$ {formatCurrency(Number(market?.fiatReserve ?? 0))}</strong></div><div className="summary-item"><span className="summary-label">Preço atual</span><strong>R$ {formatPrice(Number(market?.currentPrice ?? 0))}</strong></div></div><h5>Compras</h5>{orderBook.buyOrders.length===0?<p className="empty-state">Sem ordens abertas neste lado.</p>:orderBook.buyOrders.map((o)=><article key={o.id} className="summary-item compact-card market-order-card"><p>Preço limite: R$ {formatPrice(Number(o.limitPrice))}</p><p>Valor R$: {formatCurrency(Number(o.lockedFiatAmount||o.fiatAmount||0))}</p><p>Criada: {new Date(o.createdAt).toLocaleString('pt-BR')}</p></article>)}<h5>Vendas</h5>{orderBook.sellOrders.length===0?<p className="empty-state">Sem ordens abertas neste lado.</p>:orderBook.sellOrders.map((o)=><article key={o.id} className="summary-item compact-card market-order-card"><p>Preço limite: R$ {formatPrice(Number(o.limitPrice))}</p><p>Valor RPC: {formatCurrency(Number(o.lockedRpcAmount||o.rpcAmount||0))}</p><p>Criada: {new Date(o.createdAt).toLocaleString('pt-BR')}</p></article>)}</section>}
 
         {activeTab === 'ordens' && <section className="card nested-card market-tab-panel market-full-width"><h4>Ordem limite em breve</h4><p className="info-text">Ordens limite para RPC/R$ em breve. No momento, as compras e vendas são executadas imediatamente pelo preço estimado.</p><p className="info-text">Execução imediata · Preço pode variar conforme liquidez.</p></section>}
 

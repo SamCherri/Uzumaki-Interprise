@@ -80,6 +80,13 @@ enum RpcExchangeSide {
   SELL_RPC
 }
 
+enum RpcLimitOrderStatus {
+  OPEN
+  FILLED
+  CANCELED
+  REJECTED
+}
+
 model User {
   id           String           @id @default(cuid())
   name         String
@@ -106,6 +113,7 @@ model User {
   reviewedWithdrawalRequests WithdrawalRequest[] @relation("withdrawal_request_reviewer")
   boostInjections CompanyBoostInjection[]
   rpcExchangeTrades RpcExchangeTrade[]
+  rpcLimitOrders RpcLimitOrder[]
   testModeWallet TestModeWallet?
   testModeTrades TestModeTrade[]
   testModeReports TestModeReport[]
@@ -466,6 +474,33 @@ model RpcMarketState {
   totalSells      Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+
+model RpcLimitOrder {
+  id               String              @id @default(cuid())
+  userId           String
+  user             User                @relation(fields: [userId], references: [id])
+  side             RpcExchangeSide
+  status           RpcLimitOrderStatus @default(OPEN)
+  fiatAmount       Decimal?            @db.Decimal(18, 2)
+  rpcAmount        Decimal?            @db.Decimal(18, 2)
+  limitPrice       Decimal             @db.Decimal(24, 8)
+  lockedFiatAmount Decimal             @default(0) @db.Decimal(18, 2)
+  lockedRpcAmount  Decimal             @default(0) @db.Decimal(18, 2)
+  filledFiatAmount Decimal             @default(0) @db.Decimal(18, 2)
+  filledRpcAmount  Decimal             @default(0) @db.Decimal(18, 2)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  executedAt       DateTime?
+  canceledAt       DateTime?
+  rejectedAt       DateTime?
+
+  @@index([userId])
+  @@index([side])
+  @@index([status])
+  @@index([limitPrice])
+  @@index([createdAt])
 }
 
 model RpcExchangeTrade {
