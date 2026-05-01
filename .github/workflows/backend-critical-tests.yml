@@ -6,10 +6,25 @@ on:
 jobs:
   backend-critical-tests:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: rpc_exchange_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d rpc_exchange_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     env:
       NODE_ENV: test
-      DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
-      TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/rpc_exchange_test?schema=public
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/rpc_exchange_test?schema=public
 
     steps:
       - name: Checkout
@@ -23,13 +38,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Validar TEST_DATABASE_URL
-        run: |
-          if [ -z "${{ secrets.TEST_DATABASE_URL }}" ]; then
-            echo "Configure o secret TEST_DATABASE_URL no GitHub antes de rodar os testes."
-            exit 1
-          fi
 
       - name: Prisma generate
         run: npm run prisma:generate --workspace backend
