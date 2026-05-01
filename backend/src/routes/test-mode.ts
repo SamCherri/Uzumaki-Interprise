@@ -8,6 +8,7 @@ import { assertTestMode, isAdminRole } from '../plugins/system-mode-guard.js';
 const MARKET_ID = 'TEST_MODE_MARKET_MAIN';
 const MIN_AMOUNT = new Decimal('0.01');
 const CONTROL_ROLES = new Set(['SUPER_ADMIN', 'COIN_CHIEF_ADMIN']);
+const BOT_TICK_COOLDOWN_SECONDS = 20;
 
 function toDecimal(v: number | string | Decimal) { return v instanceof Decimal ? v : new Decimal(v); }
 function isControlRole(roles: string[]) { return roles.some((r) => CONTROL_ROLES.has(r.toUpperCase())); }
@@ -83,6 +84,45 @@ export async function testModeRoutes(app: FastifyInstance) {
         await tx.testModeMarketState.update({ where: { id: MARKET_ID }, data: { currentPrice: quote.priceAfter, fiatReserve: quote.newFiatReserve, rpcReserve: quote.newRpcReserve, totalFiatVolume: { increment: quote.fiatAmount }, totalRpcVolume: { increment: rpc }, totalSells: { increment: 1 } } });
         await tx.testModeTrade.create({ data: { userId, side: 'SELL', fiatAmount: quote.fiatAmount, rpcAmount: rpc, unitPrice: quote.unitPrice, priceBefore: quote.priceBefore, priceAfter: quote.priceAfter } });
         return { message: 'Venda de teste realizada.' };
+      });
+    } catch (e) { return badRequest(reply, e); }
+  });
+
+
+  app.post('/test-mode/bot-tick', { preHandler: [app.authenticate] }, async (_request, reply) => {
+    try {
+      if (!(await assertTestMode(reply))) return;
+      return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await tx.testModeMarketState.upsert({ where: { id: MARKET_ID }, update: {}, create: { id: MARKET_ID } });
+        await tx.$queryRaw`SELECT id FROM "TestModeMarketState" WHERE id = ${MARKET_ID} FOR UPDATE`;
+        const market = await tx.testModeMarketState.findUniqueOrThrow({ where: { id: MARKET_ID } });
+        const elapsedSeconds = (Date.now() - market.updatedAt.getTime()) / 1000;
+        if (elapsedSeconds < BOT_TICK_COOLDOWN_SECONDS) {
+          return { skipped: true, message: 'Tick ignorado por cooldown.', currentPrice: market.currentPrice };
+        }
+
+        const side: 'BUY' | 'SELL' = Math.random() < 0.5 ? 'BUY' : 'SELL';
+        const priceBefore = market.currentPrice;
+
+        if (side === 'BUY') {
+          const maxBuy = Decimal.min(new Decimal('250'), market.fiatReserve.mul(new Decimal('0.005'))).toDecimalPlaces(2);
+          const minBuy = new Decimal('20');
+          if (maxBuy.lt(minBuy)) return reply.status(400).send({ message: 'Liquidez insuficiente para tick de compra.' });
+          const fiatAmount = Decimal.max(minBuy, new Decimal((Math.random() * (Number(maxBuy.minus(minBuy)) || 0)).toFixed(2)).add(minBuy)).toDecimalPlaces(2);
+          const quote = buildBuyQuote(market, fiatAmount);
+          if (quote.rpcAmount.lt(MIN_AMOUNT)) return reply.status(400).send({ message: 'Liquidez insuficiente para tick de compra.' });
+          await tx.testModeMarketState.update({ where: { id: MARKET_ID }, data: { currentPrice: quote.priceAfter, fiatReserve: quote.newFiatReserve, rpcReserve: quote.newRpcReserve, totalFiatVolume: { increment: fiatAmount }, totalRpcVolume: { increment: quote.rpcAmount }, totalBuys: { increment: 1 } } });
+          return { side, fiatAmount, rpcAmount: quote.rpcAmount, priceBefore, priceAfter: quote.priceAfter, currentPrice: quote.priceAfter };
+        }
+
+        const maxSell = Decimal.min(new Decimal('25'), market.rpcReserve.mul(new Decimal('0.005'))).toDecimalPlaces(2);
+        const minSell = new Decimal('2');
+        if (maxSell.lt(minSell)) return reply.status(400).send({ message: 'Liquidez insuficiente para tick de venda.' });
+        const rpcAmount = Decimal.max(minSell, new Decimal((Math.random() * (Number(maxSell.minus(minSell)) || 0)).toFixed(2)).add(minSell)).toDecimalPlaces(2);
+        const quote = buildSellQuote(market, rpcAmount);
+        if (quote.fiatAmount.lt(MIN_AMOUNT)) return reply.status(400).send({ message: 'Liquidez insuficiente para tick de venda.' });
+        await tx.testModeMarketState.update({ where: { id: MARKET_ID }, data: { currentPrice: quote.priceAfter, fiatReserve: quote.newFiatReserve, rpcReserve: quote.newRpcReserve, totalFiatVolume: { increment: quote.fiatAmount }, totalRpcVolume: { increment: rpcAmount }, totalSells: { increment: 1 } } });
+        return { side, fiatAmount: quote.fiatAmount, rpcAmount, priceBefore, priceAfter: quote.priceAfter, currentPrice: quote.priceAfter };
       });
     } catch (e) { return badRequest(reply, e); }
   });

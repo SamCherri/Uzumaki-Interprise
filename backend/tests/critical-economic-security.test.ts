@@ -846,3 +846,67 @@ test('modo teste: preço, leaderboard, guardas e report types', async () => {
   const reportBlockedInNormal = await app.inject({ method: 'POST', url: '/api/test-mode/reports', headers: { authorization: `Bearer ${userToken}` }, payload: { type: 'BUG', location: 'Tela', description: 'Teste em normal' } });
   assert.equal(reportBlockedInNormal.statusCode, 403, reportBlockedInNormal.body);
 });
+
+test('bot tick do modo teste só opera em TEST e não altera economia real', async () => {
+  await resetDb();
+
+  const rUser = await mkRole('USER');
+  const user = await mkUser('testmode-bot@test.local', 'Test Bot User');
+  await prisma.userRole.create({ data: { userId: user.id, roleId: rUser.id } });
+  await prisma.platformAccount.create({ data: {} });
+
+  const userToken = await token(user.id, ['USER']);
+
+  const normalMode = await app.inject({
+    method: 'POST',
+    url: '/api/test-mode/bot-tick',
+    headers: { authorization: `Bearer ${userToken}` },
+  });
+  assert.equal(normalMode.statusCode, 403, normalMode.body);
+
+  const superAdminRole = await mkRole('SUPER_ADMIN');
+  const admin = await mkUser('testmode-admin@test.local', 'Test Admin');
+  await prisma.userRole.create({ data: { userId: admin.id, roleId: superAdminRole.id } });
+  const adminToken = await token(admin.id, ['SUPER_ADMIN']);
+
+  const setTestMode = await app.inject({
+    method: 'POST',
+    url: '/api/admin/system-mode/test/enable',
+    headers: { authorization: `Bearer ${adminToken}` },
+    payload: { reason: 'Ativando TEST para validar bot tick' },
+  });
+  assert.equal(setTestMode.statusCode, 200, setTestMode.body);
+
+  const realMarketBefore = await prisma.rpcMarketState.findFirst();
+  const realTradesBefore = await prisma.rpcExchangeTrade.count();
+  const realWalletsBefore = await prisma.wallet.count();
+  const testMarketBefore = await prisma.testModeMarketState.findUnique({ where: { id: 'TEST_MODE_MARKET_MAIN' } });
+
+  const tick = await app.inject({
+    method: 'POST',
+    url: '/api/test-mode/bot-tick',
+    headers: { authorization: `Bearer ${userToken}` },
+  });
+  assert.equal(tick.statusCode, 200, tick.body);
+  const payload = tick.json();
+  assert.ok(payload.currentPrice);
+  assert.ok(payload.skipped === true || payload.side === 'BUY' || payload.side === 'SELL');
+
+  const realMarketAfter = await prisma.rpcMarketState.findFirst();
+  const realTradesAfter = await prisma.rpcExchangeTrade.count();
+  const realWalletsAfter = await prisma.wallet.count();
+  const testMarketAfter = await prisma.testModeMarketState.findUniqueOrThrow({ where: { id: 'TEST_MODE_MARKET_MAIN' } });
+
+  assert.equal(JSON.stringify(realMarketAfter), JSON.stringify(realMarketBefore));
+  assert.equal(realTradesAfter, realTradesBefore);
+  assert.equal(realWalletsAfter, realWalletsBefore);
+  assert.notEqual(String(testMarketAfter.updatedAt), String(testMarketBefore?.updatedAt ?? ''));
+
+  const setNormalMode = await app.inject({
+    method: 'POST',
+    url: '/api/admin/system-mode/normal/enable',
+    headers: { authorization: `Bearer ${adminToken}` },
+    payload: { reason: 'Voltando para NORMAL após validar bot tick' },
+  });
+  assert.equal(setNormalMode.statusCode, 200, setNormalMode.body);
+});
