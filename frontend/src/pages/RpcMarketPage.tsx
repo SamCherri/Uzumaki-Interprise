@@ -44,6 +44,7 @@ export function RpcMarketPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeSide, setActiveSide] = useState<'buy' | 'sell'>('buy');
   const [activeTimeframe, setActiveTimeframe] = useState<Timeframe>('24H');
+  const [isMobileTradeExpanded, setIsMobileTradeExpanded] = useState(true);
 
   function getFriendlyErrorMessage(err: unknown, fallback: string) {
     const message = err instanceof Error ? err.message : '';
@@ -226,8 +227,7 @@ export function RpcMarketPage() {
             </p>
           </div>
           <div className="market-stats-row market-mini-stats">
-            <div className="market-mini-stat-card"><span className="market-mini-stat-label">Volume R$</span><strong>{formatCurrency(Number(market?.totalFiatVolume ?? 0))}</strong></div>
-            <div className="market-mini-stat-card"><span className="market-mini-stat-label">Saldo R$</span><strong>{formatCurrency(Number(wallet?.fiatAvailableBalance ?? 0))}</strong></div>
+                        <div className="market-mini-stat-card"><span className="market-mini-stat-label">Saldo R$</span><strong>{formatCurrency(Number(wallet?.fiatAvailableBalance ?? 0))}</strong></div>
             <div className="market-mini-stat-card"><span className="market-mini-stat-label">Saldo RPC</span><strong>{formatCurrency(Number(wallet?.rpcAvailableBalance ?? 0))}</strong></div>
             <div className="market-mini-stat-card"><span className="market-mini-stat-label">Atualizado</span><strong>{market?.updatedAt ? new Date(market.updatedAt).toLocaleString('pt-BR') : '--'}</strong></div>
           </div>
@@ -264,13 +264,15 @@ export function RpcMarketPage() {
           {!isLoading && chart.emptyReason && <div className="chart-empty-elegant"><strong>{chart.emptyReason === 'Ainda não há negociações neste período.' ? 'Histórico insuficiente neste período' : chart.emptyReason}</strong><span>{chart.emptyReason}</span></div>}
         </section>
 
-        <section className="card nested-card market-tab-panel">
-          <h4>Painel de negociação</h4>
+        <section className="card nested-card market-tab-panel mobile-sticky-trade-panel">
+          <div className="trade-panel-title"><h4>Painel de negociação</h4><button className="small-button" type="button" onClick={() => setIsMobileTradeExpanded((v) => !v)}>{isMobileTradeExpanded ? 'Recolher' : 'Expandir'}</button></div>
           <div className="quick-actions">
-            <button className={activeSide === 'buy' ? 'quick-pill active' : 'quick-pill'} onClick={() => setActiveSide('buy')}>Comprar RPC</button>
-            <button className={activeSide === 'sell' ? 'quick-pill active' : 'quick-pill'} onClick={() => setActiveSide('sell')}>Vender RPC</button>
+            <button className={activeSide === 'buy' ? 'quick-pill active' : 'quick-pill'} onClick={() => setActiveSide('buy')}>Comprar</button>
+            <button className={activeSide === 'sell' ? 'quick-pill active' : 'quick-pill'} onClick={() => setActiveSide('sell')}>Vender</button>
           </div>
-          {activeSide === 'buy' ? (
+          <p className="info-text">Modo atual: execução imediata pelo preço estimado.</p>
+          <p className="info-text">Execução imediata · Preço pode variar conforme liquidez · Ordem limite em breve.</p>
+          {isMobileTradeExpanded && (activeSide === 'buy' ? (
             <form onSubmit={onBuy} className="form-grid nested-card buy-side">
               <input value={fiatAmount} onChange={(e) => setFiatAmount(e.target.value)} placeholder="Entrada em R$" required />
               {buyQuoteError && <p className="info-text">Não foi possível atualizar a cotação de compra: {buyQuoteError}</p>}
@@ -278,7 +280,7 @@ export function RpcMarketPage() {
               <p className="info-text">Preço médio estimado: {`R$ ${formatPrice(Number(buyQuote?.effectiveUnitPrice ?? 0))}`}</p>
               <p className="info-text">Taxa aplicada: 0%</p>
               <p className="info-text">Total final: {`R$ ${formatCurrency(Number(fiatAmount || 0))}`}</p>
-              <button className="button-success" type="submit" disabled={!buyQuote || Number(fiatAmount) < 0.01}>Comprar RPC</button>
+              <button className="button-success" type="submit" disabled={!buyQuote || Number(fiatAmount) < 0.01}>Comprar agora</button>
             </form>
           ) : (
             <form onSubmit={onSell} className="form-grid nested-card sell-side">
@@ -288,9 +290,9 @@ export function RpcMarketPage() {
               <p className="info-text">Preço médio estimado: {`R$ ${formatPrice(Number(sellQuote?.effectiveUnitPrice ?? 0))}`}</p>
               <p className="info-text">Taxa aplicada: 0%</p>
               <p className="info-text">Total final: {`R$ ${formatCurrency(Number(sellQuote?.estimatedFiatAmount ?? 0))}`}</p>
-              <button className="button-danger" type="submit" disabled={!sellQuote || Number(rpcAmount) < 0.01}>Vender RPC</button>
+              <button className="button-danger" type="submit" disabled={!sellQuote || Number(rpcAmount) < 0.01}>Vender agora</button>
             </form>
-          )}
+          ))}
         </section>
 
         <section className="card nested-card market-book-tab market-tab-panel">
