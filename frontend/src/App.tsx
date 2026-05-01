@@ -91,6 +91,7 @@ export function App() {
   const canSeeMyProjects = roles.canSeeProjectOwner || hasOwnedProjects;
 
   const isTestModeRestrictedUser = systemMode === 'TEST' && !roles.canSeeAdmin;
+  const shouldShowTestModeEntry = roles.canSeeAdmin || systemMode === 'TEST';
   async function loadSystemMode() {
     try {
       const response = await api<{ mode: 'NORMAL'|'TEST' }>('/system-mode');
@@ -102,9 +103,16 @@ export function App() {
 
   useEffect(() => {
     if (!token) return;
-    if (!isTestModeRestrictedUser) return;
-    if (screen !== 'test-mode') setScreen('test-mode');
-  }, [isTestModeRestrictedUser, screen, token]);
+
+    if (isTestModeRestrictedUser && screen !== 'test-mode') {
+      setScreen('test-mode');
+      return;
+    }
+
+    if (!roles.canSeeAdmin && systemMode === 'NORMAL' && screen === 'test-mode') {
+      setScreen('home');
+    }
+  }, [isTestModeRestrictedUser, roles.canSeeAdmin, screen, systemMode, token]);
 
   useEffect(() => {
     if (token) {
@@ -215,9 +223,8 @@ export function App() {
   const showInstallCard = !isInstalled;
 
   const globalDrawerItems = useMemo<SideDrawerItem[]>(() => {
-    const shouldShowTestMode = roles.canSeeAdmin || systemMode === 'TEST';
     const items: SideDrawerItem[] = [
-      ...(shouldShowTestMode ? [{ key: 'test-mode', label: 'Modo Teste', icon: '🧪', active: screen === 'test-mode', onClick: () => setScreen('test-mode'), section: 'main' } as SideDrawerItem] : []),
+      ...(shouldShowTestModeEntry ? [{ key: 'test-mode', label: 'Modo Teste', icon: '🧪', active: screen === 'test-mode', onClick: () => setScreen('test-mode'), section: 'main' } as SideDrawerItem] : []),
       ...((isTestModeRestrictedUser
         ? []
         : [
@@ -236,7 +243,7 @@ export function App() {
 
     items.push({ key: 'logout', label: 'Sair', icon: '🚪', danger: true, section: 'danger', onClick: handleLogout });
     return items;
-  }, [canSeeMyProjects, roles.canSeeAdmin, roles.canSeeBroker, screen, systemMode, isTestModeRestrictedUser]);
+  }, [canSeeMyProjects, handleLogout, isTestModeRestrictedUser, roles.canSeeAdmin, roles.canSeeBroker, screen, shouldShowTestModeEntry]);
 
   if (!token) {
     return (
@@ -321,7 +328,7 @@ export function App() {
         items={globalDrawerItems}
       />
 
-      {screen === 'test-mode' && <TestModePage />}
+      {shouldShowTestModeEntry && screen === 'test-mode' && <TestModePage />}
       {!isTestModeRestrictedUser && screen === 'home' && (
         <section className="card">
           {showInstallCard && (
