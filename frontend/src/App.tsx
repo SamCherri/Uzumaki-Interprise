@@ -9,11 +9,12 @@ import { CompaniesPage } from './pages/CompaniesPage';
 import { WithdrawalsPage } from './pages/WithdrawalsPage';
 import { ProjectOwnerPanel } from './pages/ProjectOwnerPanel';
 import { RpcMarketPage } from './pages/RpcMarketPage';
+import { TestModePage } from './pages/TestModePage';
 import { api, getCurrentUser, CurrentUserResponse } from './services/api';
 import { SideDrawer, SideDrawerItem } from './components/SideDrawer';
 
 type PublicTab = 'login' | 'register';
-type PrivateScreen = 'home' | 'markets' | 'wallet' | 'rpc-market' | 'withdrawals' | 'company-request' | 'admin' | 'broker' | 'my-projects';
+type PrivateScreen = 'home' | 'markets' | 'wallet' | 'rpc-market' | 'withdrawals' | 'company-request' | 'admin' | 'broker' | 'my-projects' | 'test-mode';
 
 type ViewerRoles = {
   canSeeAdmin: boolean;
@@ -72,6 +73,7 @@ export function App() {
   const [hasOwnedProjects, setHasOwnedProjects] = useState(false);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isGlobalDrawerOpen, setIsGlobalDrawerOpen] = useState(false);
+  const [systemMode, setSystemMode] = useState<'NORMAL'|'TEST'>('NORMAL');
 
   const tokenRoles = useMemo(() => decodeRolesFromToken(token), [token]);
   const roles = useMemo(() => {
@@ -88,12 +90,26 @@ export function App() {
   }, [currentUser, tokenRoles]);
   const canSeeMyProjects = roles.canSeeProjectOwner || hasOwnedProjects;
 
+  const isTestModeRestrictedUser = systemMode === 'TEST' && !roles.canSeeAdmin;
+
+  useEffect(() => {
+    if (!token) return;
+    if (!isTestModeRestrictedUser) return;
+    if (screen !== 'test-mode') setScreen('test-mode');
+  }, [isTestModeRestrictedUser, screen, token]);
+
   useEffect(() => {
     if (token) {
       localStorage.setItem('token', token);
       return;
     }
     localStorage.removeItem('token');
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    const timer = window.setInterval(() => { void loadSystemMode(); }, 10000);
+    return () => window.clearInterval(timer);
   }, [token]);
 
   useEffect(() => {
@@ -109,12 +125,23 @@ export function App() {
   }, [roles.canSeeAdmin, roles.canSeeBroker, canSeeMyProjects, screen]);
 
 
+  async function loadSystemMode() {
+    try {
+      const modeData = await api<{ mode: 'NORMAL'|'TEST' }>('/system-mode');
+      setSystemMode(modeData.mode);
+    } catch {
+      setSystemMode('NORMAL');
+    }
+  }
+
   useEffect(() => {
     if (!token) {
       setHasOwnedProjects(false);
       setCurrentUser(null);
       return;
     }
+
+    void loadSystemMode();
 
     getCurrentUser()
       .then((response) => {
@@ -133,6 +160,12 @@ export function App() {
     api<{ companies: Array<{ id: string }> }>('/project-boosts/my-projects')
       .then((response) => setHasOwnedProjects(response.companies.length > 0))
       .catch(() => setHasOwnedProjects(false));
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    const timer = window.setInterval(() => { void loadSystemMode(); }, 10000);
+    return () => window.clearInterval(timer);
   }, [token]);
   useEffect(() => {
     const onBeforeInstallPrompt = (event: Event) => {
@@ -189,21 +222,26 @@ export function App() {
 
   const globalDrawerItems = useMemo<SideDrawerItem[]>(() => {
     const items: SideDrawerItem[] = [
-      { key: 'home', label: 'Início', icon: '🏠', active: screen === 'home', onClick: () => setScreen('home'), section: 'main' },
-      { key: 'markets', label: 'Mercados', icon: '🪙', active: screen === 'markets', onClick: () => setScreen('markets'), section: 'main' },
-      { key: 'wallet', label: 'Carteira', icon: '💼', active: screen === 'wallet', onClick: () => setScreen('wallet'), section: 'main' },
-      { key: 'rpc-market', label: 'RPC/R$', icon: '💴', active: screen === 'rpc-market', onClick: () => setScreen('rpc-market'), section: 'main' },
-      { key: 'withdrawals', label: 'Saque', icon: '🏧', active: screen === 'withdrawals', onClick: () => setScreen('withdrawals'), section: 'secondary' },
-      { key: 'company-request', label: 'Criar token', icon: '🚀', active: screen === 'company-request', onClick: () => setScreen('company-request'), section: 'secondary' },
+      ...(systemMode === 'TEST' || roles.canSeeAdmin ? [{ key: 'test-mode', label: 'Modo Teste', icon: '🧪', active: screen === 'test-mode', onClick: () => setScreen('test-mode'), section: 'main' as const }] : []),
+      ...((isTestModeRestrictedUser
+        ? []
+        : [
+            { key: 'home', label: 'Início', icon: '🏠', active: screen === 'home', onClick: () => setScreen('home'), section: 'main' },
+            { key: 'markets', label: 'Mercados', icon: '🪙', active: screen === 'markets', onClick: () => setScreen('markets'), section: 'main' },
+            { key: 'wallet', label: 'Carteira', icon: '💼', active: screen === 'wallet', onClick: () => setScreen('wallet'), section: 'main' },
+            { key: 'rpc-market', label: 'RPC/R$', icon: '💴', active: screen === 'rpc-market', onClick: () => setScreen('rpc-market'), section: 'main' },
+            { key: 'withdrawals', label: 'Saque', icon: '🏧', active: screen === 'withdrawals', onClick: () => setScreen('withdrawals'), section: 'secondary' },
+            { key: 'company-request', label: 'Criar token', icon: '🚀', active: screen === 'company-request', onClick: () => setScreen('company-request'), section: 'secondary' },
+          ] as SideDrawerItem[])),
     ];
 
-    if (canSeeMyProjects) items.push({ key: 'my-projects', label: 'Meus Projetos', icon: '📊', active: screen === 'my-projects', onClick: () => setScreen('my-projects'), section: 'secondary' });
+    if (!isTestModeRestrictedUser && canSeeMyProjects) items.push({ key: 'my-projects', label: 'Meus Projetos', icon: '📊', active: screen === 'my-projects', onClick: () => setScreen('my-projects'), section: 'secondary' });
     if (roles.canSeeAdmin) items.push({ key: 'admin', label: 'Admin', icon: '🛠️', active: screen === 'admin', onClick: () => setScreen('admin'), section: 'main' });
-    if (roles.canSeeBroker) items.push({ key: 'broker', label: 'Corretor', icon: '🤝', active: screen === 'broker', onClick: () => setScreen('broker'), section: 'secondary' });
+    if (!isTestModeRestrictedUser && roles.canSeeBroker) items.push({ key: 'broker', label: 'Corretor', icon: '🤝', active: screen === 'broker', onClick: () => setScreen('broker'), section: 'secondary' });
 
     items.push({ key: 'logout', label: 'Sair', icon: '🚪', danger: true, section: 'danger', onClick: handleLogout });
     return items;
-  }, [canSeeMyProjects, roles.canSeeAdmin, roles.canSeeBroker, screen]);
+  }, [canSeeMyProjects, roles.canSeeAdmin, roles.canSeeBroker, screen, systemMode, isTestModeRestrictedUser]);
 
   if (!token) {
     return (
@@ -288,7 +326,8 @@ export function App() {
         items={globalDrawerItems}
       />
 
-      {screen === 'home' && (
+      {screen === 'test-mode' && <TestModePage />}
+      {!isTestModeRestrictedUser && screen === 'home' && (
         <section className="card">
           {showInstallCard && (
             <article className="summary-item install-card">
@@ -360,14 +399,14 @@ export function App() {
         </section>
       )}
 
-      {screen === 'markets' && <CompaniesPage />}
-      {screen === 'wallet' && <UserDashboard onOpenRpcMarket={() => setScreen('rpc-market')} />}
-      {screen === 'rpc-market' && <RpcMarketPage />}
-      {screen === 'withdrawals' && <WithdrawalsPage />}
-      {screen === 'company-request' && <CompanyRequestPage />}
-      {screen === 'my-projects' && canSeeMyProjects && <ProjectOwnerPanel />}
+      {!isTestModeRestrictedUser && screen === 'markets' && <CompaniesPage />}
+      {!isTestModeRestrictedUser && screen === 'wallet' && <UserDashboard onOpenRpcMarket={() => setScreen('rpc-market')} />}
+      {!isTestModeRestrictedUser && screen === 'rpc-market' && <RpcMarketPage />}
+      {!isTestModeRestrictedUser && screen === 'withdrawals' && <WithdrawalsPage />}
+      {!isTestModeRestrictedUser && screen === 'company-request' && <CompanyRequestPage />}
+      {!isTestModeRestrictedUser && screen === 'my-projects' && canSeeMyProjects && <ProjectOwnerPanel />}
       {screen === 'admin' && roles.canSeeAdmin && <AdminDashboard currentUserRoles={currentUser?.roles ?? []} onPermissionsUpdated={async () => { const response = await getCurrentUser(); setCurrentUser(response.user); }} />}
-      {screen === 'broker' && roles.canSeeBroker && <BrokerDashboard />}
+      {!isTestModeRestrictedUser && screen === 'broker' && roles.canSeeBroker && <BrokerDashboard />}
     </main>
   );
 }
