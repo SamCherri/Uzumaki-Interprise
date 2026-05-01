@@ -105,7 +105,11 @@ export function App() {
   useEffect(() => {
     if (!token) return;
 
-    if (isTestModeRestrictedUser && screen !== 'test-mode') {
+    if (
+      isTestModeRestrictedUser &&
+      screen !== 'test-mode' &&
+      screen !== 'test-ranking'
+    ) {
       setScreen('test-mode');
       return;
     }
