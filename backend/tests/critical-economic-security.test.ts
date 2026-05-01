@@ -38,13 +38,13 @@ async function resetDb() {
     prisma.rolePermission.deleteMany(),
     prisma.permission.deleteMany(),
     prisma.role.deleteMany(),
-    prisma.user.deleteMany(),
-    prisma.platformAccount.deleteMany(),
-    prisma.treasuryAccount.deleteMany(),
     prisma.testModeReport.deleteMany(),
     prisma.testModeTrade.deleteMany(),
     prisma.testModeWallet.deleteMany(),
     prisma.testModeMarketState.deleteMany(),
+    prisma.user.deleteMany(),
+    prisma.platformAccount.deleteMany(),
+    prisma.treasuryAccount.deleteMany(),
   ]);
 }
 
@@ -835,12 +835,14 @@ test('modo teste: preço, leaderboard, guardas e report types', async () => {
   const sorted = [...rows].sort((a, b) => Number(b.estimatedTotalFiat) - Number(a.estimatedTotalFiat));
   assert.deepEqual(rows.map((r) => r.userId), sorted.map((r) => r.userId));
 
-
-  const setNormal = await app.inject({ method: 'POST', url: '/api/admin/system-mode/normal/enable', headers: { authorization: `Bearer ${adminToken}` }, payload: { reason: 'Voltando para modo normal no teste crítico' } });
-  assert.equal(setNormal.statusCode, 200, setNormal.body);
-
   for (const type of ['BUG','VISUAL_ERROR','BALANCE_ERROR','CHEAT_SUSPECTED','SUGGESTION','OTHER']) {
     const report = await app.inject({ method: 'POST', url: '/api/test-mode/reports', headers: { authorization: `Bearer ${userToken}` }, payload: { type, location: 'Tela', description: 'Teste' } });
     assert.equal(report.statusCode, 201, report.body);
   }
+
+  const setNormal = await app.inject({ method: 'POST', url: '/api/admin/system-mode/normal/enable', headers: { authorization: `Bearer ${adminToken}` }, payload: { reason: 'Voltando para modo normal no teste crítico' } });
+  assert.equal(setNormal.statusCode, 200, setNormal.body);
+
+  const reportBlockedInNormal = await app.inject({ method: 'POST', url: '/api/test-mode/reports', headers: { authorization: `Bearer ${userToken}` }, payload: { type: 'BUG', location: 'Tela', description: 'Teste em normal' } });
+  assert.equal(reportBlockedInNormal.statusCode, 403, reportBlockedInNormal.body);
 });
