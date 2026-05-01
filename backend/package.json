@@ -15,7 +15,8 @@
     "prisma:seed:demo": "SEED_DEMO_DATA=true tsx prisma/seed.ts",
     "test": "tsx --test tests/*.test.ts",
     "test:critical": "tsx --test tests/*.test.ts",
-    "test:critical:ci": "npm run prisma:generate && prisma migrate deploy && npm run test:critical"
+    "test:critical:ci": "npm run prisma:generate && prisma migrate deploy && npm run test:critical",
+    "test:simulation": "tsx --test tests/rpc-market-simulation.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",
