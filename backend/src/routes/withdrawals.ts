@@ -264,11 +264,17 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
     const params = z.object({ id: z.string().min(1) }).parse(request.params);
     const body = adminNoteSchema.parse(request.body);
 
+    const withdrawalOwnerCheck = await prisma.withdrawalRequest.findUnique({ where: { id: params.id }, select: { userId: true } });
+    if (withdrawalOwnerCheck?.userId === authRequest.user.sub) {
+      return reply.code(403).send({ message: 'Administrador não pode revisar o próprio saque.' });
+    }
+
     try {
       const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const withdrawal = await tx.withdrawalRequest.findUnique({ where: { id: params.id } });
         if (!withdrawal) throw new Error('Saque não encontrado.');
         if (withdrawal.status !== 'PENDING') throw new Error('Somente saque pendente pode ser marcado em processamento.');
+        if (withdrawal.userId === authRequest.user.sub) throw new Error('Administrador não pode revisar o próprio saque.');
 
         const wallet = await tx.wallet.findUniqueOrThrow({ where: { userId: withdrawal.userId } });
 
@@ -317,10 +323,16 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
     const params = z.object({ id: z.string().min(1) }).parse(request.params);
     const body = adminNoteSchema.parse(request.body);
 
+    const withdrawalOwnerCheck = await prisma.withdrawalRequest.findUnique({ where: { id: params.id }, select: { userId: true } });
+    if (withdrawalOwnerCheck?.userId === authRequest.user.sub) {
+      return reply.code(403).send({ message: 'Administrador não pode revisar o próprio saque.' });
+    }
+
     try {
       const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const withdrawal = await tx.withdrawalRequest.findUnique({ where: { id: params.id } });
         if (!withdrawal) throw new Error('Saque não encontrado.');
+        if (withdrawal.userId === authRequest.user.sub) throw new Error('Administrador não pode revisar o próprio saque.');
 
         const wallet = await tx.wallet.findUniqueOrThrow({ where: { userId: withdrawal.userId } });
         const transition = await tx.withdrawalRequest.updateMany({
@@ -390,10 +402,16 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
     const params = z.object({ id: z.string().min(1) }).parse(request.params);
     const body = adminNoteSchema.parse(request.body);
 
+    const withdrawalOwnerCheck = await prisma.withdrawalRequest.findUnique({ where: { id: params.id }, select: { userId: true } });
+    if (withdrawalOwnerCheck?.userId === authRequest.user.sub) {
+      return reply.code(403).send({ message: 'Administrador não pode revisar o próprio saque.' });
+    }
+
     try {
       const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const withdrawal = await tx.withdrawalRequest.findUnique({ where: { id: params.id } });
         if (!withdrawal) throw new Error('Saque não encontrado.');
+        if (withdrawal.userId === authRequest.user.sub) throw new Error('Administrador não pode revisar o próprio saque.');
 
         const wallet = await tx.wallet.findUniqueOrThrow({ where: { userId: withdrawal.userId } });
         const transition = await tx.withdrawalRequest.updateMany({

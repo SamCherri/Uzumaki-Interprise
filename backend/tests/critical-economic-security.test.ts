@@ -651,10 +651,13 @@ test('mercado RPC/R$ mantém singleton, cotação e integridade econômica', asy
 
   const buy = await app.inject({ method: 'POST', url: '/api/rpc-market/buy', headers: { authorization: `Bearer ${tk}` }, payload: { fiatAmount: 100 } });
   assert.equal(buy.statusCode, 200, buy.body);
+  assert.equal(buy.json().feePercent, 1);
+  assert.equal(Number(buy.json().grossFiatAmount), 100);
   assert.equal(await prisma.rpcMarketState.count(), 1);
 
   const sell = await app.inject({ method: 'POST', url: '/api/rpc-market/sell', headers: { authorization: `Bearer ${tk}` }, payload: { rpcAmount: 10 } });
   assert.equal(sell.statusCode, 200, sell.body);
+  assert.equal(sell.json().feePercent, 1);
   assert.equal(await prisma.rpcMarketState.count(), 1);
 
   const walletAfter = await prisma.wallet.findUniqueOrThrow({ where: { userId: user.id } });
@@ -668,6 +671,10 @@ test('mercado RPC/R$ mantém singleton, cotação e integridade econômica', asy
     const expected = Number(trade.fiatAmount) / Number(trade.rpcAmount);
     assert.equal(Number(trade.unitPrice).toFixed(8), expected.toFixed(8));
   }
+
+  const platform = await prisma.platformAccount.findFirstOrThrow();
+  assert.ok(Number(platform.balance) > 0);
+  assert.ok(Number(platform.totalReceivedFees) > 0);
 });
 
 test('cadastro salva characterName e bankAccountNumber e /auth/me retorna campos', async () => {
@@ -1112,4 +1119,26 @@ test('ordens limite RPC/R$ bloqueadores P1: arredondamento mínimo e seleção p
 
   const sellOrder = await prisma.rpcLimitOrder.findUniqueOrThrow({ where: { id: eligibleSellId } });
   assert.equal(sellOrder.status, 'FILLED');
+});
+
+test('admin não pode revisar o próprio saque e outro admin pode revisar', async () => {
+  await resetDb();
+  const rAdmin = await mkRole('ADMIN');
+  const adminA = await mkUser('self-wd-a@test.local');
+  const adminB = await mkUser('self-wd-b@test.local');
+  await prisma.userRole.createMany({ data: [{ userId: adminA.id, roleId: rAdmin.id }, { userId: adminB.id, roleId: rAdmin.id }] });
+  await prisma.wallet.update({ where: { userId: adminA.id }, data: { fiatAvailableBalance: 200 } });
+
+  const tkA = await token(adminA.id, ['ADMIN']);
+  const tkB = await token(adminB.id, ['ADMIN']);
+
+  const req = await app.inject({ method: 'POST', url: '/api/withdrawals', headers: { authorization: `Bearer ${tkA}` }, payload: { amount: 50 } });
+  assert.equal(req.statusCode, 201, req.body);
+  const withdrawalId = req.json().id as string;
+
+  const selfComplete = await app.inject({ method: 'POST', url: `/api/admin/withdrawals/${withdrawalId}/complete`, headers: { authorization: `Bearer ${tkA}` }, payload: { adminNote: 'self' } });
+  assert.equal(selfComplete.statusCode, 403, selfComplete.body);
+
+  const otherComplete = await app.inject({ method: 'POST', url: `/api/admin/withdrawals/${withdrawalId}/complete`, headers: { authorization: `Bearer ${tkB}` }, payload: { adminNote: 'ok' } });
+  assert.equal(otherComplete.statusCode, 200, otherComplete.body);
 });
