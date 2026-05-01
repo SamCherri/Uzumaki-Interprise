@@ -20,6 +20,7 @@ const timeframes: { key: Timeframe; label: string; hours: number | null }[] = [
 ];
 
 const RPC_MARKET_TRADES_LIMIT = 200;
+const TRADES_LOAD_FALLBACK_MESSAGE = 'Não foi possível carregar o histórico de trades agora. O preço atual continua disponível.';
 
 export function RpcMarketPage() {
   const [market, setMarket] = useState<MarketState | null>(null);
@@ -42,17 +43,24 @@ export function RpcMarketPage() {
     setIsLoading(true);
     setError('');
     try {
-      const [marketData, me, tradesData] = await Promise.all([
+      const [marketData, me, tradesResult] = await Promise.all([
         api<MarketState>('/rpc-market'),
         api<{ wallet: { fiatAvailableBalance: string; rpcAvailableBalance: string } }>('/auth/me'),
-        api<{ trades: Trade[] }>(`/rpc-market/trades?limit=${RPC_MARKET_TRADES_LIMIT}`),
+        api<{ trades: Trade[] }>(`/rpc-market/trades?limit=${RPC_MARKET_TRADES_LIMIT}`)
+          .then((data) => ({ ok: true as const, data }))
+          .catch(() => ({ ok: false as const })),
       ]);
       setMarket(marketData);
       setWallet(me.wallet);
-      setTrades(tradesData.trades);
+      if (tradesResult.ok) {
+        setTrades(tradesResult.data.trades);
+      } else {
+        setTrades([]);
+        setError(TRADES_LOAD_FALLBACK_MESSAGE);
+      }
       return true;
     } catch {
-      setError('Não foi possível carregar os dados do mercado RPC/R$ agora.');
+      setError('Não foi possível carregar os dados principais do mercado RPC/R$ agora.');
       return false;
     } finally {
       setIsLoading(false);
@@ -196,8 +204,7 @@ export function RpcMarketPage() {
       <div className="trade-screen market-mobile-shell">
         <header className="card trade-header market-pair-header market-compact-header market-asset-header market-full-width">
           <div className="market-compact-top">
-            <button type="button" className="back-button">← Voltar</button>
-            <p className="company-emoji">💴 RPC/R$</p>
+                        <p className="company-emoji">💴 RPC/R$</p>
             <span className="summary-label">Ativo</span>
             <button type="button" className="small-button">☆</button>
           </div>
@@ -253,7 +260,7 @@ export function RpcMarketPage() {
 
         <div className="mobile-trade-actions"><button className="button-success" type="button" onClick={() => setTradeFlow('buy')}>Comprar</button><button className="button-danger" type="button" onClick={() => setTradeFlow('sell')}>Vender</button></div>
 
-        {tradeFlow && <div className="trade-panel-backdrop" onClick={() => setTradeFlow(null)}><div className="trade-bottom-sheet market-trade-sheet" onClick={(event) => event.stopPropagation()}><div className="trade-panel-header"><h4>{tradeFlow === 'buy' ? 'Comprar RPC' : 'Vender RPC'}</h4><button type="button" className="small-button" onClick={() => setTradeFlow(null)}>Fechar</button></div>
+        {tradeFlow && <div className="trade-panel-backdrop" onClick={() => setTradeFlow(null)}><div className="trade-bottom-sheet market-trade-sheet" onClick={(event) => event.stopPropagation()}><div className="market-sheet-handle" aria-hidden="true" /><div className="trade-panel-header"><h4>{tradeFlow === 'buy' ? 'Comprar RPC' : 'Vender RPC'}</h4><button type="button" className="small-button" onClick={() => setTradeFlow(null)}>Fechar</button></div>
           {tradeFlow === 'buy' ? <form onSubmit={onBuy}><p className="market-sheet-balance-row">Saldo R$ disponível: {formatCurrency(Number(wallet?.fiatAvailableBalance ?? 0))}</p><input value={fiatAmount} onChange={(e) => setFiatAmount(e.target.value)} placeholder="Entrada em R$" required /><div className="market-sheet-mini-card"><p>Saída estimada em RPC: {formatCurrency(Number(buyQuote?.estimatedRpcAmount ?? 0))}</p><p>Preço médio estimado: R$ {formatPrice(Number(buyQuote?.effectiveUnitPrice ?? 0))}</p><p>Taxa aplicada: 0%</p><p>Total final: R$ {formatCurrency(Number(fiatAmount || 0))}</p></div>{buyQuoteError && <p className="info-text">{buyQuoteError}</p>}<button className="button-success" type="submit" disabled={!buyQuote || Number(fiatAmount) < 0.01}>Comprar agora</button></form> : <form onSubmit={onSell}><p className="market-sheet-balance-row">Saldo RPC disponível: {formatCurrency(Number(wallet?.rpcAvailableBalance ?? 0))}</p><input value={rpcAmount} onChange={(e) => setRpcAmount(e.target.value)} placeholder="Entrada em RPC" required /><div className="market-sheet-mini-card"><p>Saída estimada em R$: {formatCurrency(Number(sellQuote?.estimatedFiatAmount ?? 0))}</p><p>Preço médio estimado: R$ {formatPrice(Number(sellQuote?.effectiveUnitPrice ?? 0))}</p><p>Taxa aplicada: 0%</p><p>Total final: R$ {formatCurrency(Number(sellQuote?.estimatedFiatAmount ?? 0))}</p></div>{sellQuoteError && <p className="info-text">{sellQuoteError}</p>}<button className="button-danger" type="submit" disabled={!sellQuote || Number(rpcAmount) < 0.01}>Vender agora</button></form>}
         </div></div>}
       </div>
