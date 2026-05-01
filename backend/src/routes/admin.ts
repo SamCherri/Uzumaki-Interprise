@@ -19,6 +19,31 @@ function requireRole(reply: FastifyReply, roles: string[], accepted: string[], m
   return true;
 }
 
+async function resolveUniqueUserByRef(
+  tx: Prisma.TransactionClient,
+  ref: string,
+  roleKey?: string,
+) {
+  const trimmedRef = ref.trim();
+  const candidates = await tx.user.findMany({
+    where: {
+      ...(roleKey ? { roles: { some: { role: { key: roleKey } } } } : {}),
+      OR: [
+        { bankAccountNumber: { equals: trimmedRef } },
+        { characterName: { equals: trimmedRef, mode: 'insensitive' } },
+        { name: { equals: trimmedRef, mode: 'insensitive' } },
+        { email: { equals: trimmedRef.toLowerCase(), mode: 'insensitive' } },
+      ],
+    },
+    include: { roles: { select: { role: { select: { key: true } } } } },
+    take: 2,
+  });
+
+  if (candidates.length === 0) throw new Error('Usuário não encontrado.');
+  if (candidates.length > 1) throw new Error('Referência ambígua. Use a Conta RP exata ou o email técnico.');
+  return candidates[0];
+}
+
 export async function adminRoutes(app: FastifyInstance) {
   app.get('/admin/overview', { preHandler: [app.authenticate] }, async (request: FastifyRequest, reply: FastifyReply) => {
     const authRequest = request as AuthRequest;
@@ -150,12 +175,11 @@ export async function adminRoutes(app: FastifyInstance) {
         throw new Error('Saldo em R$ insuficiente na tesouraria.');
       }
 
-      const brokerUser = await tx.user.findFirst({
-        where: {
-          ...(body.brokerEmail ? { email: body.brokerEmail } : body.brokerUserId ? { id: body.brokerUserId } : { OR: [{ bankAccountNumber: brokerRef }, { characterName: { equals: brokerRef, mode: 'insensitive' } }, { name: { equals: brokerRef, mode: 'insensitive' } }, { email: { equals: brokerRef?.toLowerCase(), mode: 'insensitive' } }] }),
-          roles: { some: { role: { key: 'VIRTUAL_BROKER' } } },
-        },
-      });
+      const brokerUser = body.brokerUserId
+        ? await tx.user.findFirst({ where: { id: body.brokerUserId, roles: { some: { role: { key: 'VIRTUAL_BROKER' } } } } })
+        : body.brokerEmail
+          ? await tx.user.findFirst({ where: { email: body.brokerEmail, roles: { some: { role: { key: 'VIRTUAL_BROKER' } } } } })
+          : await resolveUniqueUserByRef(tx, brokerRef ?? '', 'VIRTUAL_BROKER');
 
       if (!brokerUser) {
         if (body.brokerEmail) {
@@ -259,9 +283,11 @@ export async function adminRoutes(app: FastifyInstance) {
         const treasury = await tx.treasuryAccount.findFirstOrThrow();
         const amount = new Decimal(parsed.amount);
 
-        const targetUser = await tx.user.findFirst({
-          where: userEmail ? { email: userEmail } : parsed.userId ? { id: parsed.userId } : { OR: [{ bankAccountNumber: userRef }, { characterName: { equals: userRef, mode: 'insensitive' } }, { name: { equals: userRef, mode: 'insensitive' } }, { email: { equals: userRef?.toLowerCase(), mode: 'insensitive' } }] },
-        });
+        const targetUser = parsed.userId
+          ? await tx.user.findUnique({ where: { id: parsed.userId } })
+          : userEmail
+            ? await tx.user.findUnique({ where: { email: userEmail } })
+            : await resolveUniqueUserByRef(tx, userRef ?? '');
 
         if (!targetUser) {
           throw new Error('Usuário de destino não encontrado.');
@@ -403,10 +429,11 @@ export async function adminRoutes(app: FastifyInstance) {
 
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const amount = new Decimal(parsed.amount);
-        const targetAdmin = await tx.user.findFirst({
-          where: targetEmail ? { email: targetEmail } : parsed.adminId ? { id: parsed.adminId } : { OR: [{ bankAccountNumber: adminRef }, { characterName: { equals: adminRef, mode: 'insensitive' } }, { name: { equals: adminRef, mode: 'insensitive' } }, { email: { equals: adminRef?.toLowerCase(), mode: 'insensitive' } }] },
-          include: { roles: { select: { role: { select: { key: true } } } } },
-        });
+        const targetAdmin = parsed.adminId
+          ? await tx.user.findFirst({ where: { id: parsed.adminId }, include: { roles: { select: { role: { select: { key: true } } } } } })
+          : targetEmail
+            ? await tx.user.findFirst({ where: { email: targetEmail }, include: { roles: { select: { role: { select: { key: true } } } } } })
+            : await resolveUniqueUserByRef(tx, adminRef ?? '');
 
         if (!targetAdmin) {
           throw new Error('Administrador de destino não encontrado.');
