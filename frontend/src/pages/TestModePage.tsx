@@ -39,6 +39,7 @@ export function TestModePage() {
   const [reportDescription, setReportDescription] = useState('');
   const isInitialLoadDoneRef = useRef(false);
   const [lastBotTick, setLastBotTick] = useState<BotTickResponse | null>(null);
+  const [botTickHistory, setBotTickHistory] = useState<BotTickResponse[]>([]);
 
   async function loadAll() {
     setLoading(true);
@@ -75,7 +76,12 @@ export function TestModePage() {
       if (!isInitialLoadDoneRef.current || document.visibilityState !== 'visible') return;
       void api<BotTickResponse>('/test-mode/bot-tick', { method: 'POST' })
         .then((tick) => {
+          if (tick.skipped) {
+            setLastBotTick(tick);
+            return;
+          }
           setLastBotTick(tick);
+          setBotTickHistory((items) => [...items, tick].slice(-50));
           return loadAll();
         })
         .catch(() => undefined);
@@ -105,11 +111,24 @@ export function TestModePage() {
   const chartTrades = useMemo(() => [...trades].reverse(), [trades]);
   const chartPrices = useMemo(() => {
     if (!market) return [1, 1];
-    if (chartTrades.length === 0) return [Number(market.currentPrice), Number(market.currentPrice)];
-    const fromTrades = chartTrades.map((t) => Number(t.priceAfter ?? t.unitPrice ?? market.currentPrice)).filter((v) => Number.isFinite(v) && v > 0);
-    if (fromTrades.length === 1) return [fromTrades[0], fromTrades[0]];
-    return fromTrades;
-  }, [chartTrades, market]);
+    const tradePrices = chartTrades
+      .map((trade) => Number(trade.priceAfter ?? trade.unitPrice ?? market.currentPrice))
+      .filter((value) => Number.isFinite(value) && value > 0);
+    const botPrices = botTickHistory
+      .map((tick) => Number(tick.priceAfter ?? tick.currentPrice ?? market.currentPrice))
+      .filter((value) => Number.isFinite(value) && value > 0);
+    const marketPrice = Number(market.currentPrice);
+    const points = [...tradePrices, ...botPrices];
+
+    if (Number.isFinite(marketPrice) && marketPrice > 0) {
+      points.push(marketPrice);
+    }
+
+    if (points.length === 0) return [marketPrice || 1, marketPrice || 1];
+    if (points.length === 1) return [points[0], points[0]];
+
+    return points;
+  }, [chartTrades, botTickHistory, market]);
 
   async function handleBuy() {
     try {
@@ -163,7 +182,7 @@ export function TestModePage() {
     {lastBotTick && !lastBotTick.skipped && <article className="card nested-card"><h4>Última movimentação simulada</h4><p>Side: {lastBotTick.side}</p><p>fiatAmount: {lastBotTick.fiatAmount}</p><p>rpcAmount: {lastBotTick.rpcAmount}</p><p>priceBefore: {lastBotTick.priceBefore}</p><p>priceAfter: {lastBotTick.priceAfter}</p><p>currentPrice: {lastBotTick.currentPrice}</p></article>}
     <div className="trade-screen market-mobile-shell">
       <header className="card trade-header market-pair-header"><p className="company-emoji">🧪 Modo Teste RPC/R$</p><h3 className="trade-price-big">R$ {Number(market?.currentPrice ?? 0).toFixed(4)}</h3><div className="market-stats-row"><div className="market-mini-stat-card"><span className="market-mini-stat-label">Saldo R$ teste</span><strong>R$ {Number(wallet?.fiatBalance ?? 0).toFixed(2)}</strong></div><div className="market-mini-stat-card"><span className="market-mini-stat-label">Saldo RPC teste</span><strong>{Number(wallet?.rpcBalance ?? 0).toFixed(2)} RPC</strong></div><div className="market-mini-stat-card"><span className="market-mini-stat-label">Patrimônio estimado</span><strong>R$ {total.toFixed(2)}</strong></div><div className="market-mini-stat-card"><span className="market-mini-stat-label">Atualizado</span><strong>{market?.updatedAt ? new Date(market.updatedAt).toLocaleString('pt-BR') : '--'}</strong></div></div></header>
-      <section className="card nested-card market-tab-panel"><h4>Preço RPC/R$ (teste)</h4><div className="chart-wrap chart-wrap-highlight modern-chart-shell"><svg viewBox="0 0 100 100" preserveAspectRatio="none" className="line-chart">{(() => { const min = Math.min(...chartPrices); const max = Math.max(...chartPrices); const range = max - min || 1; const points = chartPrices.map((p, i) => `${(i / Math.max(1, chartPrices.length - 1)) * 84},${100 - ((p - min) / range) * 100}`).join(' '); if (chartTrades.length >= 2) return <polyline points={points} fill="none" stroke="#38bdf8" strokeWidth="2.6" />; if (chartTrades.length === 1) return <line x1="0" x2="84" y1={points.split(',')[1]} y2={points.split(',')[1]} stroke="#38bdf8" strokeWidth="2.6" />; return <line x1="0" x2="84" y1="50" y2="50" stroke="#38bdf8" strokeWidth="2.6" />; })()}</svg></div></section>
+      <section className="card nested-card market-tab-panel"><h4>Preço RPC/R$ (teste)</h4><div className="chart-wrap chart-wrap-highlight modern-chart-shell"><svg viewBox="0 0 100 100" preserveAspectRatio="none" className="line-chart">{(() => { const min = Math.min(...chartPrices); const max = Math.max(...chartPrices); const range = max - min || 1; const points = chartPrices.map((p, i) => `${(i / Math.max(1, chartPrices.length - 1)) * 84},${100 - ((p - min) / range) * 100}`).join(' '); if (chartPrices.length >= 2) return <polyline points={points} fill="none" stroke="#38bdf8" strokeWidth="2.6" />; if (chartPrices.length === 1) return <line x1="0" x2="84" y1={points.split(',')[1]} y2={points.split(',')[1]} stroke="#38bdf8" strokeWidth="2.6" />; return <line x1="0" x2="84" y1="50" y2="50" stroke="#38bdf8" strokeWidth="2.6" />; })()}</svg></div></section>
       <section className="card nested-card market-tab-panel"><h4>Painel de negociação</h4><div className="quick-actions"><button className={activeSide === 'buy' ? 'quick-pill active' : 'quick-pill'} onClick={() => setActiveSide('buy')}>Comprar RPC</button><button className={activeSide === 'sell' ? 'quick-pill active' : 'quick-pill'} onClick={() => setActiveSide('sell')}>Vender RPC</button></div>{activeSide === 'buy' ? <div className="form-grid nested-card buy-side"><input type="number" inputMode="decimal" min="0" step="0.01" value={fiatAmount} onChange={(e) => setFiatAmount(e.target.value)} /><p className="info-text">Entrada em R$: {fiatAmount || '0'}</p><p className="info-text">Saída estimada em RPC: {buyQuote?.estimatedRpcAmount ?? '-'}</p><p className="info-text">Preço efetivo: {buyQuote?.effectiveUnitPrice ?? '-'}</p><p className="info-text">Preço antes: {market?.currentPrice ?? '-'}</p><p className="info-text">Preço depois: {buyQuote?.estimatedPriceAfter ?? '-'}</p><p className="info-text">Variação estimada: {buyQuote ? (Number(buyQuote.estimatedPriceAfter) - Number(market?.currentPrice ?? 0)).toFixed(6) : '-'}</p><button className="button-success" disabled={isBuying || !buyQuote} onClick={handleBuy}>{isBuying ? 'Comprando...' : 'Comprar RPC de teste'}</button></div> : <div className="form-grid nested-card sell-side"><input type="number" inputMode="decimal" min="0" step="0.01" value={rpcAmount} onChange={(e) => setRpcAmount(e.target.value)} /><p className="info-text">Entrada em RPC: {rpcAmount || '0'}</p><p className="info-text">Saída estimada em R$: {sellQuote?.estimatedFiatAmount ?? '-'}</p><p className="info-text">Preço efetivo: {sellQuote?.effectiveUnitPrice ?? '-'}</p><p className="info-text">Preço antes: {market?.currentPrice ?? '-'}</p><p className="info-text">Preço depois: {sellQuote?.estimatedPriceAfter ?? '-'}</p><p className="info-text">Variação estimada: {sellQuote ? (Number(sellQuote.estimatedPriceAfter) - Number(market?.currentPrice ?? 0)).toFixed(6) : '-'}</p><button className="button-danger" disabled={isSelling || !sellQuote} onClick={handleSell}>{isSelling ? 'Vendendo...' : 'Vender RPC de teste'}</button></div>}</section>
       <section className="card nested-card market-book-tab market-tab-panel"><h4>Profundidade/liquidez de teste</h4><div className="order-book-grid"><div className="summary-item"><span className="summary-label">Reserva R$ teste</span><strong>R$ {Number(market?.fiatReserve ?? 0).toFixed(2)}</strong></div><div className="summary-item"><span className="summary-label">Reserva RPC teste</span><strong>{Number(market?.rpcReserve ?? 0).toFixed(2)} RPC</strong></div></div></section>
       <section className="card nested-card market-tab-panel"><h4>Últimos trades</h4><div className="mobile-card-list">{trades.length === 0 && <p className="empty-state">Sem negociações ainda.</p>}{trades.slice(0, 20).map((trade) => { const isBuy = trade.side === 'BUY' || trade.side === 'BUY_RPC'; return <article key={trade.id} className="summary-item compact-card"><p><strong>{isBuy ? 'COMPRA' : 'VENDA'}</strong> · {new Date(trade.createdAt).toLocaleString('pt-BR')}</p><p>RPC: {trade.rpcAmount}</p><p>Total R$: {trade.fiatAmount}</p><p>Preço unitário: {trade.unitPrice ?? '-'}</p></article>; })}</div></section>
