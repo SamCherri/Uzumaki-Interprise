@@ -6,6 +6,7 @@ type Market = { currentPrice: string; fiatReserve: string; rpcReserve: string; u
 type Trade = { id: string; side: 'BUY' | 'SELL' | 'BUY_RPC' | 'SELL_RPC'; fiatAmount: string; rpcAmount: string; unitPrice?: string; priceAfter?: string; priceBefore?: string; createdAt: string };
 type LeaderboardRow = { userId: string; name?: string | null; characterName?: string | null; fiatBalance: string; rpcBalance: string; estimatedTotalFiat: string };
 type Quote = { estimatedRpcAmount?: string; estimatedFiatAmount?: string; effectiveUnitPrice: string; estimatedPriceAfter: string };
+type BotTickResponse = { skipped?: boolean; message?: string; side?: 'BUY' | 'SELL'; fiatAmount?: string; rpcAmount?: string; priceBefore?: string; priceAfter?: string; currentPrice?: string };
 
 const REPORT_TYPES = [
   { value: 'BUG', label: 'Bug' },
@@ -37,6 +38,7 @@ export function TestModePage() {
   const [reportLocation, setReportLocation] = useState('');
   const [reportDescription, setReportDescription] = useState('');
   const isInitialLoadDoneRef = useRef(false);
+  const [lastBotTick, setLastBotTick] = useState<BotTickResponse | null>(null);
 
   async function loadAll() {
     setLoading(true);
@@ -71,7 +73,12 @@ export function TestModePage() {
   useEffect(() => {
     const interval = window.setInterval(() => {
       if (!isInitialLoadDoneRef.current || document.visibilityState !== 'visible') return;
-      void api('/test-mode/bot-tick', { method: 'POST' }).then(() => loadAll()).catch(() => undefined);
+      void api<BotTickResponse>('/test-mode/bot-tick', { method: 'POST' })
+        .then((tick) => {
+          setLastBotTick(tick);
+          return loadAll();
+        })
+        .catch(() => undefined);
     }, 30000);
     return () => window.clearInterval(interval);
   }, []);
@@ -152,6 +159,8 @@ export function TestModePage() {
 
   return <section className="card market-page market-shell"><p className="warning">Modo Teste ativo. Nenhuma operação desta tela afeta a Exchange principal.</p><p className="info-text">O mercado de teste possui movimentações simuladas para ajudar os jogadores a testar lucro, prejuízo e bugs.</p>
     {loading && <p>Carregando dados do modo teste...</p>}{error && <p className="status-message error">{error}</p>}{message && <p className="status-message success">{message}</p>}
+    {lastBotTick?.skipped && <p className="info-text">Aguardando próxima janela de simulação.</p>}
+    {lastBotTick && !lastBotTick.skipped && <article className="card nested-card"><h4>Última movimentação simulada</h4><p>Side: {lastBotTick.side}</p><p>fiatAmount: {lastBotTick.fiatAmount}</p><p>rpcAmount: {lastBotTick.rpcAmount}</p><p>priceBefore: {lastBotTick.priceBefore}</p><p>priceAfter: {lastBotTick.priceAfter}</p><p>currentPrice: {lastBotTick.currentPrice}</p></article>}
     <div className="trade-screen market-mobile-shell">
       <header className="card trade-header market-pair-header"><p className="company-emoji">🧪 Modo Teste RPC/R$</p><h3 className="trade-price-big">R$ {Number(market?.currentPrice ?? 0).toFixed(4)}</h3><div className="market-stats-row"><div className="market-mini-stat-card"><span className="market-mini-stat-label">Saldo R$ teste</span><strong>R$ {Number(wallet?.fiatBalance ?? 0).toFixed(2)}</strong></div><div className="market-mini-stat-card"><span className="market-mini-stat-label">Saldo RPC teste</span><strong>{Number(wallet?.rpcBalance ?? 0).toFixed(2)} RPC</strong></div><div className="market-mini-stat-card"><span className="market-mini-stat-label">Patrimônio estimado</span><strong>R$ {total.toFixed(2)}</strong></div><div className="market-mini-stat-card"><span className="market-mini-stat-label">Atualizado</span><strong>{market?.updatedAt ? new Date(market.updatedAt).toLocaleString('pt-BR') : '--'}</strong></div></div></header>
       <section className="card nested-card market-tab-panel"><h4>Preço RPC/R$ (teste)</h4><div className="chart-wrap chart-wrap-highlight modern-chart-shell"><svg viewBox="0 0 100 100" preserveAspectRatio="none" className="line-chart">{(() => { const min = Math.min(...chartPrices); const max = Math.max(...chartPrices); const range = max - min || 1; const points = chartPrices.map((p, i) => `${(i / Math.max(1, chartPrices.length - 1)) * 84},${100 - ((p - min) / range) * 100}`).join(' '); if (chartTrades.length >= 2) return <polyline points={points} fill="none" stroke="#38bdf8" strokeWidth="2.6" />; if (chartTrades.length === 1) return <line x1="0" x2="84" y1={points.split(',')[1]} y2={points.split(',')[1]} stroke="#38bdf8" strokeWidth="2.6" />; return <line x1="0" x2="84" y1="50" y2="50" stroke="#38bdf8" strokeWidth="2.6" />; })()}</svg></div></section>

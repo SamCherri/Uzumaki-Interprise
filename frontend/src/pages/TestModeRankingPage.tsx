@@ -11,10 +11,8 @@ export function TestModeRankingPage() {
 
   async function loadRanking() {
     setError('');
-    const [me, board] = await Promise.all([
-      api<{ userId?: string }>('/test-mode/me'),
-      api<{ leaderboard: LeaderboardRow[] }>('/test-mode/leaderboard'),
-    ]);
+    const me = await api<{ userId?: string }>('/test-mode/me');
+    const board = await api<{ leaderboard: LeaderboardRow[] }>('/test-mode/leaderboard');
     setMeId(me.userId ?? null);
     setLeaderboard((board.leaderboard ?? []).sort((a, b) => Number(b.estimatedTotalFiat) - Number(a.estimatedTotalFiat)));
   }

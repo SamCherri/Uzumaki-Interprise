@@ -8,6 +8,7 @@ import { assertTestMode, isAdminRole } from '../plugins/system-mode-guard.js';
 const MARKET_ID = 'TEST_MODE_MARKET_MAIN';
 const MIN_AMOUNT = new Decimal('0.01');
 const CONTROL_ROLES = new Set(['SUPER_ADMIN', 'COIN_CHIEF_ADMIN']);
+const BOT_TICK_COOLDOWN_SECONDS = 20;
 
 function toDecimal(v: number | string | Decimal) { return v instanceof Decimal ? v : new Decimal(v); }
 function isControlRole(roles: string[]) { return roles.some((r) => CONTROL_ROLES.has(r.toUpperCase())); }
@@ -95,6 +96,10 @@ export async function testModeRoutes(app: FastifyInstance) {
         await tx.testModeMarketState.upsert({ where: { id: MARKET_ID }, update: {}, create: { id: MARKET_ID } });
         await tx.$queryRaw`SELECT id FROM "TestModeMarketState" WHERE id = ${MARKET_ID} FOR UPDATE`;
         const market = await tx.testModeMarketState.findUniqueOrThrow({ where: { id: MARKET_ID } });
+        const elapsedSeconds = (Date.now() - market.updatedAt.getTime()) / 1000;
+        if (elapsedSeconds < BOT_TICK_COOLDOWN_SECONDS) {
+          return { skipped: true, message: 'Tick ignorado por cooldown.', currentPrice: market.currentPrice };
+        }
 
         const side: 'BUY' | 'SELL' = Math.random() < 0.5 ? 'BUY' : 'SELL';
         const priceBefore = market.currentPrice;
