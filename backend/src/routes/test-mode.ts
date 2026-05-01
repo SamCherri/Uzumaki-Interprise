@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyReply } from 'fastify';
 import { ZodError, z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { assertTestMode, isAdminRole } from '../plugins/system-mode-guard.js';
@@ -12,7 +12,7 @@ const CONTROL_ROLES = new Set(['SUPER_ADMIN', 'COIN_CHIEF_ADMIN']);
 function toDecimal(v: number | string | Decimal) { return v instanceof Decimal ? v : new Decimal(v); }
 function isControlRole(roles: string[]) { return roles.some((r) => CONTROL_ROLES.has(r.toUpperCase())); }
 function isSuperAdmin(roles: string[]) { return roles.some((r) => r.toUpperCase() === 'SUPER_ADMIN'); }
-function badRequest(reply: any, error: unknown) { const msg = error instanceof ZodError ? error.issues[0]?.message ?? 'Dados inválidos.' : (error as Error).message || 'Dados inválidos.'; return reply.status(400).send({ message: msg }); }
+function badRequest(reply: FastifyReply, error: unknown) { const msg = error instanceof ZodError ? error.issues[0]?.message ?? 'Dados inválidos.' : (error as Error).message || 'Dados inválidos.'; return reply.status(400).send({ message: msg }); }
 async function ensureMarket() { return prisma.testModeMarketState.upsert({ where: { id: MARKET_ID }, update: {}, create: { id: MARKET_ID } }); }
 async function ensureWallet(userId: string) { return prisma.testModeWallet.upsert({ where: { userId }, update: {}, create: { userId } }); }
 
@@ -87,7 +87,7 @@ export async function testModeRoutes(app: FastifyInstance) {
     } catch (e) { return badRequest(reply, e); }
   });
 
-  app.get('/test-mode/leaderboard', { preHandler: [app.authenticate] }, async (_request, reply) => { if (!(await assertTestMode(reply))) return; const market = await ensureMarket(); const wallets = await prisma.testModeWallet.findMany({ include: { user: true } }); const leaderboard = wallets.map((w) => ({ userId: w.userId, name: w.user.name, characterName: w.user.characterName, fiatBalance: w.fiatBalance, rpcBalance: w.rpcBalance, estimatedTotalFiat: w.fiatBalance.add(w.rpcBalance.mul(market.currentPrice)) })).sort((a, b) => b.estimatedTotalFiat.comparedTo(a.estimatedTotalFiat)).map((item, i) => ({ ...item, position: i + 1 })); return { leaderboard }; });
+  app.get('/test-mode/leaderboard', { preHandler: [app.authenticate] }, async (_request, reply) => { if (!(await assertTestMode(reply))) return; const market = await ensureMarket(); const wallets = await prisma.testModeWallet.findMany({ include: { user: true } }); const leaderboard = wallets.map((w: (typeof wallets)[number]) => ({ userId: w.userId, name: w.user.name, characterName: w.user.characterName, fiatBalance: w.fiatBalance, rpcBalance: w.rpcBalance, estimatedTotalFiat: w.fiatBalance.add(w.rpcBalance.mul(market.currentPrice)) })).sort((a: { estimatedTotalFiat: Decimal }, b: { estimatedTotalFiat: Decimal }) => b.estimatedTotalFiat.comparedTo(a.estimatedTotalFiat)).map((item: { userId: string; name: string | null; characterName: string | null; fiatBalance: Decimal; rpcBalance: Decimal; estimatedTotalFiat: Decimal }, i: number) => ({ ...item, position: i + 1 })); return { leaderboard }; });
   app.post('/test-mode/reports', { preHandler: [app.authenticate] }, async (request, reply) => { try { if (!(await assertTestMode(reply))) return; const body = z.object({ type: z.enum(['BUG', 'VISUAL_ERROR', 'BALANCE_ERROR', 'CHEAT_SUSPECTED', 'SUGGESTION', 'OTHER']), location: z.string().min(2), description: z.string().min(5) }).parse(request.body ?? {}); const userId = (request.user as { sub: string }).sub; const wallet = await ensureWallet(userId); const market = await ensureMarket(); const report = await prisma.testModeReport.create({ data: { userId, ...body, userSnapshot: JSON.stringify({ fiatBalance: wallet.fiatBalance.toString(), rpcBalance: wallet.rpcBalance.toString(), currentPrice: market.currentPrice.toString() }) } }); return reply.status(201).send(report); } catch (e) { return badRequest(reply, e); } });
 
   app.get('/admin/test-mode/reports', { preHandler: [app.authenticate] }, async (request, reply) => { try { const roles = ((request.user as { roles?: string[] }).roles ?? []); if (!isAdminRole(roles)) return reply.status(403).send({ message: 'Sem permissão.' }); const q = z.object({ status: z.string().optional(), type: z.string().optional() }).parse(request.query ?? {}); return prisma.testModeReport.findMany({ where: { status: q.status, type: q.type }, orderBy: { createdAt: 'desc' } }); } catch (e) { return badRequest(reply, e); } });
@@ -115,7 +115,7 @@ export async function testModeRoutes(app: FastifyInstance) {
       if (!isSuperAdmin(roles)) return reply.status(403).send({ message: 'Sem permissão.' });
       const body = z.object({ reason: z.string().min(10), confirmation: z.literal('LIMPAR MODO TESTE') }).parse(request.body ?? {});
       const previous = { trades: await prisma.testModeTrade.count(), wallets: await prisma.testModeWallet.count(), reports: await prisma.testModeReport.count(), marketExists: Boolean(await prisma.testModeMarketState.findUnique({ where: { id: MARKET_ID } })) };
-      await prisma.$transaction(async (tx) => { await tx.testModeTrade.deleteMany(); await tx.testModeReport.deleteMany(); await tx.testModeWallet.deleteMany(); await tx.testModeMarketState.deleteMany(); await tx.testModeMarketState.create({ data: { id: MARKET_ID } }); });
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => { await tx.testModeTrade.deleteMany(); await tx.testModeReport.deleteMany(); await tx.testModeWallet.deleteMany(); await tx.testModeMarketState.deleteMany(); await tx.testModeMarketState.create({ data: { id: MARKET_ID } }); });
       const current = { trades: await prisma.testModeTrade.count(), wallets: await prisma.testModeWallet.count(), reports: await prisma.testModeReport.count(), marketExists: Boolean(await prisma.testModeMarketState.findUnique({ where: { id: MARKET_ID } })) };
       await app.logAdmin({ userId: (request.user as { sub: string }).sub, action: 'TEST_MODE_CLEAR', entity: 'TestModeData', reason: body.reason, previous: JSON.stringify(previous), current: JSON.stringify(current) });
       return { message: 'Dados de teste limpos com sucesso.' };
