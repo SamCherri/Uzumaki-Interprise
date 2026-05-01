@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { z } from 'zod';
+import { z, ZodError } from 'zod';
 import { loginUser, registerUser } from '../services/auth-service.js';
 import { prisma } from '../lib/prisma.js';
 
@@ -7,22 +7,29 @@ export async function authRoutes(app: FastifyInstance) {
   app.post('/auth/register', async (request: FastifyRequest, reply: FastifyReply) => {
     const schema = z.object({
       name: z.string().min(3),
+      characterName: z.string().min(3),
+      bankAccountNumber: z.string().min(3),
       email: z.string().email(),
       password: z.string().min(8),
     });
 
-    const body = schema.parse(request.body);
-
     try {
-      const user = await registerUser(body.name, body.email, body.password);
+      const body = schema.parse(request.body);
+      const user = await registerUser(body.name, body.characterName, body.bankAccountNumber, body.email, body.password);
       await app.logAdmin({ action: 'CREATE_ACCOUNT', entity: 'User', userId: user.id, reason: 'Cadastro inicial' });
 
       return reply.code(201).send({
         id: user.id,
         name: user.name,
+        characterName: user.characterName,
+        bankAccountNumber: user.bankAccountNumber,
         email: user.email,
       });
     } catch (error) {
+      if (error instanceof ZodError) {
+        const firstIssue = error.issues[0];
+        return reply.code(400).send({ message: firstIssue?.message ?? 'Dados de cadastro inválidos.' });
+      }
       return reply.code(400).send({ message: (error as Error).message });
     }
   });
@@ -51,6 +58,8 @@ export async function authRoutes(app: FastifyInstance) {
       user: {
         id: user.id,
         name: user.name,
+        characterName: user.characterName,
+        bankAccountNumber: user.bankAccountNumber,
         email: user.email,
         roles,
         isBlocked: user.isBlocked,

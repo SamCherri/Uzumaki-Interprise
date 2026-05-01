@@ -7,6 +7,8 @@ type RegisterPageProps = {
 
 export function RegisterPage({ onSwitchLogin }: RegisterPageProps) {
   const [name, setName] = useState('');
+  const [characterName, setCharacterName] = useState('');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
@@ -16,10 +18,12 @@ export function RegisterPage({ onSwitchLogin }: RegisterPageProps) {
     try {
       await api('/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, characterName, bankAccountNumber, email, password }),
       });
       setMessage('Conta criada com sucesso. Entre com o e-mail cadastrado.');
       setName('');
+      setCharacterName('');
+      setBankAccountNumber('');
       setEmail('');
       setPassword('');
       if (onSwitchLogin) onSwitchLogin();
@@ -36,6 +40,15 @@ export function RegisterPage({ onSwitchLogin }: RegisterPageProps) {
           Nome
           <input placeholder="Seu nome" value={name} onChange={(event) => setName(event.target.value)} required />
         </label>
+        <label>
+          Nome do personagem
+          <input placeholder="Nome do personagem" value={characterName} onChange={(event) => setCharacterName(event.target.value)} required minLength={3} />
+        </label>
+        <label>
+          Número da conta bancária fictícia do RP
+          <input placeholder="Ex.: RP-12345" value={bankAccountNumber} onChange={(event) => setBankAccountNumber(event.target.value)} required minLength={3} />
+        </label>
+        <p className="info-text">A conta bancária é fictícia e usada apenas dentro do RP.</p>
         <label>
           E-mail
           <input placeholder="seuemail@exemplo.com" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />

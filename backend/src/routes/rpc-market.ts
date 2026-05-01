@@ -9,6 +9,13 @@ const PRICE_SCALE = 8;
 const RESERVE_SCALE = 2;
 const RPC_MARKET_STATE_ID = 'RPC_MARKET_MAIN';
 
+
+const ADMIN_ROLES = ['SUPER_ADMIN', 'COIN_CHIEF_ADMIN'];
+
+function hasAdminLiquidityRole(roles: string[]) {
+  return roles.some((role) => ADMIN_ROLES.includes(role));
+}
+
 const amountSchema = z.object({
   fiatAmount: z.coerce.number().min(0.01).optional(),
   rpcAmount: z.coerce.number().min(0.01).optional(),
@@ -132,6 +139,87 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
       });
 
       return { message: 'RPC comprado com sucesso.', fiatAmount: result.fiatAmount, rpcAmount: result.rpcAmount, priceBefore: result.priceBefore, priceAfter: result.priceAfter, wallet: { fiatAvailableBalance: result.wallet.fiatAvailableBalance, rpcAvailableBalance: result.wallet.rpcAvailableBalance } };
+    } catch (error) {
+      return reply.status(400).send({ message: (error as Error).message });
+    }
+  });
+
+
+  app.get('/admin/rpc-market/liquidity', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const roles = ((request.user as { roles?: string[] }).roles ?? []).map((role) => role.toUpperCase());
+    if (!hasAdminLiquidityRole(roles)) return reply.status(403).send({ message: 'Sem permissão para gerenciar liquidez RPC/R$.' });
+    const state = await ensureMarketState();
+    return {
+      currentPrice: state.currentPrice,
+      fiatReserve: state.fiatReserve,
+      rpcReserve: state.rpcReserve,
+      totalFiatVolume: state.totalFiatVolume,
+      totalRpcVolume: state.totalRpcVolume,
+      totalBuys: state.totalBuys,
+      totalSells: state.totalSells,
+      updatedAt: state.updatedAt,
+    };
+  });
+
+  const liquiditySchema = z.object({
+    fiatAmount: z.coerce.number().positive().optional(),
+    rpcAmount: z.coerce.number().positive().optional(),
+    reason: z.string().min(10),
+  }).refine((value) => (value.fiatAmount ?? 0) > 0 || (value.rpcAmount ?? 0) > 0, { message: 'Informe fiatAmount ou rpcAmount maior que zero.' });
+
+  app.post('/admin/rpc-market/liquidity/inject', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const roles = ((request.user as { roles?: string[] }).roles ?? []).map((role) => role.toUpperCase());
+    if (!hasAdminLiquidityRole(roles)) return reply.status(403).send({ message: 'Sem permissão para gerenciar liquidez RPC/R$.' });
+    try {
+      const body = liquiditySchema.parse(request.body ?? {});
+      const actorUserId = (request.user as { sub: string }).sub;
+      const fiatAmount = toDecimal(body.fiatAmount ?? 0).toDecimalPlaces(2);
+      const rpcAmount = toDecimal(body.rpcAmount ?? 0).toDecimalPlaces(2);
+      const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await tx.rpcMarketState.upsert({ where: { id: RPC_MARKET_STATE_ID }, update: {}, create: { id: RPC_MARKET_STATE_ID, currentPrice: new Decimal('1.00000000'), fiatReserve: new Decimal('1000000.00'), rpcReserve: new Decimal('1000000.00') } });
+        await tx.$queryRaw`SELECT id FROM "RpcMarketState" WHERE id = ${RPC_MARKET_STATE_ID} FOR UPDATE`;
+        const state = await tx.rpcMarketState.findUniqueOrThrow({ where: { id: RPC_MARKET_STATE_ID } });
+        const previous = { currentPrice: state.currentPrice.toString(), fiatReserve: state.fiatReserve.toString(), rpcReserve: state.rpcReserve.toString(), totalFiatVolume: state.totalFiatVolume.toString(), totalRpcVolume: state.totalRpcVolume.toString(), totalBuys: state.totalBuys, totalSells: state.totalSells, updatedAt: state.updatedAt.toISOString() };
+        const nextFiat = state.fiatReserve.add(fiatAmount).toDecimalPlaces(2);
+        const nextRpc = state.rpcReserve.add(rpcAmount).toDecimalPlaces(2);
+        ensurePositive(nextFiat, 'Reserva R$ deve permanecer positiva.');
+        ensurePositive(nextRpc, 'Reserva RPC deve permanecer positiva.');
+        const nextPrice = nextFiat.div(nextRpc).toDecimalPlaces(PRICE_SCALE);
+        const updated = await tx.rpcMarketState.update({ where: { id: RPC_MARKET_STATE_ID }, data: { fiatReserve: nextFiat, rpcReserve: nextRpc, currentPrice: nextPrice } });
+        const current = { currentPrice: updated.currentPrice.toString(), fiatReserve: updated.fiatReserve.toString(), rpcReserve: updated.rpcReserve.toString(), totalFiatVolume: updated.totalFiatVolume.toString(), totalRpcVolume: updated.totalRpcVolume.toString(), totalBuys: updated.totalBuys, totalSells: updated.totalSells, updatedAt: updated.updatedAt.toISOString(), fiatInjected: fiatAmount.toString(), rpcInjected: rpcAmount.toString() };
+        await tx.adminLog.create({ data: { userId: actorUserId, action: 'RPC_MARKET_LIQUIDITY_INJECT', entity: 'RpcMarketState', reason: body.reason.trim(), previous: JSON.stringify(previous), current: JSON.stringify(current) } });
+        return updated;
+      });
+      return { message: 'Liquidez adicionada com sucesso.', state: result };
+    } catch (error) {
+      return reply.status(400).send({ message: (error as Error).message });
+    }
+  });
+
+  app.post('/admin/rpc-market/liquidity/withdraw', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const roles = ((request.user as { roles?: string[] }).roles ?? []).map((role) => role.toUpperCase());
+    if (!hasAdminLiquidityRole(roles)) return reply.status(403).send({ message: 'Sem permissão para gerenciar liquidez RPC/R$.' });
+    try {
+      const body = liquiditySchema.parse(request.body ?? {});
+      const actorUserId = (request.user as { sub: string }).sub;
+      const fiatAmount = toDecimal(body.fiatAmount ?? 0).toDecimalPlaces(2);
+      const rpcAmount = toDecimal(body.rpcAmount ?? 0).toDecimalPlaces(2);
+      const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await tx.rpcMarketState.upsert({ where: { id: RPC_MARKET_STATE_ID }, update: {}, create: { id: RPC_MARKET_STATE_ID, currentPrice: new Decimal('1.00000000'), fiatReserve: new Decimal('1000000.00'), rpcReserve: new Decimal('1000000.00') } });
+        await tx.$queryRaw`SELECT id FROM "RpcMarketState" WHERE id = ${RPC_MARKET_STATE_ID} FOR UPDATE`;
+        const state = await tx.rpcMarketState.findUniqueOrThrow({ where: { id: RPC_MARKET_STATE_ID } });
+        const previous = { currentPrice: state.currentPrice.toString(), fiatReserve: state.fiatReserve.toString(), rpcReserve: state.rpcReserve.toString(), totalFiatVolume: state.totalFiatVolume.toString(), totalRpcVolume: state.totalRpcVolume.toString(), totalBuys: state.totalBuys, totalSells: state.totalSells, updatedAt: state.updatedAt.toISOString() };
+        const nextFiat = state.fiatReserve.sub(fiatAmount).toDecimalPlaces(2);
+        const nextRpc = state.rpcReserve.sub(rpcAmount).toDecimalPlaces(2);
+        ensurePositive(nextFiat, 'Reserva R$ não pode ficar menor ou igual a zero.');
+        ensurePositive(nextRpc, 'Reserva RPC não pode ficar menor ou igual a zero.');
+        const nextPrice = nextFiat.div(nextRpc).toDecimalPlaces(PRICE_SCALE);
+        const updated = await tx.rpcMarketState.update({ where: { id: RPC_MARKET_STATE_ID }, data: { fiatReserve: nextFiat, rpcReserve: nextRpc, currentPrice: nextPrice } });
+        const current = { currentPrice: updated.currentPrice.toString(), fiatReserve: updated.fiatReserve.toString(), rpcReserve: updated.rpcReserve.toString(), totalFiatVolume: updated.totalFiatVolume.toString(), totalRpcVolume: updated.totalRpcVolume.toString(), totalBuys: updated.totalBuys, totalSells: updated.totalSells, updatedAt: updated.updatedAt.toISOString(), fiatWithdrawn: fiatAmount.toString(), rpcWithdrawn: rpcAmount.toString() };
+        await tx.adminLog.create({ data: { userId: actorUserId, action: 'RPC_MARKET_LIQUIDITY_WITHDRAW', entity: 'RpcMarketState', reason: body.reason.trim(), previous: JSON.stringify(previous), current: JSON.stringify(current) } });
+        return updated;
+      });
+      return { message: 'Liquidez removida com sucesso.', state: result };
     } catch (error) {
       return reply.status(400).send({ message: (error as Error).message });
     }

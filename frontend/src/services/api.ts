@@ -40,6 +40,8 @@ export type CurrentUserResponse = {
     id: string;
     name: string;
     email: string;
+    characterName?: string | null;
+    bankAccountNumber?: string | null;
     roles: string[];
     isBlocked: boolean;
     createdAt: string;
