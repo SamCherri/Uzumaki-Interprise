@@ -25,6 +25,9 @@ const timeframes: { key: Timeframe; label: string; hours: number | null }[] = [
   { key: '30D', label: '30D', hours: 24 * 30 },
   { key: 'ALL', label: 'ALL', hours: null },
 ];
+const RPC_MARKET_TRADES_LIMIT = 200;
+const TRADES_LOAD_FALLBACK_MESSAGE = 'Não foi possível carregar o histórico de trades agora. O preço atual continua disponível.';
+const TRADES_LIMIT_WARNING_MESSAGE = 'Limite de histórico inválido. Usando histórico reduzido.';
 
 export function RpcMarketPage() {
   const [market, setMarket] = useState<MarketState | null>(null);
@@ -42,20 +45,34 @@ export function RpcMarketPage() {
   const [activeSide, setActiveSide] = useState<'buy' | 'sell'>('buy');
   const [activeTimeframe, setActiveTimeframe] = useState<Timeframe>('24H');
 
+  function getFriendlyErrorMessage(err: unknown, fallback: string) {
+    const message = err instanceof Error ? err.message : '';
+    if (message.includes('Number must be less than or equal to 200')) return TRADES_LIMIT_WARNING_MESSAGE;
+    return fallback;
+  }
+
   async function load() {
     setIsLoading(true);
+    setError('');
     try {
-      const [marketData, tradesData, me] = await Promise.all([
+      const [marketData, me, tradesResult] = await Promise.all([
         api<MarketState>('/rpc-market'),
-        api<{ trades: Trade[] }>('/rpc-market/trades?limit=500'),
         api<{ wallet: { fiatAvailableBalance: string; rpcAvailableBalance: string } }>('/auth/me'),
+        api<{ trades: Trade[] }>(`/rpc-market/trades?limit=${RPC_MARKET_TRADES_LIMIT}`)
+          .then((data) => ({ ok: true as const, data }))
+          .catch((err: unknown) => ({ ok: false as const, err })),
       ]);
       setMarket(marketData);
-      setTrades(tradesData.trades);
       setWallet(me.wallet);
+      if (tradesResult.ok) {
+        setTrades(tradesResult.data.trades);
+      } else {
+        setTrades([]);
+        setError(getFriendlyErrorMessage(tradesResult.err, TRADES_LOAD_FALLBACK_MESSAGE));
+      }
       return true;
     } catch (err) {
-      setError((err as Error).message);
+      setError('Não foi possível carregar os dados principais do mercado agora. Tente novamente em instantes.');
       return false;
     } finally {
       setIsLoading(false);
