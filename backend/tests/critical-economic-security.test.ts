@@ -801,7 +801,7 @@ test('modo teste: preço, leaderboard, guardas e report types', async () => {
   const adminToken = await token(admin.id, ['SUPER_ADMIN']);
   const userToken = await token(user.id, ['USER']);
 
-  const setTest = await app.inject({ method: 'POST', url: '/api/system-mode', headers: { authorization: `Bearer ${adminToken}` }, payload: { mode: 'TEST' } });
+  const setTest = await app.inject({ method: 'POST', url: '/api/admin/system-mode/test/enable', headers: { authorization: `Bearer ${adminToken}` }, payload: { reason: 'Ativando modo teste para teste crítico' } });
   assert.equal(setTest.statusCode, 200, setTest.body);
 
   const deniedMe = await app.inject({ method: 'GET', url: '/api/me', headers: { authorization: `Bearer ${userToken}` } });
@@ -818,11 +818,15 @@ test('modo teste: preço, leaderboard, guardas e report types', async () => {
 
   const buy = await app.inject({ method: 'POST', url: '/api/test-mode/buy', headers: { authorization: `Bearer ${userToken}` }, payload: { fiatAmount: 100 } });
   assert.equal(buy.statusCode, 200, buy.body);
-  assert.ok(Number(buy.json().currentPrice) > beforePrice);
+  const afterBuyMarket = await app.inject({ method: 'GET', url: '/api/test-mode/market', headers: { authorization: `Bearer ${userToken}` } });
+  const afterBuyPrice = Number(afterBuyMarket.json().currentPrice);
+  assert.ok(afterBuyPrice > beforePrice);
 
   const sell = await app.inject({ method: 'POST', url: '/api/test-mode/sell', headers: { authorization: `Bearer ${userToken}` }, payload: { rpcAmount: 1 } });
   assert.equal(sell.statusCode, 200, sell.body);
-  assert.ok(Number(sell.json().currentPrice) < Number(buy.json().currentPrice));
+  const afterSellMarket = await app.inject({ method: 'GET', url: '/api/test-mode/market', headers: { authorization: `Bearer ${userToken}` } });
+  const afterSellPrice = Number(afterSellMarket.json().currentPrice);
+  assert.ok(afterSellPrice < afterBuyPrice);
 
   const leaderboard = await app.inject({ method: 'GET', url: '/api/test-mode/leaderboard', headers: { authorization: `Bearer ${userToken}` } });
   assert.equal(leaderboard.statusCode, 200, leaderboard.body);
@@ -830,6 +834,10 @@ test('modo teste: preço, leaderboard, guardas e report types', async () => {
   assert.ok(rows.some((row) => row.userId === user.id));
   const sorted = [...rows].sort((a, b) => Number(b.estimatedTotalFiat) - Number(a.estimatedTotalFiat));
   assert.deepEqual(rows.map((r) => r.userId), sorted.map((r) => r.userId));
+
+
+  const setNormal = await app.inject({ method: 'POST', url: '/api/admin/system-mode/normal/enable', headers: { authorization: `Bearer ${adminToken}` }, payload: { reason: 'Voltando para modo normal no teste crítico' } });
+  assert.equal(setNormal.statusCode, 200, setNormal.body);
 
   for (const type of ['BUG','VISUAL_ERROR','BALANCE_ERROR','CHEAT_SUSPECTED','SUGGESTION','OTHER']) {
     const report = await app.inject({ method: 'POST', url: '/api/test-mode/reports', headers: { authorization: `Bearer ${userToken}` }, payload: { type, location: 'Tela', description: 'Teste' } });
