@@ -23,9 +23,9 @@ const amountSchema = z.object({
 
 const limitOrderCreateSchema = z.object({
   side: z.enum(['BUY_RPC','SELL_RPC']),
-  fiatAmount: z.coerce.number().min(0.01).optional(),
-  rpcAmount: z.coerce.number().min(0.01).optional(),
-  limitPrice: z.coerce.number().positive(),
+  fiatAmount: z.coerce.number().min(0.01, 'Valor mínimo para ordem é 0,01.').optional(),
+  rpcAmount: z.coerce.number().min(0.01, 'Valor mínimo para ordem é 0,01.').optional(),
+  limitPrice: z.coerce.number().positive('Preço limite deve ser maior que zero.'),
 });
 
 function isRoleAllowedToProcess(roles: string[]) {
