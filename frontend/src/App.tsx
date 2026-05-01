@@ -353,6 +353,11 @@ export function App() {
                 <strong>Carteira</strong>
                 <small>Saldo e ativos</small>
               </button>
+              <button className="mobile-action-card" onClick={() => setScreen('rpc-market')}>
+                <span>💴</span>
+                <strong>RPC/R$</strong>
+                <small>Comprar e vender RPC</small>
+              </button>
               {roles.canSeeAdmin && (
                 <button className="mobile-action-card mobile-action-wide" onClick={() => setScreen('admin')}>
                   <span>🛠️</span>
