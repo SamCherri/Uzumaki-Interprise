@@ -23,8 +23,8 @@ const amountSchema = z.object({
 
 const limitOrderCreateSchema = z.object({
   side: z.enum(['BUY_RPC','SELL_RPC']),
-  fiatAmount: z.coerce.number().positive().optional(),
-  rpcAmount: z.coerce.number().positive().optional(),
+  fiatAmount: z.coerce.number().min(0.01).optional(),
+  rpcAmount: z.coerce.number().min(0.01).optional(),
   limitPrice: z.coerce.number().positive(),
 });
 
@@ -308,8 +308,8 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
   });
 
   const liquiditySchema = z.object({
-    fiatAmount: z.coerce.number().positive().optional(),
-    rpcAmount: z.coerce.number().positive().optional(),
+    fiatAmount: z.coerce.number().min(0.01).optional(),
+    rpcAmount: z.coerce.number().min(0.01).optional(),
     reason: z.string().min(10),
   }).refine((value) => (value.fiatAmount ?? 0) > 0 || (value.rpcAmount ?? 0) > 0, { message: 'Informe fiatAmount ou rpcAmount maior que zero.' });
 

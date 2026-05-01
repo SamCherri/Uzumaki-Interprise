@@ -24,11 +24,13 @@ const timeframes: { key: Timeframe; label: string; hours: number | null }[] = [
 
 const RPC_MARKET_TRADES_LIMIT = 200;
 const TRADES_LOAD_FALLBACK_MESSAGE = 'Não foi possível carregar o histórico de trades agora. O preço atual continua disponível.';
+const OPTIONAL_DATA_FALLBACK_MESSAGE = 'Alguns dados secundários (livro/ordens/trades) não puderam ser carregados agora.';
 
 export function RpcMarketPage() {
   const [market, setMarket] = useState<MarketState | null>(null);
   const [trades, setTrades] = useState<Trade[]>([]);
-  const [wallet, setWallet] = useState<{ fiatAvailableBalance: string; rpcAvailableBalance: string } | null>(null);
+  type WalletView = { fiatAvailableBalance: string; rpcAvailableBalance: string; fiatLockedBalance?: string; rpcLockedBalance?: string; };
+  const [wallet, setWallet] = useState<WalletView | null>(null);
   const [fiatAmount, setFiatAmount] = useState('');
   const [rpcAmount, setRpcAmount] = useState('');
   const [buyQuote, setBuyQuote] = useState<BuyQuote | null>(null);
@@ -53,24 +55,33 @@ export function RpcMarketPage() {
     setIsLoading(true);
     setError('');
     try {
-      const [marketData, me, tradesResult, orderBookData, myOrdersData] = await Promise.all([
+      const [marketData, me, tradesResult, orderBookResult, myOrdersResult] = await Promise.all([
         api<MarketState>('/rpc-market'),
-        api<{ wallet: { fiatAvailableBalance: string; rpcAvailableBalance: string } }>('/auth/me'),
+        api<{ wallet: WalletView }>('/auth/me'),
         api<{ trades: Trade[] }>(`/rpc-market/trades?limit=${RPC_MARKET_TRADES_LIMIT}`)
           .then((data) => ({ ok: true as const, data }))
           .catch(() => ({ ok: false as const })),
-        api<OrderBook>('/rpc-market/order-book'),
-        api<{ orders: LimitOrder[] }>('/rpc-market/orders/me'),
+        api<OrderBook>('/rpc-market/order-book')
+          .then((data) => ({ ok: true as const, data }))
+          .catch(() => ({ ok: false as const })),
+        api<{ orders: LimitOrder[] }>('/rpc-market/orders/me')
+          .then((data) => ({ ok: true as const, data }))
+          .catch(() => ({ ok: false as const })),
       ]);
       setMarket(marketData);
-      setWallet(me.wallet as any);
-      setOrderBook(orderBookData);
-      setMyOrders(myOrdersData.orders);
-      if (tradesResult.ok) {
-        setTrades(tradesResult.data.trades);
-      } else {
-        setTrades([]);
-        setError(TRADES_LOAD_FALLBACK_MESSAGE);
+      setWallet(me.wallet);
+
+      if (tradesResult.ok) setTrades(tradesResult.data.trades);
+      else setTrades([]);
+
+      if (orderBookResult.ok) setOrderBook(orderBookResult.data);
+      else setOrderBook({ buyOrders: [], sellOrders: [] });
+
+      if (myOrdersResult.ok) setMyOrders(myOrdersResult.data.orders);
+      else setMyOrders([]);
+
+      if (!tradesResult.ok || !orderBookResult.ok || !myOrdersResult.ok) {
+        setError(OPTIONAL_DATA_FALLBACK_MESSAGE);
       }
       return true;
     } catch {
@@ -210,6 +221,41 @@ export function RpcMarketPage() {
     }
   }
 
+
+  async function onCreateLimitOrder(event: FormEvent) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+    try {
+      if (tradeFlow === 'buy') {
+        await api('/rpc-market/orders', { method: 'POST', body: JSON.stringify({ side: 'BUY_RPC', fiatAmount: Number(limitFiatAmount), limitPrice: Number(limitPrice) }) });
+        setMessage('Ordem limite de compra criada com sucesso.');
+        setLimitFiatAmount('');
+      } else {
+        await api('/rpc-market/orders', { method: 'POST', body: JSON.stringify({ side: 'SELL_RPC', rpcAmount: Number(limitRpcAmount), limitPrice: Number(limitPrice) }) });
+        setMessage('Ordem limite de venda criada com sucesso.');
+        setLimitRpcAmount('');
+      }
+      setLimitPrice('');
+      setTradeFlow(null);
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function onCancelOrder(orderId: string) {
+    setError('');
+    setMessage('');
+    try {
+      await api(`/rpc-market/orders/${orderId}/cancel`, { method: 'POST' });
+      setMessage('Ordem cancelada com sucesso.');
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
   const variationAbs = chart.variationAbs;
   const variationPercent = chart.variationPercent;
 
@@ -266,16 +312,19 @@ export function RpcMarketPage() {
 
         {activeTab === 'livro' && <section className="card nested-card market-tab-panel market-full-width"><h4>Livro de ordens RPC/R$</h4><p className="info-text">RPC/R$ ainda usa liquidez automática para execução. O livro mostra ordens limite pendentes.</p><div className="order-book-grid"><div className="summary-item"><span className="summary-label">Reserva RPC</span><strong>{formatCurrency(Number(market?.rpcReserve ?? 0))} RPC</strong></div><div className="summary-item"><span className="summary-label">Reserva R$</span><strong>R$ {formatCurrency(Number(market?.fiatReserve ?? 0))}</strong></div><div className="summary-item"><span className="summary-label">Preço atual</span><strong>R$ {formatPrice(Number(market?.currentPrice ?? 0))}</strong></div></div><h5>Compras</h5>{orderBook.buyOrders.length===0?<p className="empty-state">Sem ordens abertas neste lado.</p>:orderBook.buyOrders.map((o)=><article key={o.id} className="summary-item compact-card market-order-card"><p>Preço limite: R$ {formatPrice(Number(o.limitPrice))}</p><p>Valor R$: {formatCurrency(Number(o.lockedFiatAmount||o.fiatAmount||0))}</p><p>Criada: {new Date(o.createdAt).toLocaleString('pt-BR')}</p></article>)}<h5>Vendas</h5>{orderBook.sellOrders.length===0?<p className="empty-state">Sem ordens abertas neste lado.</p>:orderBook.sellOrders.map((o)=><article key={o.id} className="summary-item compact-card market-order-card"><p>Preço limite: R$ {formatPrice(Number(o.limitPrice))}</p><p>Valor RPC: {formatCurrency(Number(o.lockedRpcAmount||o.rpcAmount||0))}</p><p>Criada: {new Date(o.createdAt).toLocaleString('pt-BR')}</p></article>)}</section>}
 
-        {activeTab === 'ordens' && <section className="card nested-card market-tab-panel market-full-width"><h4>Ordem limite em breve</h4><p className="info-text">Ordens limite para RPC/R$ em breve. No momento, as compras e vendas são executadas imediatamente pelo preço estimado.</p><p className="info-text">Execução imediata · Preço pode variar conforme liquidez.</p></section>}
+        {activeTab === 'ordens' && <section className="card nested-card market-tab-panel market-full-width"><h4>Minhas ordens RPC/R$</h4>{myOrders.length===0?<p className="empty-state">Nenhuma ordem RPC/R$ criada ainda.</p>:<div className="mobile-card-list">{myOrders.map((order)=><article key={order.id} className="summary-item compact-card market-order-card"><p><strong>{order.side==='BUY_RPC'?'COMPRA':'VENDA'}</strong> · {order.status}</p><p>Preço limite: R$ {formatPrice(Number(order.limitPrice||0))}</p><p>Valor: {order.side==='BUY_RPC'?`R$ ${formatCurrency(Number(order.fiatAmount??0))}`:`${formatCurrency(Number(order.rpcAmount??0))} RPC`}</p><p>Travado: {order.side==='BUY_RPC'?`R$ ${formatCurrency(Number(order.lockedFiatAmount??0))}`:`${formatCurrency(Number(order.lockedRpcAmount??0))} RPC`}</p><p>Criada: {new Date(order.createdAt).toLocaleString('pt-BR')}</p>{order.executedAt && <p>Executada: {new Date(order.executedAt).toLocaleString('pt-BR')}</p>}{order.canceledAt && <p>Cancelada: {new Date(order.canceledAt).toLocaleString('pt-BR')}</p>}{order.status==='OPEN' && <button type="button" className="small-button" onClick={() => void onCancelOrder(order.id)}>Cancelar</button>}</article>)}</div>}</section>}
 
         {activeTab === 'trades' && <section className="card nested-card market-tab-panel market-full-width"><h4>Últimos trades RPC/R$</h4><div className="mobile-card-list">{trades.length === 0 && <p className="empty-state">Sem negociações ainda.</p>}{trades.slice(0, 20).map((trade) => <article key={trade.id} className="summary-item compact-card market-order-card"><p><strong>{trade.side === 'BUY_RPC' ? 'COMPRA' : 'VENDA'}</strong> · {new Date(trade.createdAt).toLocaleTimeString('pt-BR')}</p><p>Preço: R$ {formatPrice(Number(trade.unitPrice))}</p><p>Quantidade: {formatCurrency(Number(trade.rpcAmount))} RPC</p><p>Total: R$ {formatCurrency(Number(trade.fiatAmount))}</p></article>)}</div></section>}
 
-        {activeTab === 'dados' && <section className="card nested-card market-tab-panel market-full-width"><h4>Dados do mercado</h4><div className="market-data-grid"><div className="summary-item"><span className="summary-label">Preço atual</span><strong>R$ {formatPrice(Number(market?.currentPrice ?? 0))}</strong></div><div className="summary-item"><span className="summary-label">Reserva RPC</span><strong>{formatCurrency(Number(market?.rpcReserve ?? 0))} RPC</strong></div><div className="summary-item"><span className="summary-label">Reserva R$</span><strong>R$ {formatCurrency(Number(market?.fiatReserve ?? 0))}</strong></div><div className="summary-item"><span className="summary-label">Volume total R$</span><strong>{formatCurrency(Number(market?.totalFiatVolume ?? 0))}</strong></div><div className="summary-item"><span className="summary-label">Volume total RPC</span><strong>{formatCurrency(Number(market?.totalRpcVolume ?? 0))}</strong></div><div className="summary-item"><span className="summary-label">Total compras</span><strong>{market?.totalBuys ?? 0}</strong></div><div className="summary-item"><span className="summary-label">Total vendas</span><strong>{market?.totalSells ?? 0}</strong></div><div className="summary-item"><span className="summary-label">Atualizado em</span><strong>{market?.updatedAt ? new Date(market.updatedAt).toLocaleString('pt-BR') : '--'}</strong></div><div className="summary-item"><span className="summary-label">Saldo R$</span><strong>{formatCurrency(Number(wallet?.fiatAvailableBalance ?? 0))}</strong></div><div className="summary-item"><span className="summary-label">Saldo RPC</span><strong>{formatCurrency(Number(wallet?.rpcAvailableBalance ?? 0))}</strong></div></div></section>}
+        {activeTab === 'dados' && <section className="card nested-card market-tab-panel market-full-width"><h4>Dados do mercado</h4><div className="market-data-grid"><div className="summary-item"><span className="summary-label">Preço atual</span><strong>R$ {formatPrice(Number(market?.currentPrice ?? 0))}</strong></div><div className="summary-item"><span className="summary-label">Reserva RPC</span><strong>{formatCurrency(Number(market?.rpcReserve ?? 0))} RPC</strong></div><div className="summary-item"><span className="summary-label">Reserva R$</span><strong>R$ {formatCurrency(Number(market?.fiatReserve ?? 0))}</strong></div><div className="summary-item"><span className="summary-label">Volume total R$</span><strong>{formatCurrency(Number(market?.totalFiatVolume ?? 0))}</strong></div><div className="summary-item"><span className="summary-label">Volume total RPC</span><strong>{formatCurrency(Number(market?.totalRpcVolume ?? 0))}</strong></div><div className="summary-item"><span className="summary-label">Total compras</span><strong>{market?.totalBuys ?? 0}</strong></div><div className="summary-item"><span className="summary-label">Total vendas</span><strong>{market?.totalSells ?? 0}</strong></div><div className="summary-item"><span className="summary-label">Atualizado em</span><strong>{market?.updatedAt ? new Date(market.updatedAt).toLocaleString('pt-BR') : '--'}</strong></div><div className="summary-item"><span className="summary-label">Saldo R$ disponível</span><strong>{formatCurrency(Number(wallet?.fiatAvailableBalance ?? 0))}</strong></div><div className="summary-item"><span className="summary-label">Saldo R$ travado</span><strong>{formatCurrency(Number(wallet?.fiatLockedBalance ?? 0))}</strong></div><div className="summary-item"><span className="summary-label">Saldo RPC disponível</span><strong>{formatCurrency(Number(wallet?.rpcAvailableBalance ?? 0))}</strong></div><div className="summary-item"><span className="summary-label">Saldo RPC travado</span><strong>{formatCurrency(Number(wallet?.rpcLockedBalance ?? 0))}</strong></div></div></section>}
 
         <div className="mobile-trade-actions"><button className="button-success" type="button" onClick={() => setTradeFlow('buy')}>Comprar</button><button className="button-danger" type="button" onClick={() => setTradeFlow('sell')}>Vender</button></div>
 
-        {tradeFlow && <div className="trade-panel-backdrop" onClick={() => setTradeFlow(null)}><div className="trade-bottom-sheet market-trade-sheet" onClick={(event) => event.stopPropagation()}><div className="market-sheet-handle" aria-hidden="true" /><div className="trade-panel-header"><h4>{tradeFlow === 'buy' ? 'Comprar RPC' : 'Vender RPC'}</h4><button type="button" className="small-button" onClick={() => setTradeFlow(null)}>Fechar</button></div>
-          {tradeFlow === 'buy' ? <form onSubmit={onBuy}><p className="market-sheet-balance-row">Saldo R$ disponível: {formatCurrency(Number(wallet?.fiatAvailableBalance ?? 0))}</p><input value={fiatAmount} onChange={(e) => setFiatAmount(e.target.value)} placeholder="Entrada em R$" required /><div className="market-sheet-mini-card"><p>Saída estimada em RPC: {formatCurrency(Number(buyQuote?.estimatedRpcAmount ?? 0))}</p><p>Preço médio estimado: R$ {formatPrice(Number(buyQuote?.effectiveUnitPrice ?? 0))}</p><p>Taxa aplicada: 0%</p><p>Total final: R$ {formatCurrency(Number(fiatAmount || 0))}</p></div>{buyQuoteError && <p className="info-text">{buyQuoteError}</p>}<button className="button-success" type="submit" disabled={!buyQuote || Number(fiatAmount) < 0.01}>Comprar agora</button></form> : <form onSubmit={onSell}><p className="market-sheet-balance-row">Saldo RPC disponível: {formatCurrency(Number(wallet?.rpcAvailableBalance ?? 0))}</p><input value={rpcAmount} onChange={(e) => setRpcAmount(e.target.value)} placeholder="Entrada em RPC" required /><div className="market-sheet-mini-card"><p>Saída estimada em R$: {formatCurrency(Number(sellQuote?.estimatedFiatAmount ?? 0))}</p><p>Preço médio estimado: R$ {formatPrice(Number(sellQuote?.effectiveUnitPrice ?? 0))}</p><p>Taxa aplicada: 0%</p><p>Total final: R$ {formatCurrency(Number(sellQuote?.estimatedFiatAmount ?? 0))}</p></div>{sellQuoteError && <p className="info-text">{sellQuoteError}</p>}<button className="button-danger" type="submit" disabled={!sellQuote || Number(rpcAmount) < 0.01}>Vender agora</button></form>}
+        {tradeFlow && <div className="trade-panel-backdrop" onClick={() => setTradeFlow(null)}><div className="trade-bottom-sheet market-trade-sheet" onClick={(event) => event.stopPropagation()}><div className="market-sheet-handle" aria-hidden="true" /><div className="trade-panel-header"><h4>{tradeFlow === 'buy' ? 'Comprar RPC' : 'Vender RPC'}</h4><button type="button" className="small-button" onClick={() => setTradeFlow(null)}>Fechar</button></div><nav className="quick-actions"><button type="button" className={tradeMode === 'market' ? 'quick-pill active' : 'quick-pill'} onClick={() => setTradeMode('market')}>Mercado</button><button type="button" className={tradeMode === 'limit' ? 'quick-pill active' : 'quick-pill'} onClick={() => setTradeMode('limit')}>Limite</button></nav>
+          {tradeFlow === 'buy' && tradeMode === 'market' && <form onSubmit={onBuy}><p className="market-sheet-balance-row">Saldo R$ disponível: {formatCurrency(Number(wallet?.fiatAvailableBalance ?? 0))}</p><input value={fiatAmount} onChange={(e) => setFiatAmount(e.target.value)} placeholder="Entrada em R$" required /><div className="market-sheet-mini-card"><p>Saída estimada em RPC: {formatCurrency(Number(buyQuote?.estimatedRpcAmount ?? 0))}</p><p>Preço médio estimado: R$ {formatPrice(Number(buyQuote?.effectiveUnitPrice ?? 0))}</p><p>Taxa aplicada: 0%</p><p>Total final: R$ {formatCurrency(Number(fiatAmount || 0))}</p></div>{buyQuoteError && <p className="info-text">{buyQuoteError}</p>}<button className="button-success" type="submit" disabled={!buyQuote || Number(fiatAmount) < 0.01}>Comprar agora</button></form>}
+          {tradeFlow === 'sell' && tradeMode === 'market' && <form onSubmit={onSell}><p className="market-sheet-balance-row">Saldo RPC disponível: {formatCurrency(Number(wallet?.rpcAvailableBalance ?? 0))}</p><input value={rpcAmount} onChange={(e) => setRpcAmount(e.target.value)} placeholder="Entrada em RPC" required /><div className="market-sheet-mini-card"><p>Saída estimada em R$: {formatCurrency(Number(sellQuote?.estimatedFiatAmount ?? 0))}</p><p>Preço médio estimado: R$ {formatPrice(Number(sellQuote?.effectiveUnitPrice ?? 0))}</p><p>Taxa aplicada: 0%</p><p>Total final: R$ {formatCurrency(Number(sellQuote?.estimatedFiatAmount ?? 0))}</p></div>{sellQuoteError && <p className="info-text">{sellQuoteError}</p>}<button className="button-danger" type="submit" disabled={!sellQuote || Number(rpcAmount) < 0.01}>Vender agora</button></form>}
+          {tradeFlow === 'buy' && tradeMode === 'limit' && <form onSubmit={onCreateLimitOrder}><p className="market-sheet-balance-row">Saldo R$ disponível: {formatCurrency(Number(wallet?.fiatAvailableBalance ?? 0))}</p><input value={limitFiatAmount} onChange={(e) => setLimitFiatAmount(e.target.value)} placeholder="Entrada em R$" required /><input value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço limite" required /><p className="info-text">Executa se o preço médio for menor ou igual ao limite.</p><button className="button-success" type="submit" disabled={Number(limitFiatAmount) < 0.01 || Number(limitPrice) <= 0}>Criar ordem de compra</button></form>}
+          {tradeFlow === 'sell' && tradeMode === 'limit' && <form onSubmit={onCreateLimitOrder}><p className="market-sheet-balance-row">Saldo RPC disponível: {formatCurrency(Number(wallet?.rpcAvailableBalance ?? 0))}</p><input value={limitRpcAmount} onChange={(e) => setLimitRpcAmount(e.target.value)} placeholder="Entrada em RPC" required /><input value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço limite" required /><p className="info-text">Executa se o preço médio for maior ou igual ao limite.</p><button className="button-danger" type="submit" disabled={Number(limitRpcAmount) < 0.01 || Number(limitPrice) <= 0}>Criar ordem de venda</button></form>}
         </div></div>}
       </div>
     </section>

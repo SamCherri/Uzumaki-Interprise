@@ -976,3 +976,95 @@ test('bot tick do modo teste só opera em TEST e não altera economia real', asy
   });
   assert.equal(setNormalMode.statusCode, 200, setNormalMode.body);
 });
+
+test('ordens limite RPC/R$ travam/cancelam saldos e processam elegíveis com segurança', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const rChief = await mkRole('COIN_CHIEF_ADMIN');
+  const buyer = await mkUser('rpc-buyer@test.local');
+  const seller = await mkUser('rpc-seller@test.local');
+  const other = await mkUser('rpc-other@test.local');
+  const chief = await mkUser('rpc-chief@test.local');
+  await prisma.userRole.createMany({ data: [
+    { userId: buyer.id, roleId: rUser.id },
+    { userId: seller.id, roleId: rUser.id },
+    { userId: other.id, roleId: rUser.id },
+    { userId: chief.id, roleId: rChief.id },
+  ] });
+
+  await prisma.wallet.update({ where: { userId: buyer.id }, data: { fiatAvailableBalance: 1000 } });
+  await prisma.wallet.update({ where: { userId: seller.id }, data: { rpcAvailableBalance: 300 } });
+
+  const buyerTk = await token(buyer.id, ['USER']);
+  const sellerTk = await token(seller.id, ['USER']);
+  const otherTk = await token(other.id, ['USER']);
+  const chiefTk = await token(chief.id, ['COIN_CHIEF_ADMIN']);
+
+  const createBuy = await app.inject({ method: 'POST', url: '/api/rpc-market/orders', headers: { authorization: `Bearer ${buyerTk}` }, payload: { side: 'BUY_RPC', fiatAmount: 120, limitPrice: 2 } });
+  assert.equal(createBuy.statusCode, 201, createBuy.body);
+  const buyOrderId = createBuy.json().order.id as string;
+  let buyerWallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: buyer.id } });
+  let buyOrder = await prisma.rpcLimitOrder.findUniqueOrThrow({ where: { id: buyOrderId } });
+  assert.equal(Number(buyerWallet.fiatAvailableBalance), 880);
+  assert.equal(Number(buyerWallet.fiatLockedBalance), 120);
+  assert.equal(buyOrder.status, 'OPEN');
+
+  const cancelByOther = await app.inject({ method: 'POST', url: `/api/rpc-market/orders/${buyOrderId}/cancel`, headers: { authorization: `Bearer ${otherTk}` } });
+  assert.equal(cancelByOther.statusCode, 400, cancelByOther.body);
+  buyerWallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: buyer.id } });
+  assert.equal(Number(buyerWallet.fiatAvailableBalance), 880);
+  assert.equal(Number(buyerWallet.fiatLockedBalance), 120);
+
+  const cancelBuy = await app.inject({ method: 'POST', url: `/api/rpc-market/orders/${buyOrderId}/cancel`, headers: { authorization: `Bearer ${buyerTk}` } });
+  assert.equal(cancelBuy.statusCode, 200, cancelBuy.body);
+  buyerWallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: buyer.id } });
+  buyOrder = await prisma.rpcLimitOrder.findUniqueOrThrow({ where: { id: buyOrderId } });
+  assert.equal(Number(buyerWallet.fiatAvailableBalance), 1000);
+  assert.equal(Number(buyerWallet.fiatLockedBalance), 0);
+  assert.equal(buyOrder.status, 'CANCELED');
+
+  const createSell = await app.inject({ method: 'POST', url: '/api/rpc-market/orders', headers: { authorization: `Bearer ${sellerTk}` }, payload: { side: 'SELL_RPC', rpcAmount: 40, limitPrice: 0.5 } });
+  assert.equal(createSell.statusCode, 201, createSell.body);
+  const sellOrderId = createSell.json().order.id as string;
+  let sellerWallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: seller.id } });
+  let sellOrder = await prisma.rpcLimitOrder.findUniqueOrThrow({ where: { id: sellOrderId } });
+  assert.equal(Number(sellerWallet.rpcAvailableBalance), 260);
+  assert.equal(Number(sellerWallet.rpcLockedBalance), 40);
+  assert.equal(sellOrder.status, 'OPEN');
+
+  const cancelSell = await app.inject({ method: 'POST', url: `/api/rpc-market/orders/${sellOrderId}/cancel`, headers: { authorization: `Bearer ${sellerTk}` } });
+  assert.equal(cancelSell.statusCode, 200, cancelSell.body);
+  sellerWallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: seller.id } });
+  sellOrder = await prisma.rpcLimitOrder.findUniqueOrThrow({ where: { id: sellOrderId } });
+  assert.equal(Number(sellerWallet.rpcAvailableBalance), 300);
+  assert.equal(Number(sellerWallet.rpcLockedBalance), 0);
+  assert.equal(sellOrder.status, 'CANCELED');
+
+  const fillBuyResp = await app.inject({ method: 'POST', url: '/api/rpc-market/orders', headers: { authorization: `Bearer ${buyerTk}` }, payload: { side: 'BUY_RPC', fiatAmount: 100, limitPrice: 2 } });
+  const fillSellResp = await app.inject({ method: 'POST', url: '/api/rpc-market/orders', headers: { authorization: `Bearer ${sellerTk}` }, payload: { side: 'SELL_RPC', rpcAmount: 20, limitPrice: 0.5 } });
+  assert.equal(fillBuyResp.statusCode, 201, fillBuyResp.body);
+  assert.equal(fillSellResp.statusCode, 201, fillSellResp.body);
+  const fillBuyId = fillBuyResp.json().order.id as string;
+  const fillSellId = fillSellResp.json().order.id as string;
+
+  const process = await app.inject({ method: 'POST', url: '/api/admin/rpc-market/orders/process', headers: { authorization: `Bearer ${chiefTk}` }, payload: { maxOrders: 20 } });
+  assert.equal(process.statusCode, 200, process.body);
+
+  const filledBuy = await prisma.rpcLimitOrder.findUniqueOrThrow({ where: { id: fillBuyId } });
+  const filledSell = await prisma.rpcLimitOrder.findUniqueOrThrow({ where: { id: fillSellId } });
+  assert.equal(filledBuy.status, 'FILLED');
+  assert.equal(filledSell.status, 'FILLED');
+
+  buyerWallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: buyer.id } });
+  sellerWallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: seller.id } });
+  assert.equal(Number(buyerWallet.fiatLockedBalance), 0);
+  assert.ok(Number(buyerWallet.rpcAvailableBalance) > 0);
+  assert.equal(Number(sellerWallet.rpcLockedBalance), 0);
+  assert.ok(Number(sellerWallet.fiatAvailableBalance) > 0);
+
+  const rpcTrades = await prisma.rpcExchangeTrade.findMany({ where: { userId: { in: [buyer.id, seller.id] } } });
+  assert.ok(rpcTrades.length >= 2);
+  const state = await prisma.rpcMarketState.findUniqueOrThrow({ where: { id: 'RPC_MARKET_MAIN' } });
+  assert.ok(Number(state.totalBuys) >= 1);
+  assert.ok(Number(state.totalSells) >= 1);
+});
