@@ -720,8 +720,8 @@ test('modo teste global bloqueia rotas reais, mantém isolamento e registra logs
   assert.equal(testMe.statusCode, 200, testMe.body);
   assert.equal(Number(testMe.json().fiatBalance), 10000);
 
-  const reportInTest = await app.inject({ method: 'POST', url: '/api/test-mode/reports', headers: { authorization: `Bearer ${userTk}` }, payload: { type: 'BUG', location: 'x', description: 'erro de teste modo' } });
-  assert.equal(reportInTest.statusCode, 200, reportInTest.body);
+  const reportInTest = await app.inject({ method: 'POST', url: '/api/test-mode/reports', headers: { authorization: `Bearer ${userTk}` }, payload: { type: 'BUG', location: 'Tela', description: 'Teste de report' } });
+  assert.equal(reportInTest.statusCode, 201, reportInTest.body);
 
   const buy = await app.inject({ method: 'POST', url: '/api/test-mode/buy', headers: { authorization: `Bearer ${userTk}` }, payload: { fiatAmount: 100 } });
   assert.equal(buy.statusCode, 200, buy.body);
@@ -747,7 +747,7 @@ test('modo teste global bloqueia rotas reais, mantém isolamento e registra logs
   const disable = await app.inject({ method: 'POST', url: '/api/admin/system-mode/normal/enable', headers: { authorization: `Bearer ${superTk}` }, payload: { reason: 'encerrando modo teste global' } });
   assert.equal(disable.statusCode, 200, disable.body);
 
-  const reportInNormal = await app.inject({ method: 'POST', url: '/api/test-mode/reports', headers: { authorization: `Bearer ${userTk}` }, payload: { type: 'BUG', location: 'x', description: 'erro normal' } });
+  const reportInNormal = await app.inject({ method: 'POST', url: '/api/test-mode/reports', headers: { authorization: `Bearer ${userTk}` }, payload: { type: 'BUG', location: 'Tela', description: 'Teste de report' } });
   assert.equal(reportInNormal.statusCode, 403);
 
   const logs = await prisma.adminLog.findMany({ where: { action: { in: ['SYSTEM_MODE_ENABLE_TEST', 'SYSTEM_MODE_ENABLE_NORMAL', 'TEST_MODE_RESET_USER', 'TEST_MODE_CLEAR'] } } });
