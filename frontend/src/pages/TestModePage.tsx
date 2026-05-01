@@ -39,6 +39,7 @@ export function TestModePage() {
   const [reportDescription, setReportDescription] = useState('');
   const isInitialLoadDoneRef = useRef(false);
   const [lastBotTick, setLastBotTick] = useState<BotTickResponse | null>(null);
+  const [botTickHistory, setBotTickHistory] = useState<BotTickResponse[]>([]);
 
   async function loadAll() {
     setLoading(true);
@@ -75,7 +76,12 @@ export function TestModePage() {
       if (!isInitialLoadDoneRef.current || document.visibilityState !== 'visible') return;
       void api<BotTickResponse>('/test-mode/bot-tick', { method: 'POST' })
         .then((tick) => {
+          if (tick.skipped) {
+            setLastBotTick(tick);
+            return;
+          }
           setLastBotTick(tick);
+          setBotTickHistory((items) => [...items, tick].slice(-50));
           return loadAll();
         })
         .catch(() => undefined);
@@ -105,11 +111,24 @@ export function TestModePage() {
   const chartTrades = useMemo(() => [...trades].reverse(), [trades]);
   const chartPrices = useMemo(() => {
     if (!market) return [1, 1];
-    if (chartTrades.length === 0) return [Number(market.currentPrice), Number(market.currentPrice)];
-    const fromTrades = chartTrades.map((t) => Number(t.priceAfter ?? t.unitPrice ?? market.currentPrice)).filter((v) => Number.isFinite(v) && v > 0);
-    if (fromTrades.length === 1) return [fromTrades[0], fromTrades[0]];
-    return fromTrades;
-  }, [chartTrades, market]);
+    const tradePrices = chartTrades
+      .map((trade) => Number(trade.priceAfter ?? trade.unitPrice ?? market.currentPrice))
+      .filter((value) => Number.isFinite(value) && value > 0);
+    const botPrices = botTickHistory
+      .map((tick) => Number(tick.priceAfter ?? tick.currentPrice ?? market.currentPrice))
+      .filter((value) => Number.isFinite(value) && value > 0);
+    const marketPrice = Number(market.currentPrice);
+    const points = [...tradePrices, ...botPrices];
+
+    if (Number.isFinite(marketPrice) && marketPrice > 0) {
+      points.push(marketPrice);
+    }
+
+    if (points.length === 0) return [marketPrice || 1, marketPrice || 1];
+    if (points.length === 1) return [points[0], points[0]];
+
+    return points;
+  }, [chartTrades, botTickHistory, market]);
 
   async function handleBuy() {
     try {
