@@ -10,12 +10,13 @@ const transferSchema = z
   .object({
     userEmail: z.string().email().optional(),
     userId: z.string().min(1).optional(),
+    userRef: z.string().min(1).optional(),
     amount: z.coerce.number().positive(),
     reason: z.string().min(3),
   })
-  .refine((data) => Boolean(data.userEmail || data.userId), {
-    message: 'Informe o e-mail do usuário ou ID do usuário.',
-    path: ['userEmail'],
+  .refine((data) => Boolean(data.userEmail || data.userId || data.userRef), {
+    message: 'Informe conta RP, personagem, nome, e-mail técnico ou ID do usuário.',
+    path: ['userRef'],
   });
 
 function requireBroker(reply: FastifyReply, roles: string[]) {
@@ -86,9 +87,12 @@ export async function brokerRoutes(app: FastifyInstance) {
       }
 
       const normalizedEmail = body.userEmail?.trim().toLowerCase();
+      const normalizedRef = body.userRef?.trim();
       const targetUser = normalizedEmail
         ? await tx.user.findUnique({ where: { email: normalizedEmail }, include: { wallet: true } })
-        : await tx.user.findUnique({ where: { id: body.userId }, include: { wallet: true } });
+        : body.userId
+          ? await tx.user.findUnique({ where: { id: body.userId }, include: { wallet: true } })
+          : await tx.user.findFirst({ where: { OR: [{ bankAccountNumber: normalizedRef }, { characterName: { equals: normalizedRef, mode: 'insensitive' } }, { name: { equals: normalizedRef, mode: 'insensitive' } }, { email: { equals: normalizedRef?.toLowerCase(), mode: 'insensitive' } }] }, include: { wallet: true } });
       if (!targetUser) {
         throw new Error('Usuário de destino não encontrado.');
       }

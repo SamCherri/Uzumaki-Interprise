@@ -6,6 +6,8 @@ type UserRow = {
   id: string;
   name: string;
   email: string;
+  characterName?: string | null;
+  bankAccountNumber?: string | null;
   roles: string[];
   isBlocked: boolean;
   wallet: {
@@ -130,7 +132,7 @@ export function AdminUsersPanel({ onPermissionsUpdated, mode = 'users' }: AdminU
           loadUsers();
         }}
       >
-        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={mode === 'brokers' ? 'Buscar corretor por nome/e-mail' : 'Buscar por nome/e-mail'} />
+        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={mode === 'brokers' ? 'Buscar por conta RP/personagem/nome/e-mail' : 'Buscar por conta RP/personagem/nome/e-mail'} />
         <button className="button-primary" type="submit">{mode === 'brokers' ? 'Buscar corretores' : 'Buscar usuários'}</button>
       </form>
 
@@ -142,8 +144,10 @@ export function AdminUsersPanel({ onPermissionsUpdated, mode = 'users' }: AdminU
         <div className="mobile-card-list">
           {users.map((user) => (
           <article key={user.id} className="summary-item compact-card">
-            <strong>{user.name}</strong>
-            <p>{user.email}</p>
+            <strong>Usuário: {user.name}</strong>
+            <p>Personagem: {user.characterName ?? 'Sem personagem'}</p>
+            <p>Conta RP: {user.bankAccountNumber ?? 'Sem conta RP'}</p>
+            <p className="info-text">Email técnico: {user.email}</p>
             <p>Status: {user.isBlocked ? 'Bloqueado' : 'Ativo'}</p>
             <p>Cargos: {user.roles.map((role) => translateRole(role)).join(', ')}</p>
             <p>Disponível: {user.wallet.availableBalance}</p>
@@ -183,8 +187,10 @@ export function AdminUsersPanel({ onPermissionsUpdated, mode = 'users' }: AdminU
       <div className="mobile-card-list">
         {brokers.map((broker) => (
           <article key={broker.id} className="summary-item compact-card">
-            <strong>{broker.name}</strong>
-            <p>{broker.email}</p>
+            <strong>Usuário: {broker.name}</strong>
+            <p>Personagem: {broker.characterName ?? 'Sem personagem'}</p>
+            <p>Conta RP: {broker.bankAccountNumber ?? 'Sem conta RP'}</p>
+            <p className="info-text">Email técnico: {broker.email}</p>
             <p>Saldo RPC: {broker.wallet.availableBalance}</p>
             <button className="button-danger" onClick={() => removeBrokerRole(broker)}>
               Remover função de corretor

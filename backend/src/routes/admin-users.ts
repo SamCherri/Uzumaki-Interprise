@@ -46,6 +46,8 @@ export async function adminUsersRoutes(app: FastifyInstance) {
           OR: [
             { name: { contains: query.search, mode: 'insensitive' } },
             { email: { contains: query.search, mode: 'insensitive' } },
+            { characterName: { contains: query.search, mode: 'insensitive' } },
+            { bankAccountNumber: { contains: query.search, mode: 'insensitive' } },
           ],
         } : {}),
         ...(query.status ? { isBlocked: query.status === 'BLOCKED' } : {}),
@@ -60,10 +62,12 @@ export async function adminUsersRoutes(app: FastifyInstance) {
     });
 
     return {
-      users: users.map((user: { id: string; name: string | null; email: string; roles: Array<{ role: { key: string } }>; isBlocked: boolean; wallet: { availableBalance: unknown; lockedBalance: unknown; pendingWithdrawalBalance: unknown } | null; createdAt: Date }) => ({
+      users: users.map((user: { id: string; name: string | null; email: string; characterName: string | null; bankAccountNumber: string | null; roles: Array<{ role: { key: string } }>; isBlocked: boolean; wallet: { availableBalance: unknown; lockedBalance: unknown; pendingWithdrawalBalance: unknown } | null; createdAt: Date }) => ({
         id: user.id,
         name: user.name,
         email: user.email,
+        characterName: user.characterName,
+        bankAccountNumber: user.bankAccountNumber,
         roles: user.roles.map((role: { role: { key: string } }) => role.role.key),
         isBlocked: user.isBlocked,
         wallet: {
@@ -124,6 +128,8 @@ export async function adminUsersRoutes(app: FastifyInstance) {
         id: user.id,
         name: user.name,
         email: user.email,
+        characterName: user.characterName,
+        bankAccountNumber: user.bankAccountNumber,
         isBlocked: user.isBlocked,
         createdAt: user.createdAt,
       },

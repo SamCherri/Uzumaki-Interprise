@@ -38,13 +38,13 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
 
   const [issuanceAmount, setIssuanceAmount] = useState('');
   const [issuanceReason, setIssuanceReason] = useState('');
-  const [brokerEmail, setBrokerEmail] = useState('');
+  const [brokerRef, setBrokerRef] = useState('');
   const [brokerAmount, setBrokerAmount] = useState('');
   const [brokerReason, setBrokerReason] = useState('');
-  const [userDepositEmail, setUserDepositEmail] = useState('');
+  const [userDepositRef, setUserDepositRef] = useState('');
   const [userDepositAmount, setUserDepositAmount] = useState('');
   const [userDepositReason, setUserDepositReason] = useState('');
-  const [platformWithdrawEmail, setPlatformWithdrawEmail] = useState('');
+  const [platformWithdrawRef, setPlatformWithdrawRef] = useState('');
   const [platformWithdrawAmount, setPlatformWithdrawAmount] = useState('');
   const [platformWithdrawReason, setPlatformWithdrawReason] = useState('');
   const [isSubmittingPlatformWithdraw, setIsSubmittingPlatformWithdraw] = useState(false);
@@ -177,8 +177,8 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
     setIsSubmittingBrokerTransfer(true);
 
     try {
-      await api('/admin/treasury/transfer-to-broker', { method: 'POST', body: JSON.stringify({ brokerEmail, amount: brokerAmount, reason: brokerReason }) });
-      setBrokerEmail('');
+      await api('/admin/treasury/transfer-to-broker', { method: 'POST', body: JSON.stringify({ brokerRef, amount: brokerAmount, reason: brokerReason }) });
+      setBrokerRef('');
       setBrokerAmount('');
       setBrokerReason('');
       await load();
@@ -202,12 +202,12 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
       await api('/admin/platform-account/withdraw-to-admin', {
         method: 'POST',
         body: JSON.stringify({
-          adminEmail: platformWithdrawEmail,
+          adminRef: platformWithdrawRef,
           amount: platformWithdrawAmount,
           reason: platformWithdrawReason,
         }),
       });
-      setPlatformWithdrawEmail('');
+      setPlatformWithdrawRef('');
       setPlatformWithdrawAmount('');
       setPlatformWithdrawReason('');
       await load();
@@ -235,9 +235,9 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
     try {
       await api('/admin/treasury/transfer-to-user', {
         method: 'POST',
-        body: JSON.stringify({ userEmail: userDepositEmail, amount: userDepositAmount, reason: userDepositReason }),
+        body: JSON.stringify({ userRef: userDepositRef, amount: userDepositAmount, reason: userDepositReason }),
       });
-      setUserDepositEmail('');
+      setUserDepositRef('');
       setUserDepositAmount('');
       setUserDepositReason('');
       await load();
@@ -340,7 +340,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
 
           <h3 className="nested-card">Enviar R$ para corretor</h3>
           <form onSubmit={submitBrokerTransfer} className="form-grid">
-            <input value={brokerEmail} onChange={(e) => setBrokerEmail(e.target.value)} placeholder="E-mail do corretor" type="email" required />
+            <input value={brokerRef} onChange={(e) => setBrokerRef(e.target.value)} placeholder="Conta RP, personagem, nome ou email técnico do corretor" required />
             <input value={brokerAmount} onChange={(e) => setBrokerAmount(e.target.value)} placeholder="Valor em R$" required />
             <input value={brokerReason} onChange={(e) => setBrokerReason(e.target.value)} placeholder="Observação" required />
             <button className="button-primary" type="submit" disabled={isSubmittingBrokerTransfer}>{isSubmittingBrokerTransfer ? 'Processando...' : 'Enviar R$ ao corretor'}</button>
@@ -348,7 +348,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
 
           <h3 className="nested-card">Depositar R$ em jogador</h3>
           <form onSubmit={submitUserDeposit} className="form-grid">
-            <input value={userDepositEmail} onChange={(e) => setUserDepositEmail(e.target.value)} placeholder="E-mail do jogador" type="email" required />
+            <input value={userDepositRef} onChange={(e) => setUserDepositRef(e.target.value)} placeholder="Conta RP, personagem, nome ou email técnico do jogador" required />
             <input value={userDepositAmount} onChange={(e) => setUserDepositAmount(e.target.value)} placeholder="Valor em R$" required />
             <input value={userDepositReason} onChange={(e) => setUserDepositReason(e.target.value)} placeholder="Motivo" required />
             <button className="button-primary" type="submit" disabled={isSubmittingUserDeposit}>{isSubmittingUserDeposit ? 'Processando...' : 'Depositar R$ no jogador'}</button>
@@ -399,10 +399,10 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
               <h3 className="nested-card">Retirar lucro da Exchange</h3>
               <form onSubmit={submitPlatformWithdraw} className="form-grid">
                 <input
-                  value={platformWithdrawEmail}
-                  onChange={(e) => setPlatformWithdrawEmail(e.target.value)}
+                  value={platformWithdrawRef}
+                  onChange={(e) => setPlatformWithdrawRef(e.target.value)}
                   placeholder="E-mail do administrador"
-                  type="email"
+                  
                   required
                 />
                 <input
