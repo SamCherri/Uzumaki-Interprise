@@ -4,7 +4,6 @@ import { prisma } from '../lib/prisma.js';
 export const SYSTEM_MODE_ID = 'SYSTEM_MODE_MAIN';
 
 const ADMIN_ROLES = new Set(['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN']);
-const BLOCKED_PREFIXES = ['/api/rpc-market', '/api/market', '/api/companies', '/api/withdrawals', '/api/broker', '/api/project-boosts', '/api/user'];
 
 export async function ensureSystemModeConfig() {
   return prisma.systemModeConfig.upsert({ where: { id: SYSTEM_MODE_ID }, update: {}, create: { id: SYSTEM_MODE_ID, mode: 'NORMAL' } });
@@ -18,18 +17,27 @@ export async function assertTestMode(reply: FastifyReply) {
   return true;
 }
 
+const PUBLIC_ALLOWED_PREFIXES = ['/api/auth/login', '/api/auth/register', '/api/auth/me', '/api/system-mode', '/api/test-mode'];
+const ADMIN_PREFIX = '/api/admin';
+
 export async function globalSystemModeGuard(request: FastifyRequest, reply: FastifyReply) {
-  if (!BLOCKED_PREFIXES.some((prefix) => request.url.startsWith(prefix))) return;
   const config = await ensureSystemModeConfig();
   if (config.mode !== 'TEST') return;
+
+  const path = request.url.split('?')[0];
+  const isPublicAllowed = PUBLIC_ALLOWED_PREFIXES.some((prefix) => path.startsWith(prefix));
+  const isAdminRoute = path.startsWith(ADMIN_PREFIX);
 
   try {
     await request.jwtVerify();
   } catch {
+    if (isPublicAllowed && !isAdminRoute) return;
     return reply.status(403).send({ message: 'O site está em Modo Teste. Esta área está temporariamente desabilitada.' });
   }
 
   const roles = ((request.user as { roles?: string[] } | undefined)?.roles ?? []).map((r) => r.toUpperCase());
   if (isAdminRole(roles)) return;
+
+  if (isPublicAllowed && !isAdminRoute) return;
   return reply.status(403).send({ message: 'O site está em Modo Teste. Esta área está temporariamente desabilitada.' });
 }

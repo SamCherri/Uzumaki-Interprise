@@ -91,6 +91,14 @@ export function App() {
   const canSeeMyProjects = roles.canSeeProjectOwner || hasOwnedProjects;
 
   const isTestModeRestrictedUser = systemMode === 'TEST' && !roles.canSeeAdmin;
+  async function loadSystemMode() {
+    try {
+      const response = await api<{ mode: 'NORMAL'|'TEST' }>('/system-mode');
+      setSystemMode(response.mode);
+    } catch {
+      setSystemMode('NORMAL');
+    }
+  }
 
   useEffect(() => {
     if (!token) return;
@@ -126,7 +134,7 @@ export function App() {
       return;
     }
 
-    api<{ mode: 'NORMAL'|'TEST' }>('/system-mode').then((v)=>setSystemMode(v.mode)).catch(()=>setSystemMode('NORMAL'));
+    void loadSystemMode();
 
     getCurrentUser()
       .then((response) => {
@@ -145,6 +153,13 @@ export function App() {
     api<{ companies: Array<{ id: string }> }>('/project-boosts/my-projects')
       .then((response) => setHasOwnedProjects(response.companies.length > 0))
       .catch(() => setHasOwnedProjects(false));
+  }, [token]);
+  useEffect(() => {
+    if (!token) return;
+    const interval = window.setInterval(() => {
+      void loadSystemMode();
+    }, 15000);
+    return () => window.clearInterval(interval);
   }, [token]);
   useEffect(() => {
     const onBeforeInstallPrompt = (event: Event) => {
@@ -200,8 +215,9 @@ export function App() {
   const showInstallCard = !isInstalled;
 
   const globalDrawerItems = useMemo<SideDrawerItem[]>(() => {
+    const shouldShowTestMode = roles.canSeeAdmin || systemMode === 'TEST';
     const items: SideDrawerItem[] = [
-      { key: 'test-mode', label: 'Modo Teste', icon: '🧪', active: screen === 'test-mode', onClick: () => setScreen('test-mode'), section: 'main' },
+      ...(shouldShowTestMode ? [{ key: 'test-mode', label: 'Modo Teste', icon: '🧪', active: screen === 'test-mode', onClick: () => setScreen('test-mode'), section: 'main' } as SideDrawerItem] : []),
       ...((isTestModeRestrictedUser
         ? []
         : [
@@ -214,9 +230,9 @@ export function App() {
           ] as SideDrawerItem[])),
     ];
 
-    if (canSeeMyProjects) items.push({ key: 'my-projects', label: 'Meus Projetos', icon: '📊', active: screen === 'my-projects', onClick: () => setScreen('my-projects'), section: 'secondary' });
+    if (canSeeMyProjects && !isTestModeRestrictedUser) items.push({ key: 'my-projects', label: 'Meus Projetos', icon: '📊', active: screen === 'my-projects', onClick: () => setScreen('my-projects'), section: 'secondary' });
     if (roles.canSeeAdmin) items.push({ key: 'admin', label: 'Admin', icon: '🛠️', active: screen === 'admin', onClick: () => setScreen('admin'), section: 'main' });
-    if (roles.canSeeBroker) items.push({ key: 'broker', label: 'Corretor', icon: '🤝', active: screen === 'broker', onClick: () => setScreen('broker'), section: 'secondary' });
+    if (roles.canSeeBroker && !isTestModeRestrictedUser) items.push({ key: 'broker', label: 'Corretor', icon: '🤝', active: screen === 'broker', onClick: () => setScreen('broker'), section: 'secondary' });
 
     items.push({ key: 'logout', label: 'Sair', icon: '🚪', danger: true, section: 'danger', onClick: handleLogout });
     return items;
