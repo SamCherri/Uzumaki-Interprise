@@ -3,11 +3,14 @@ import { Prisma } from '@prisma/client';
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { RPC_MARKET_BUY_FEE_PERCENT, RPC_MARKET_SELL_FEE_PERCENT } from '../constants/fee-rules.js';
+import { ensurePlatformAccount } from '../services/fee-distribution-service.js';
 
 const MIN_AMOUNT = new Decimal('0.01');
 const PRICE_SCALE = 8;
 const RESERVE_SCALE = 2;
 const RPC_MARKET_STATE_ID = 'RPC_MARKET_MAIN';
+const HUNDRED = new Decimal(100);
 
 
 const ADMIN_ROLES = ['SUPER_ADMIN', 'COIN_CHIEF_ADMIN'];
@@ -30,6 +33,27 @@ const limitOrderCreateSchema = z.object({
 
 function isRoleAllowedToProcess(roles: string[]) {
   return roles.some((role) => ADMIN_ROLES.includes(role));
+}
+
+async function creditRpcMarketFee(tx: Prisma.TransactionClient, feeAmount: Decimal, userId: string, description: string) {
+  if (feeAmount.lte(0)) return;
+  const platformAccount = await ensurePlatformAccount(tx);
+  await tx.platformAccount.update({
+    where: { id: platformAccount.id },
+    data: {
+      balance: { increment: feeAmount },
+      totalReceivedFees: { increment: feeAmount },
+    },
+  });
+  await tx.adminLog.create({
+    data: {
+      userId,
+      action: 'RPC_MARKET_FEE_CREDITED',
+      entity: 'PlatformAccount',
+      reason: description,
+      current: JSON.stringify({ feeAmount: feeAmount.toString() }),
+    },
+  });
 }
 
 async function processEligibleRpcLimitOrders(options?: { maxOrders?: number }) {
@@ -69,13 +93,18 @@ async function processEligibleRpcLimitOrders(options?: { maxOrders?: number }) {
       if (order.side === 'BUY_RPC') {
         if (!order.fiatAmount || order.lockedFiatAmount.lt(order.fiatAmount) || wallet.fiatLockedBalance.lt(order.lockedFiatAmount)) return;
         if (marketState.currentPrice.gt(order.limitPrice)) return;
-        const quote = buildBuyQuote(marketState, order.fiatAmount);
-        if (quote.unitPrice.gt(order.limitPrice)) return;
+        const feeAmount = order.fiatAmount.mul(RPC_MARKET_BUY_FEE_PERCENT).div(HUNDRED).toDecimalPlaces(2);
+        const netFiatAmount = order.fiatAmount.sub(feeAmount).toDecimalPlaces(2);
+        const quote = buildBuyQuote(marketState, netFiatAmount);
+        const effectiveUnitPrice = order.fiatAmount.div(quote.rpcAmount).toDecimalPlaces(PRICE_SCALE);
+        if (effectiveUnitPrice.gt(order.limitPrice)) return;
         const moved = await tx.wallet.updateMany({ where: { id: wallet.id, fiatLockedBalance: { gte: order.lockedFiatAmount } }, data: { fiatLockedBalance: { decrement: order.lockedFiatAmount }, rpcAvailableBalance: { increment: quote.rpcAmount } } });
         if (moved.count !== 1) return;
-        await tx.rpcMarketState.update({ where: { id: RPC_MARKET_STATE_ID }, data: { fiatReserve: quote.newFiatReserve, rpcReserve: quote.newRpcReserve, currentPrice: quote.priceAfter, totalFiatVolume: { increment: order.fiatAmount }, totalRpcVolume: { increment: quote.rpcAmount }, totalBuys: { increment: 1 } } });
+        await creditRpcMarketFee(tx, feeAmount, order.userId, `Taxa RPC limite BUY executada: ${order.id}`);
+        await tx.rpcMarketState.update({ where: { id: RPC_MARKET_STATE_ID }, data: { fiatReserve: quote.newFiatReserve, rpcReserve: quote.newRpcReserve, currentPrice: quote.priceAfter, totalFiatVolume: { increment: netFiatAmount }, totalRpcVolume: { increment: quote.rpcAmount }, totalBuys: { increment: 1 } } });
         await tx.rpcExchangeTrade.create({ data: { userId: order.userId, side: 'BUY_RPC', fiatAmount: order.fiatAmount, rpcAmount: quote.rpcAmount, unitPrice: quote.unitPrice, priceBefore: quote.priceBefore, priceAfter: quote.priceAfter } });
         await tx.transaction.create({ data: { walletId: wallet.id, type: 'RPC_LIMIT_BUY_FILLED', amount: order.fiatAmount, description: `Ordem limite RPC BUY executada: ${order.id}` } });
+        await tx.transaction.create({ data: { walletId: wallet.id, type: 'RPC_LIMIT_BUY_FEE', amount: feeAmount, description: `Taxa ordem limite RPC BUY: ${order.id}` } });
         await tx.rpcLimitOrder.update({ where: { id: order.id }, data: { status: 'FILLED', executedAt: new Date(), filledFiatAmount: order.fiatAmount, filledRpcAmount: quote.rpcAmount, lockedFiatAmount: new Decimal('0') } });
         processed += 1;
         return;
@@ -83,12 +112,17 @@ async function processEligibleRpcLimitOrders(options?: { maxOrders?: number }) {
       if (!order.rpcAmount || order.lockedRpcAmount.lt(order.rpcAmount) || wallet.rpcLockedBalance.lt(order.lockedRpcAmount)) return;
       if (marketState.currentPrice.lt(order.limitPrice)) return;
       const quote = buildSellQuote(marketState, order.rpcAmount);
-      if (quote.unitPrice.lt(order.limitPrice)) return;
-      const moved = await tx.wallet.updateMany({ where: { id: wallet.id, rpcLockedBalance: { gte: order.lockedRpcAmount } }, data: { rpcLockedBalance: { decrement: order.lockedRpcAmount }, fiatAvailableBalance: { increment: quote.fiatAmount } } });
+      const feeAmount = quote.fiatAmount.mul(RPC_MARKET_SELL_FEE_PERCENT).div(HUNDRED).toDecimalPlaces(2);
+      const netFiatAmount = quote.fiatAmount.sub(feeAmount).toDecimalPlaces(2);
+      const effectiveUnitPrice = netFiatAmount.div(order.rpcAmount).toDecimalPlaces(PRICE_SCALE);
+      if (effectiveUnitPrice.lt(order.limitPrice)) return;
+      const moved = await tx.wallet.updateMany({ where: { id: wallet.id, rpcLockedBalance: { gte: order.lockedRpcAmount } }, data: { rpcLockedBalance: { decrement: order.lockedRpcAmount }, fiatAvailableBalance: { increment: netFiatAmount } } });
       if (moved.count !== 1) return;
+      await creditRpcMarketFee(tx, feeAmount, order.userId, `Taxa RPC limite SELL executada: ${order.id}`);
       await tx.rpcMarketState.update({ where: { id: RPC_MARKET_STATE_ID }, data: { fiatReserve: quote.newFiatReserve, rpcReserve: quote.newRpcReserve, currentPrice: quote.priceAfter, totalFiatVolume: { increment: quote.fiatAmount }, totalRpcVolume: { increment: order.rpcAmount }, totalSells: { increment: 1 } } });
       await tx.rpcExchangeTrade.create({ data: { userId: order.userId, side: 'SELL_RPC', fiatAmount: quote.fiatAmount, rpcAmount: order.rpcAmount, unitPrice: quote.unitPrice, priceBefore: quote.priceBefore, priceAfter: quote.priceAfter } });
       await tx.transaction.create({ data: { walletId: wallet.id, type: 'RPC_LIMIT_SELL_FILLED', amount: quote.fiatAmount, description: `Ordem limite RPC SELL executada: ${order.id}` } });
+      await tx.transaction.create({ data: { walletId: wallet.id, type: 'RPC_LIMIT_SELL_FEE', amount: feeAmount, description: `Taxa ordem limite RPC SELL: ${order.id}` } });
       await tx.rpcLimitOrder.update({ where: { id: order.id }, data: { status: 'FILLED', executedAt: new Date(), filledFiatAmount: quote.fiatAmount, filledRpcAmount: order.rpcAmount, lockedRpcAmount: new Decimal('0') } });
       processed += 1;
     });
@@ -149,13 +183,16 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
       const query = z.object({ fiatAmount: z.coerce.number().min(0.01) }).parse(request.query ?? {});
       const fiatAmount = toDecimal(query.fiatAmount).toDecimalPlaces(2);
       const state = await ensureMarketState();
-      const quote = buildBuyQuote(state, fiatAmount);
+      const feeAmount = fiatAmount.mul(RPC_MARKET_BUY_FEE_PERCENT).div(HUNDRED).toDecimalPlaces(2);
+      const netFiatAmount = fiatAmount.sub(feeAmount).toDecimalPlaces(2);
+      const quote = buildBuyQuote(state, netFiatAmount);
       return {
-        fiatAmount,
+        grossFiatAmount: fiatAmount,
+        netFiatAmount,
+        feeAmount,
+        feePercent: RPC_MARKET_BUY_FEE_PERCENT,
         estimatedRpcAmount: quote.rpcAmount,
-        priceBefore: quote.priceBefore,
-        estimatedPriceAfter: quote.priceAfter,
-        effectiveUnitPrice: quote.unitPrice,
+        effectiveUnitPrice: fiatAmount.div(quote.rpcAmount).toDecimalPlaces(PRICE_SCALE),
       };
     } catch (error) {
       return reply.status(400).send({ message: (error as Error).message });
@@ -168,12 +205,17 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
       const rpcAmount = toDecimal(query.rpcAmount).toDecimalPlaces(2);
       const state = await ensureMarketState();
       const quote = buildSellQuote(state, rpcAmount);
+      const feeAmount = quote.fiatAmount.mul(RPC_MARKET_SELL_FEE_PERCENT).div(HUNDRED).toDecimalPlaces(2);
+      const netFiatAmount = quote.fiatAmount.sub(feeAmount).toDecimalPlaces(2);
       return {
         rpcAmount,
-        estimatedFiatAmount: quote.fiatAmount,
-        priceBefore: quote.priceBefore,
-        estimatedPriceAfter: quote.priceAfter,
-        effectiveUnitPrice: quote.unitPrice,
+        grossFiatAmount: quote.fiatAmount,
+        netFiatAmount,
+        feeAmount,
+        feePercent: RPC_MARKET_SELL_FEE_PERCENT,
+        estimatedFiatAmount: netFiatAmount,
+        grossEstimatedFiatAmount: quote.fiatAmount,
+        effectiveUnitPrice: netFiatAmount.div(rpcAmount).toDecimalPlaces(PRICE_SCALE),
       };
     } catch (error) {
       return reply.status(400).send({ message: (error as Error).message });
@@ -191,8 +233,8 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
     try {
       const body = amountSchema.parse(request.body ?? {});
       if (body.fiatAmount == null) return reply.status(400).send({ message: 'fiatAmount é obrigatório.' });
-      const fiatAmount = toDecimal(body.fiatAmount).toDecimalPlaces(2);
-      if (fiatAmount.lt(MIN_AMOUNT)) return reply.status(400).send({ message: 'Valor mínimo para compra é R$ 0,01.' });
+      const grossFiatAmount = toDecimal(body.fiatAmount).toDecimalPlaces(2);
+      if (grossFiatAmount.lt(MIN_AMOUNT)) return reply.status(400).send({ message: 'Valor mínimo para compra é R$ 0,01.' });
 
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const wallet = await tx.wallet.findUnique({ where: { userId: (request.user as { sub: string }).sub } });
@@ -202,19 +244,22 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
         await tx.$queryRaw`SELECT id FROM "RpcMarketState" WHERE id = ${RPC_MARKET_STATE_ID} FOR UPDATE`;
         const state = await tx.rpcMarketState.findUniqueOrThrow({ where: { id: RPC_MARKET_STATE_ID } });
 
-        const quote = buildBuyQuote(state, fiatAmount);
-        const updatedWallet = await tx.wallet.updateMany({ where: { id: wallet.id, fiatAvailableBalance: { gte: fiatAmount } }, data: { fiatAvailableBalance: { decrement: fiatAmount }, rpcAvailableBalance: { increment: quote.rpcAmount } } });
+        const feeAmount = grossFiatAmount.mul(RPC_MARKET_BUY_FEE_PERCENT).div(HUNDRED).toDecimalPlaces(2);
+        const netFiatAmount = grossFiatAmount.sub(feeAmount).toDecimalPlaces(2);
+        const quote = buildBuyQuote(state, netFiatAmount);
+        const updatedWallet = await tx.wallet.updateMany({ where: { id: wallet.id, fiatAvailableBalance: { gte: grossFiatAmount } }, data: { fiatAvailableBalance: { decrement: grossFiatAmount }, rpcAvailableBalance: { increment: quote.rpcAmount } } });
         if (updatedWallet.count !== 1) throw new Error('Saldo insuficiente.');
-
-        await tx.rpcMarketState.update({ where: { id: RPC_MARKET_STATE_ID }, data: { fiatReserve: quote.newFiatReserve, rpcReserve: quote.newRpcReserve, currentPrice: quote.priceAfter, totalFiatVolume: { increment: fiatAmount }, totalRpcVolume: { increment: quote.rpcAmount }, totalBuys: { increment: 1 } } });
-        await tx.rpcExchangeTrade.create({ data: { userId: (request.user as { sub: string }).sub, side: 'BUY_RPC', fiatAmount, rpcAmount: quote.rpcAmount, unitPrice: quote.unitPrice, priceBefore: quote.priceBefore, priceAfter: quote.priceAfter } });
-        await tx.transaction.create({ data: { walletId: wallet.id, type: 'RPC_MARKET_BUY', amount: fiatAmount, description: 'Compra de RPC com R$' } });
+        await creditRpcMarketFee(tx, feeAmount, (request.user as { sub: string }).sub, 'Taxa RPC mercado BUY');
+        await tx.rpcMarketState.update({ where: { id: RPC_MARKET_STATE_ID }, data: { fiatReserve: quote.newFiatReserve, rpcReserve: quote.newRpcReserve, currentPrice: quote.priceAfter, totalFiatVolume: { increment: netFiatAmount }, totalRpcVolume: { increment: quote.rpcAmount }, totalBuys: { increment: 1 } } });
+        await tx.rpcExchangeTrade.create({ data: { userId: (request.user as { sub: string }).sub, side: 'BUY_RPC', fiatAmount: grossFiatAmount, rpcAmount: quote.rpcAmount, unitPrice: grossFiatAmount.div(quote.rpcAmount).toDecimalPlaces(PRICE_SCALE), priceBefore: quote.priceBefore, priceAfter: quote.priceAfter } });
+        await tx.transaction.create({ data: { walletId: wallet.id, type: 'RPC_MARKET_BUY', amount: grossFiatAmount, description: 'Compra de RPC com R$ (valor bruto)' } });
+        await tx.transaction.create({ data: { walletId: wallet.id, type: 'RPC_MARKET_BUY_FEE', amount: feeAmount, description: 'Taxa da Exchange na compra RPC/R$' } });
         const latestWallet = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
-        return { fiatAmount, rpcAmount: quote.rpcAmount, priceBefore: quote.priceBefore, priceAfter: quote.priceAfter, wallet: latestWallet };
+        return { grossFiatAmount, netFiatAmount, feeAmount, feePercent: RPC_MARKET_BUY_FEE_PERCENT, rpcAmount: quote.rpcAmount, priceBefore: quote.priceBefore, priceAfter: quote.priceAfter, wallet: latestWallet };
       });
 
       try { await processEligibleRpcLimitOrders({ maxOrders: 10 }); } catch (error) { request.log.warn({ error }, 'Falha ao processar ordens limite após buy'); }
-      return { message: 'RPC comprado com sucesso.', fiatAmount: result.fiatAmount, rpcAmount: result.rpcAmount, priceBefore: result.priceBefore, priceAfter: result.priceAfter, wallet: { fiatAvailableBalance: result.wallet.fiatAvailableBalance, rpcAvailableBalance: result.wallet.rpcAvailableBalance } };
+      return { message: 'RPC comprado com sucesso.', grossFiatAmount: result.grossFiatAmount, netFiatAmount: result.netFiatAmount, feeAmount: result.feeAmount, feePercent: result.feePercent, rpcAmount: result.rpcAmount, priceBefore: result.priceBefore, priceAfter: result.priceAfter, wallet: { fiatAvailableBalance: result.wallet.fiatAvailableBalance, rpcAvailableBalance: result.wallet.rpcAvailableBalance } };
     } catch (error) {
       return reply.status(400).send({ message: (error as Error).message });
     }
@@ -394,18 +439,22 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
         const state = await tx.rpcMarketState.findUniqueOrThrow({ where: { id: RPC_MARKET_STATE_ID } });
 
         const quote = buildSellQuote(state, rpcAmount);
-        const updatedWallet = await tx.wallet.updateMany({ where: { id: wallet.id, rpcAvailableBalance: { gte: rpcAmount } }, data: { rpcAvailableBalance: { decrement: rpcAmount }, fiatAvailableBalance: { increment: quote.fiatAmount } } });
+        const grossFiatAmount = quote.fiatAmount;
+        const feeAmount = grossFiatAmount.mul(RPC_MARKET_SELL_FEE_PERCENT).div(HUNDRED).toDecimalPlaces(2);
+        const netFiatAmount = grossFiatAmount.sub(feeAmount).toDecimalPlaces(2);
+        const updatedWallet = await tx.wallet.updateMany({ where: { id: wallet.id, rpcAvailableBalance: { gte: rpcAmount } }, data: { rpcAvailableBalance: { decrement: rpcAmount }, fiatAvailableBalance: { increment: netFiatAmount } } });
         if (updatedWallet.count !== 1) throw new Error('Saldo insuficiente.');
-
+        await creditRpcMarketFee(tx, feeAmount, (request.user as { sub: string }).sub, 'Taxa RPC mercado SELL');
         await tx.rpcMarketState.update({ where: { id: RPC_MARKET_STATE_ID }, data: { fiatReserve: quote.newFiatReserve, rpcReserve: quote.newRpcReserve, currentPrice: quote.priceAfter, totalFiatVolume: { increment: quote.fiatAmount }, totalRpcVolume: { increment: rpcAmount }, totalSells: { increment: 1 } } });
-        await tx.rpcExchangeTrade.create({ data: { userId: (request.user as { sub: string }).sub, side: 'SELL_RPC', fiatAmount: quote.fiatAmount, rpcAmount, unitPrice: quote.unitPrice, priceBefore: quote.priceBefore, priceAfter: quote.priceAfter } });
-        await tx.transaction.create({ data: { walletId: wallet.id, type: 'RPC_MARKET_SELL', amount: quote.fiatAmount, description: 'Venda de RPC por R$' } });
+        await tx.rpcExchangeTrade.create({ data: { userId: (request.user as { sub: string }).sub, side: 'SELL_RPC', fiatAmount: grossFiatAmount, rpcAmount, unitPrice: netFiatAmount.div(rpcAmount).toDecimalPlaces(PRICE_SCALE), priceBefore: quote.priceBefore, priceAfter: quote.priceAfter } });
+        await tx.transaction.create({ data: { walletId: wallet.id, type: 'RPC_MARKET_SELL', amount: netFiatAmount, description: 'Venda de RPC por R$ (líquido)' } });
+        await tx.transaction.create({ data: { walletId: wallet.id, type: 'RPC_MARKET_SELL_FEE', amount: feeAmount, description: 'Taxa da Exchange na venda RPC/R$' } });
         const latestWallet = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
-        return { fiatAmount: quote.fiatAmount, rpcAmount, priceBefore: quote.priceBefore, priceAfter: quote.priceAfter, wallet: latestWallet };
+        return { grossFiatAmount, netFiatAmount, feeAmount, feePercent: RPC_MARKET_SELL_FEE_PERCENT, rpcAmount, priceBefore: quote.priceBefore, priceAfter: quote.priceAfter, wallet: latestWallet };
       });
 
       try { await processEligibleRpcLimitOrders({ maxOrders: 10 }); } catch (error) { request.log.warn({ error }, 'Falha ao processar ordens limite após sell'); }
-      return { message: 'RPC vendido com sucesso.', fiatAmount: result.fiatAmount, rpcAmount: result.rpcAmount, priceBefore: result.priceBefore, priceAfter: result.priceAfter, wallet: { fiatAvailableBalance: result.wallet.fiatAvailableBalance, rpcAvailableBalance: result.wallet.rpcAvailableBalance } };
+      return { message: 'RPC vendido com sucesso.', grossFiatAmount: result.grossFiatAmount, netFiatAmount: result.netFiatAmount, feeAmount: result.feeAmount, feePercent: result.feePercent, rpcAmount: result.rpcAmount, priceBefore: result.priceBefore, priceAfter: result.priceAfter, wallet: { fiatAvailableBalance: result.wallet.fiatAvailableBalance, rpcAvailableBalance: result.wallet.rpcAvailableBalance } };
     } catch (error) {
       return reply.status(400).send({ message: (error as Error).message });
     }
