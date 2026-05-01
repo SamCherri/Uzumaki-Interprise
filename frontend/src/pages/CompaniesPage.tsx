@@ -380,15 +380,15 @@ export function CompaniesPage() {
     <section className="card market-page market-shell">
       {!selected && (
         <>
-          <h2>🪙 Mercados</h2>
-          <input className="market-search-input" placeholder="Buscar token ou ticker" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <h2>🪙 Mercados de moedas</h2>
+          <input className="market-search-input" placeholder="Buscar moeda ou ticker" value={search} onChange={(e) => setSearch(e.target.value)} />
           <nav className="quick-actions nested-card">
             <button className={marketListTab === 'mercado' ? 'quick-pill active' : 'quick-pill'} onClick={() => setMarketListTab('mercado')}>Mercado</button>
             <button className={marketListTab === 'destaques' ? 'quick-pill active' : 'quick-pill'} onClick={() => setMarketListTab('destaques')}>Destaques</button>
           </nav>
-          <p className="info-text">Negocie tokens criados por usuários usando RPC.</p>
+          <p className="info-text">Negocie moedas criadas por usuários usando RPC.</p>
           {error && <p className="status-message error">{error}</p>}
-          {companies.length === 0 && <p className="empty-state">Nenhum token listado ainda.</p>}
+          {companies.length === 0 && <p className="empty-state">Nenhuma moeda listada ainda.</p>}
           <ul className="company-list">
             {(marketListTab === 'destaques' ? featuredCompanies.filter((company) => `${company.name} ${company.ticker}`.toLowerCase().includes(search.toLowerCase())) : visibleCompanies).map((company) => (
               <li key={company.id} className="card company-visual-card finance-card market-list-card">
@@ -403,14 +403,14 @@ export function CompaniesPage() {
                   {(() => { const changePercent = getPriceChangePercent(company); return <p className={changePercent >= 0 ? 'positive-change' : 'negative-change'}>{changePercent >= 0 ? '▲' : '▼'} {formatPercent(Math.abs(changePercent))}%</p>; })()}
                 </div>
                 <div className="market-list-card-footer">
-                  <p className="info-text">Tokens disponíveis: {company.availableOfferShares.toLocaleString('pt-BR')}</p>
+                  <p className="info-text">Moedas disponíveis: {company.availableOfferShares.toLocaleString('pt-BR')}</p>
                   <button className="button-primary market-open-cta" onClick={() => selectCompany(company.id)}>Abrir mercado</button>
                 </div>
               </li>
             ))}
           </ul>
           {(marketListTab === 'mercado' ? visibleCompanies : featuredCompanies.filter((company) => `${company.name} ${company.ticker}`.toLowerCase().includes(search.toLowerCase()))).length === 0 && (
-            <p className="empty-state">Nenhum token encontrado para essa busca.</p>
+            <p className="empty-state">Nenhuma moeda encontrada para essa busca.</p>
           )}
         </>
       )}
@@ -463,7 +463,7 @@ export function CompaniesPage() {
             <button className={activeTab === 'dados' ? 'quick-pill active' : 'quick-pill'} onClick={() => setActiveTab('dados')}>Dados</button>
           </nav>
 
-          {activeTab === 'dados' && <section className="card nested-card market-data-grid market-tab-panel"><h4>Dados</h4><article className="market-data-section"><h5>Projeto</h5><div className="market-data-item"><span className="market-data-label">Setor</span><strong className="market-data-value">{selected.sector}</strong></div><div className="market-data-item"><span className="market-data-label">Status</span><strong className="market-data-value">{translateCompanyStatus(selected.status)}</strong></div><div className="market-data-item"><span className="market-data-label">Descrição</span><p className="market-data-value">{selected.description || 'Projeto/token listado para negociação em ambiente RP.'}</p></div></article><article className="market-data-section"><h5>Preço</h5><div className="market-data-item"><span className="market-data-label">Preço inicial</span><strong className="market-data-value">{formatPrice(Number(selected.initialPrice))}</strong></div><div className="market-data-item"><span className="market-data-label">Market cap fictício</span><strong className="market-data-value">{formatCurrency(Number(selected.currentPrice) * selected.totalShares)} RPC</strong></div></article><article className="market-data-section"><h5>Taxas</h5><div className="market-data-item"><span className="market-data-label">Taxa compra</span><strong className="market-data-value">{buyFee}%</strong></div><div className="market-data-item"><span className="market-data-label">Taxa venda</span><strong className="market-data-value">{sellFee}%</strong></div></article><article className="market-data-section"><h5>Supply</h5><div className="market-data-item"><span className="market-data-label">Supply total</span><strong className="market-data-value">{selected.totalShares.toLocaleString('pt-BR')}</strong></div><div className="market-data-item"><span className="market-data-label">Oferta disponível</span><strong className="market-data-value">{selected.availableOfferShares.toLocaleString('pt-BR')}</strong></div></article><article className="market-data-section"><h5>Minha posição</h5><div className="market-data-item"><span className="market-data-label">Saldo RPC</span><strong className="market-data-value">{formatCurrency(walletBalance)} RPC</strong></div><div className="market-data-item"><span className="market-data-label">Tokens em carteira</span><strong className="market-data-value">{holdingQty}</strong></div></article></section>}
+          {activeTab === 'dados' && <section className="card nested-card market-data-grid market-tab-panel"><h4>Dados</h4><article className="market-data-section"><h5>Moeda</h5><div className="market-data-item"><span className="market-data-label">Categoria</span><strong className="market-data-value">{selected.sector}</strong></div><div className="market-data-item"><span className="market-data-label">Status</span><strong className="market-data-value">{translateCompanyStatus(selected.status)}</strong></div><div className="market-data-item"><span className="market-data-label">Descrição</span><p className="market-data-value">{selected.description || 'Moeda listada para negociação em ambiente RP.'}</p></div></article><article className="market-data-section"><h5>Preço</h5><div className="market-data-item"><span className="market-data-label">Preço inicial</span><strong className="market-data-value">{formatPrice(Number(selected.initialPrice))}</strong></div><div className="market-data-item"><span className="market-data-label">Market cap fictício</span><strong className="market-data-value">{formatCurrency(Number(selected.currentPrice) * selected.totalShares)} RPC</strong></div></article><article className="market-data-section"><h5>Taxas</h5><div className="market-data-item"><span className="market-data-label">Taxa compra</span><strong className="market-data-value">{buyFee}%</strong></div><div className="market-data-item"><span className="market-data-label">Taxa venda</span><strong className="market-data-value">{sellFee}%</strong></div></article><article className="market-data-section"><h5>Oferta</h5><div className="market-data-item"><span className="market-data-label">Supply total</span><strong className="market-data-value">{selected.totalShares.toLocaleString('pt-BR')}</strong></div><div className="market-data-item"><span className="market-data-label">Oferta disponível</span><strong className="market-data-value">{selected.availableOfferShares.toLocaleString('pt-BR')}</strong></div></article><article className="market-data-section"><h5>Minha posição</h5><div className="market-data-item"><span className="market-data-label">Saldo RPC</span><strong className="market-data-value">{formatCurrency(walletBalance)} RPC</strong></div><div className="market-data-item"><span className="market-data-label">Moedas em carteira</span><strong className="market-data-value">{holdingQty}</strong></div></article></section>}
 
           {activeTab === 'preco' && (
             <section className="card nested-card market-price-tab market-tab-panel">
@@ -576,31 +576,31 @@ export function CompaniesPage() {
               <section className="trade-bottom-sheet market-trade-sheet" onClick={(event) => event.stopPropagation()}>
                 <div className="market-sheet-handle" aria-hidden="true" />
                 <div className="trade-panel-header">
-                  <h4>{tradeFlow === 'buy' ? '🟢 Comprar tokens' : '🔴 Vender tokens'}</h4>
+                  <h4>{tradeFlow === 'buy' ? '🟢 Comprar moedas' : '🔴 Vender moedas'}</h4>
                   <button className="back-button" onClick={() => setTradeFlow(null)}>Fechar</button>
                 </div>
 
                 <div className="market-sheet-balance-row">
                   <div className="market-sheet-mini-card"><span>Saldo RPC</span><strong>{formatCurrency(walletBalance)} RPC</strong></div>
-                  <div className="market-sheet-mini-card"><span>Tokens em carteira</span><strong>{holdingQty}</strong></div>
+                  <div className="market-sheet-mini-card"><span>Moedas em carteira</span><strong>{holdingQty}</strong></div>
                 </div>
 
                 {tradeFlow === 'buy' && (
                   <div className="market-sheet-section">
                     <nav className="quick-actions">
-                      <button className={buyMode === 'initial' ? 'quick-pill active' : 'quick-pill'} onClick={() => setBuyMode('initial')}>Comprar tokens</button>
+                      <button className={buyMode === 'initial' ? 'quick-pill active' : 'quick-pill'} onClick={() => setBuyMode('initial')}>Comprar moedas</button>
                       <button className={buyMode === 'limit' ? 'quick-pill active' : 'quick-pill'} onClick={() => setBuyMode('limit')}>Definir preço</button>
                       <button className={buyMode === 'market' ? 'quick-pill active' : 'quick-pill'} onClick={() => setBuyMode('market')}>Comprar agora</button>
                     </nav>
                     {buyMode === 'initial' && (
                       <form onSubmit={buyInitialOffer}>
                         <p className="info-text">Comprar no lançamento altera o preço atual, mas não cria trade no histórico.</p>
-                        <input type="number" min="1" value={initialQty} onChange={(e) => setInitialQty(e.target.value)} placeholder="Quantidade de tokens" required />
-                        <button className="button-success" type="submit">Comprar tokens</button>
+                        <input type="number" min="1" value={initialQty} onChange={(e) => setInitialQty(e.target.value)} placeholder="Quantidade de moedas" required />
+                        <button className="button-success" type="submit">Comprar moedas</button>
                       </form>
                     )}
-                    {buyMode === 'limit' && <form onSubmit={(event) => createLimitOrder('BUY', event)}><input type="number" min="1" value={limitQty} onChange={(e) => setLimitQty(e.target.value)} placeholder="Quantidade de tokens" required /><input type="number" min="0.01" step="0.01" value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço por token" required /><div className="summary-item"><p>Subtotal: {formatCurrency(limitSubtotal)}</p><p>Taxa: {buyFee}%</p><p>Total estimado: {formatCurrency(limitTotalBuy)}</p></div><button className="button-success" type="submit">Definir preço de compra</button></form>}
-                    {buyMode === 'market' && <div><input type="number" min="1" value={marketBuyQty} onChange={(e) => setMarketBuyQty(e.target.value)} placeholder="Quantidade de tokens" /><input type="number" min="0" max="100" value={marketBuySlip} onChange={(e) => setMarketBuySlip(e.target.value)} placeholder="Variação máxima (%)" /><button className="button-success" onClick={() => sendMarket('BUY')}>Comprar agora</button><p className="info-text">Preço agora: {formatPrice(bestAsk)}</p></div>}
+                    {buyMode === 'limit' && <form onSubmit={(event) => createLimitOrder('BUY', event)}><input type="number" min="1" value={limitQty} onChange={(e) => setLimitQty(e.target.value)} placeholder="Quantidade de moedas" required /><input type="number" min="0.01" step="0.01" value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço por moeda" required /><div className="summary-item"><p>Subtotal: {formatCurrency(limitSubtotal)}</p><p>Taxa: {buyFee}%</p><p>Total estimado: {formatCurrency(limitTotalBuy)}</p></div><button className="button-success" type="submit">Definir preço de compra</button></form>}
+                    {buyMode === 'market' && <div><input type="number" min="1" value={marketBuyQty} onChange={(e) => setMarketBuyQty(e.target.value)} placeholder="Quantidade de moedas" /><input type="number" min="0" max="100" value={marketBuySlip} onChange={(e) => setMarketBuySlip(e.target.value)} placeholder="Variação máxima (%)" /><button className="button-success" onClick={() => sendMarket('BUY')}>Comprar agora</button><p className="info-text">Preço agora: {formatPrice(bestAsk)}</p></div>}
                   </div>
                 )}
 
@@ -610,8 +610,8 @@ export function CompaniesPage() {
                       <button className={sellMode === 'limit' ? 'quick-pill active' : 'quick-pill'} onClick={() => setSellMode('limit')}>Definir preço</button>
                       <button className={sellMode === 'market' ? 'quick-pill active' : 'quick-pill'} onClick={() => setSellMode('market')}>Vender agora</button>
                     </nav>
-                    {sellMode === 'limit' && <form onSubmit={(event) => createLimitOrder('SELL', event)}><input type="number" min="1" value={limitQty} onChange={(e) => setLimitQty(e.target.value)} placeholder="Quantidade de tokens" required /><input type="number" min="0.01" step="0.01" value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço por token" required /><div className="summary-item"><p>Subtotal: {formatCurrency(limitSubtotal)}</p><p>Taxa: {sellFee}%</p><p>Total estimado: {formatCurrency(limitNetSell)}</p></div><button className="button-danger" type="submit">Definir preço de venda</button></form>}
-                    {sellMode === 'market' && <div><input type="number" min="1" value={marketSellQty} onChange={(e) => setMarketSellQty(e.target.value)} placeholder="Quantidade de tokens" /><input type="number" min="0" max="100" value={marketSellSlip} onChange={(e) => setMarketSellSlip(e.target.value)} placeholder="Variação máxima (%)" /><button className="button-danger" onClick={() => sendMarket('SELL')}>Vender agora</button><p className="info-text">Preço agora: {formatPrice(bestBid)}</p></div>}
+                    {sellMode === 'limit' && <form onSubmit={(event) => createLimitOrder('SELL', event)}><input type="number" min="1" value={limitQty} onChange={(e) => setLimitQty(e.target.value)} placeholder="Quantidade de moedas" required /><input type="number" min="0.01" step="0.01" value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço por moeda" required /><div className="summary-item"><p>Subtotal: {formatCurrency(limitSubtotal)}</p><p>Taxa: {sellFee}%</p><p>Total estimado: {formatCurrency(limitNetSell)}</p></div><button className="button-danger" type="submit">Definir preço de venda</button></form>}
+                    {sellMode === 'market' && <div><input type="number" min="1" value={marketSellQty} onChange={(e) => setMarketSellQty(e.target.value)} placeholder="Quantidade de moedas" /><input type="number" min="0" max="100" value={marketSellSlip} onChange={(e) => setMarketSellSlip(e.target.value)} placeholder="Variação máxima (%)" /><button className="button-danger" onClick={() => sendMarket('SELL')}>Vender agora</button><p className="info-text">Preço agora: {formatPrice(bestBid)}</p></div>}
                   </div>
                 )}
               </section>
