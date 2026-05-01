@@ -1068,3 +1068,47 @@ test('ordens limite RPC/R$ travam/cancelam saldos e processam elegíveis com seg
   assert.ok(Number(state.totalBuys) >= 1);
   assert.ok(Number(state.totalSells) >= 1);
 });
+
+test('ordens limite RPC/R$ bloqueadores P1: arredondamento mínimo e seleção por lado', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const rChief = await mkRole('COIN_CHIEF_ADMIN');
+  const buyer = await mkUser('p1-buyer@test.local');
+  const seller = await mkUser('p1-seller@test.local');
+  const chief = await mkUser('p1-chief@test.local');
+  await prisma.userRole.createMany({ data: [
+    { userId: buyer.id, roleId: rUser.id },
+    { userId: seller.id, roleId: rUser.id },
+    { userId: chief.id, roleId: rChief.id },
+  ] });
+
+  await prisma.wallet.update({ where: { userId: buyer.id }, data: { fiatAvailableBalance: 1000 } });
+  await prisma.wallet.update({ where: { userId: seller.id }, data: { rpcAvailableBalance: 2000 } });
+
+  const buyerTk = await token(buyer.id, ['USER']);
+  const sellerTk = await token(seller.id, ['USER']);
+  const chiefTk = await token(chief.id, ['COIN_CHIEF_ADMIN']);
+
+  const tooSmallBuy = await app.inject({ method: 'POST', url: '/api/rpc-market/orders', headers: { authorization: `Bearer ${buyerTk}` }, payload: { side: 'BUY_RPC', fiatAmount: 0.001, limitPrice: 1 } });
+  assert.equal(tooSmallBuy.statusCode, 400, tooSmallBuy.body);
+  assert.match(tooSmallBuy.body, /valor mínimo para ordem é 0,01/i);
+
+  const tooSmallSell = await app.inject({ method: 'POST', url: '/api/rpc-market/orders', headers: { authorization: `Bearer ${sellerTk}` }, payload: { side: 'SELL_RPC', rpcAmount: 0.001, limitPrice: 1 } });
+  assert.equal(tooSmallSell.statusCode, 400, tooSmallSell.body);
+  assert.match(tooSmallSell.body, /valor mínimo para ordem é 0,01/i);
+
+  for (let i = 0; i < 220; i += 1) {
+    const o = await app.inject({ method: 'POST', url: '/api/rpc-market/orders', headers: { authorization: `Bearer ${buyerTk}` }, payload: { side: 'BUY_RPC', fiatAmount: 1, limitPrice: 0.5 } });
+    assert.equal(o.statusCode, 201, o.body);
+  }
+
+  const eligibleSell = await app.inject({ method: 'POST', url: '/api/rpc-market/orders', headers: { authorization: `Bearer ${sellerTk}` }, payload: { side: 'SELL_RPC', rpcAmount: 20, limitPrice: 0.8 } });
+  assert.equal(eligibleSell.statusCode, 201, eligibleSell.body);
+  const eligibleSellId = eligibleSell.json().order.id as string;
+
+  const process = await app.inject({ method: 'POST', url: '/api/admin/rpc-market/orders/process', headers: { authorization: `Bearer ${chiefTk}` }, payload: { maxOrders: 20 } });
+  assert.equal(process.statusCode, 200, process.body);
+
+  const sellOrder = await prisma.rpcLimitOrder.findUniqueOrThrow({ where: { id: eligibleSellId } });
+  assert.equal(sellOrder.status, 'FILLED');
+});
