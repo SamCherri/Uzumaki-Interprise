@@ -721,7 +721,7 @@ test('modo teste global bloqueia rotas reais, mantém isolamento e registra logs
   assert.equal(Number(testMe.json().fiatBalance), 10000);
 
   const reportInTest = await app.inject({ method: 'POST', url: '/api/test-mode/reports', headers: { authorization: `Bearer ${userTk}` }, payload: { type: 'BUG', location: 'Tela', description: 'Teste de report' } });
-  assert.equal(reportInTest.statusCode, 200, reportInTest.body);
+  assert.equal(reportInTest.statusCode, 201, reportInTest.body);
 
   const buy = await app.inject({ method: 'POST', url: '/api/test-mode/buy', headers: { authorization: `Bearer ${userTk}` }, payload: { fiatAmount: 100 } });
   assert.equal(buy.statusCode, 200, buy.body);
