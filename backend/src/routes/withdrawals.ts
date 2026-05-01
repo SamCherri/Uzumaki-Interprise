@@ -224,6 +224,7 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
 
     const query = z.object({
       status: z.enum(['PENDING', 'PROCESSING', 'COMPLETED', 'REJECTED', 'CANCELED']).optional(),
+      userRef: z.string().min(1).optional(),
       userEmail: z.string().email().optional(),
       code: z.string().min(2).optional(),
     }).parse(request.query);
@@ -232,10 +233,18 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
       where: {
         ...(query.status ? { status: query.status } : {}),
         ...(query.code ? { code: { contains: query.code, mode: 'insensitive' } } : {}),
-        ...(query.userEmail ? { user: { email: query.userEmail.toLowerCase() } } : {}),
+        ...((query.userRef || query.userEmail) ? { user: { OR: [
+          ...(query.userEmail ? [{ email: query.userEmail.toLowerCase() }] : []),
+          ...(query.userRef ? [
+            { bankAccountNumber: { contains: query.userRef, mode: 'insensitive' as const } },
+            { characterName: { contains: query.userRef, mode: 'insensitive' as const } },
+            { name: { contains: query.userRef, mode: 'insensitive' as const } },
+            { email: { contains: query.userRef.toLowerCase(), mode: 'insensitive' as const } },
+          ] : []),
+        ] } } : {}),
       },
       include: {
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: { id: true, name: true, email: true, characterName: true, bankAccountNumber: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 200,

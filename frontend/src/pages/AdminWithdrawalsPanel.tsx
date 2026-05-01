@@ -12,6 +12,8 @@ type Withdrawal = {
   user: {
     name: string;
     email: string;
+    characterName?: string | null;
+    bankAccountNumber?: string | null;
   };
 };
 
@@ -51,8 +53,11 @@ export function AdminWithdrawalsPanel() {
         {items.map((item) => (
           <article key={item.id} className="summary-item compact-card">
             <p><strong>Código:</strong> {item.code}</p>
+            <p><strong>Dados do jogador:</strong></p>
             <p><strong>Usuário:</strong> {item.user.name}</p>
-            <p><strong>E-mail:</strong> {item.user.email}</p>
+            <p><strong>Personagem:</strong> {item.user.characterName ?? 'Sem personagem'}</p>
+            <p><strong>Conta RP:</strong> {item.user.bankAccountNumber ?? 'Sem conta RP'}</p>
+            <p><strong>Email técnico:</strong> {item.user.email}</p>
             <p><strong>Valor:</strong> {item.amount} RPC</p>
             <p><strong>Status:</strong> {translateWithdrawalStatus(item.status)}</p>
             <p><strong>Observação do usuário:</strong> {item.userNote || 'Sem observação'}</p>

@@ -127,10 +127,11 @@ export async function adminRoutes(app: FastifyInstance) {
       const schema = z.object({
         brokerUserId: z.string().min(1).optional(),
         brokerEmail: z.string().email().optional(),
+        brokerRef: z.string().min(1).optional(),
         amount: amountSchema,
         reason: z.string().min(3),
       }).superRefine((value, ctx) => {
-        if (!value.brokerEmail && !value.brokerUserId) {
+        if (!value.brokerEmail && !value.brokerUserId && !value.brokerRef) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: 'Informe o e-mail do corretor.',
@@ -139,6 +140,7 @@ export async function adminRoutes(app: FastifyInstance) {
         }
       });
       const body = schema.parse(request.body);
+      const brokerRef = body.brokerRef?.trim();
 
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const treasury = await tx.treasuryAccount.findFirstOrThrow();
@@ -150,7 +152,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
       const brokerUser = await tx.user.findFirst({
         where: {
-          ...(body.brokerEmail ? { email: body.brokerEmail } : { id: body.brokerUserId }),
+          ...(body.brokerEmail ? { email: body.brokerEmail } : body.brokerUserId ? { id: body.brokerUserId } : { OR: [{ bankAccountNumber: brokerRef }, { characterName: { equals: brokerRef, mode: 'insensitive' } }, { name: { equals: brokerRef, mode: 'insensitive' } }, { email: { equals: brokerRef?.toLowerCase(), mode: 'insensitive' } }] }),
           roles: { some: { role: { key: 'VIRTUAL_BROKER' } } },
         },
       });
@@ -236,10 +238,11 @@ export async function adminRoutes(app: FastifyInstance) {
       const schema = z.object({
         userId: z.string().min(1).optional(),
         userEmail: z.string().email().optional(),
+        userRef: z.string().min(1).optional(),
         amount: amountSchema,
         reason: z.string().trim().min(3),
       }).superRefine((value, ctx) => {
-        if (!value.userId && !value.userEmail) {
+        if (!value.userId && !value.userEmail && !value.userRef) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: 'Informe o e-mail ou id do usuário de destino.',
@@ -250,13 +253,14 @@ export async function adminRoutes(app: FastifyInstance) {
 
       const parsed = schema.parse(request.body);
       const userEmail = parsed.userEmail?.trim().toLowerCase();
+      const userRef = parsed.userRef?.trim();
 
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const treasury = await tx.treasuryAccount.findFirstOrThrow();
         const amount = new Decimal(parsed.amount);
 
         const targetUser = await tx.user.findFirst({
-          where: userEmail ? { email: userEmail } : { id: parsed.userId },
+          where: userEmail ? { email: userEmail } : parsed.userId ? { id: parsed.userId } : { OR: [{ bankAccountNumber: userRef }, { characterName: { equals: userRef, mode: 'insensitive' } }, { name: { equals: userRef, mode: 'insensitive' } }, { email: { equals: userRef?.toLowerCase(), mode: 'insensitive' } }] },
         });
 
         if (!targetUser) {
@@ -379,11 +383,12 @@ export async function adminRoutes(app: FastifyInstance) {
     try {
       const schema = z.object({
         adminEmail: z.string().email().optional(),
+        adminRef: z.string().min(1).optional(),
         adminId: z.string().min(1).optional(),
         amount: amountSchema,
         reason: z.string().trim().min(3),
       }).superRefine((value, ctx) => {
-        if (!value.adminEmail && !value.adminId) {
+        if (!value.adminEmail && !value.adminId && !value.adminRef) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: 'Informe o e-mail ou id do administrador de destino.',
@@ -394,11 +399,12 @@ export async function adminRoutes(app: FastifyInstance) {
 
       const parsed = schema.parse(request.body);
       const targetEmail = parsed.adminEmail?.trim().toLowerCase();
+      const adminRef = parsed.adminRef?.trim();
 
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const amount = new Decimal(parsed.amount);
         const targetAdmin = await tx.user.findFirst({
-          where: targetEmail ? { email: targetEmail } : { id: parsed.adminId },
+          where: targetEmail ? { email: targetEmail } : parsed.adminId ? { id: parsed.adminId } : { OR: [{ bankAccountNumber: adminRef }, { characterName: { equals: adminRef, mode: 'insensitive' } }, { name: { equals: adminRef, mode: 'insensitive' } }, { email: { equals: adminRef?.toLowerCase(), mode: 'insensitive' } }] },
           include: { roles: { select: { role: { select: { key: true } } } } },
         });
 
