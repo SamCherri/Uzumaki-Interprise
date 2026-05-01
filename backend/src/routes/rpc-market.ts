@@ -229,7 +229,7 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
     return { trades };
   });
 
-  app.post('/rpc-market/buy', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/rpc-market/buy', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 40, timeWindow: '1 minute' } } }, async (request, reply) => {
     try {
       const body = amountSchema.parse(request.body ?? {});
       if (body.fiatAmount == null) return reply.status(400).send({ message: 'fiatAmount é obrigatório.' });
@@ -280,7 +280,7 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
     return { buyOrders, sellOrders };
   });
 
-  app.post('/rpc-market/orders', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/rpc-market/orders', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
     try {
       const body = limitOrderCreateSchema.parse(request.body ?? {});
       const userId = (request.user as { sub: string }).sub;
@@ -309,7 +309,7 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/rpc-market/orders/:id/cancel', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/rpc-market/orders/:id/cancel', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
     try {
       const { id } = z.object({ id: z.string().min(1) }).parse(request.params ?? {});
       const userId = (request.user as { sub: string }).sub;
@@ -423,7 +423,7 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/rpc-market/sell', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/rpc-market/sell', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 40, timeWindow: '1 minute' } } }, async (request, reply) => {
     try {
       const body = amountSchema.parse(request.body ?? {});
       if (body.rpcAmount == null) return reply.status(400).send({ message: 'rpcAmount é obrigatório.' });

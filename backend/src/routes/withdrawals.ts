@@ -62,7 +62,7 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
     return { withdrawals };
   });
 
-  app.post('/withdrawals', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/withdrawals', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
 
     try {
@@ -141,7 +141,7 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/withdrawals/:id/cancel', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/withdrawals/:id/cancel', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 15, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const params = z.object({ id: z.string().min(1) }).parse(request.params);
 

@@ -4,7 +4,7 @@ import { loginUser, registerUser } from '../services/auth-service.js';
 import { prisma } from '../lib/prisma.js';
 
 export async function authRoutes(app: FastifyInstance) {
-  app.post('/auth/register', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post('/auth/register', { config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 10, timeWindow: '1 minute' } } }, async (request: FastifyRequest, reply: FastifyReply) => {
     const schema = z.object({
       name: z.string().min(3),
       characterName: z.string().min(3),
@@ -89,7 +89,7 @@ export async function authRoutes(app: FastifyInstance) {
     };
   });
 
-  app.post('/auth/login', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post('/auth/login', { config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 8, timeWindow: '1 minute' } } }, async (request: FastifyRequest, reply: FastifyReply) => {
     const schema = z.object({ email: z.string().email(), password: z.string().min(8) });
 
     try {
@@ -97,7 +97,8 @@ export async function authRoutes(app: FastifyInstance) {
       const user = await loginUser(body.email, body.password);
       const roles = user.roles.map((item: { role: { key: string } }) => item.role.key);
 
-      const token = await reply.jwtSign({ sub: user.id, roles });
+      const expiresIn = roles.some((role: string) => ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN'].includes(role)) ? '2h' : '8h';
+      const token = await reply.jwtSign({ sub: user.id, roles }, { expiresIn });
       await app.logAdmin({ action: 'LOGIN', entity: 'User', userId: user.id, reason: 'Login bem-sucedido' });
 
       return { token, user: { id: user.id, name: user.name, email: user.email, roles } };
@@ -105,7 +106,11 @@ export async function authRoutes(app: FastifyInstance) {
       if (error instanceof ZodError) {
         return reply.code(400).send({ message: 'Dados de login inválidos.' });
       }
-      return reply.code(400).send({ message: (error as Error).message });
+      const message = (error as Error).message;
+      if (message === 'Credenciais inválidas.' || message === 'Muitas tentativas inválidas. Tente novamente mais tarde.') {
+        return reply.code(401).send({ message });
+      }
+      return reply.code(400).send({ message });
     }
   });
 }

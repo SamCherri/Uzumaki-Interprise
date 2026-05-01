@@ -81,7 +81,7 @@ export async function adminRoutes(app: FastifyInstance) {
     return { balance: treasury.balance };
   });
 
-  app.post('/admin/treasury/issuance', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/admin/treasury/issuance', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
 
@@ -140,7 +140,7 @@ export async function adminRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/admin/treasury/transfer-to-broker', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/admin/treasury/transfer-to-broker', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
 
