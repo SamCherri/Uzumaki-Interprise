@@ -11,11 +11,12 @@ import { ProjectOwnerPanel } from './pages/ProjectOwnerPanel';
 import { RpcMarketPage } from './pages/RpcMarketPage';
 import { TestModePage } from './pages/TestModePage';
 import { TestModeRankingPage } from './pages/TestModeRankingPage';
+import { TestModeReportPage } from './pages/TestModeReportPage';
 import { api, getCurrentUser, CurrentUserResponse } from './services/api';
 import { SideDrawer, SideDrawerItem } from './components/SideDrawer';
 
 type PublicTab = 'login' | 'register';
-type PrivateScreen = 'home' | 'markets' | 'wallet' | 'rpc-market' | 'withdrawals' | 'company-request' | 'admin' | 'broker' | 'my-projects' | 'test-mode' | 'test-ranking';
+type PrivateScreen = 'home' | 'markets' | 'wallet' | 'rpc-market' | 'withdrawals' | 'company-request' | 'admin' | 'broker' | 'my-projects' | 'test-mode' | 'test-ranking' | 'test-report';
 
 type ViewerRoles = {
   canSeeAdmin: boolean;
@@ -108,13 +109,14 @@ export function App() {
     if (
       isTestModeRestrictedUser &&
       screen !== 'test-mode' &&
-      screen !== 'test-ranking'
+      screen !== 'test-ranking' &&
+      screen !== 'test-report'
     ) {
       setScreen('test-mode');
       return;
     }
 
-    if (!roles.canSeeAdmin && systemMode === 'NORMAL' && (screen === 'test-mode' || screen === 'test-ranking')) {
+    if (!roles.canSeeAdmin && systemMode === 'NORMAL' && (screen === 'test-mode' || screen === 'test-ranking' || screen === 'test-report')) {
       setScreen('home');
     }
   }, [isTestModeRestrictedUser, roles.canSeeAdmin, screen, systemMode, token]);
@@ -232,6 +234,7 @@ export function App() {
       ...(shouldShowTestModeEntry ? [
         { key: 'test-mode', label: 'Modo Teste', icon: '🧪', active: screen === 'test-mode', onClick: () => setScreen('test-mode'), section: 'main' } as SideDrawerItem,
         { key: 'test-ranking', label: 'Ranking Teste', icon: '🏆', active: screen === 'test-ranking', onClick: () => setScreen('test-ranking'), section: 'main' } as SideDrawerItem,
+        { key: 'test-report', label: 'Reportar Bug', icon: '🐞', active: screen === 'test-report', onClick: () => setScreen('test-report'), section: 'main' } as SideDrawerItem,
       ] : []),
       ...((isTestModeRestrictedUser
         ? []
@@ -338,6 +341,7 @@ export function App() {
 
       {shouldShowTestModeEntry && screen === 'test-mode' && <TestModePage />}
       {shouldShowTestModeEntry && screen === 'test-ranking' && <TestModeRankingPage />}
+      {shouldShowTestModeEntry && screen === 'test-report' && <TestModeReportPage />}
       {!isTestModeRestrictedUser && screen === 'home' && (
         <section className="card">
           {showInstallCard && (
