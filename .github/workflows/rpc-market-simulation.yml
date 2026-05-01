@@ -1,0 +1,49 @@
+name: RPC Market Simulation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rpc_exchange_simulation
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d rpc_exchange_simulation"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/rpc_exchange_simulation?schema=public
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/rpc_exchange_simulation?schema=public
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prisma generate (backend)
+        run: npm run prisma:generate --workspace backend
+
+      - name: Prisma migrate deploy (backend)
+        run: npx prisma migrate deploy --schema backend/prisma/schema.prisma
+
+      - name: Run RPC Market Simulation Test
+        run: npm run test:simulation --workspace backend
