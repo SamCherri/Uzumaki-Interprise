@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma.js';
 
-export async function registerUser(name: string, email: string, password: string) {
+export async function registerUser(name: string, characterName: string, bankAccountNumber: string, email: string, password: string) {
   const normalizedEmail = email.trim().toLowerCase();
   const exists = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (exists) {
@@ -20,6 +20,8 @@ export async function registerUser(name: string, email: string, password: string
       name,
       email: normalizedEmail,
       passwordHash,
+      characterName,
+      bankAccountNumber,
       wallet: { create: {} },
       roles: { create: [{ roleId: userRole.id }] },
     },

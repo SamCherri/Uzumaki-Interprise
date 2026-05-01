@@ -107,6 +107,7 @@ export function RpcMarketPage() {
       last: Number(ordered[ordered.length - 1]?.priceAfter ?? fallback),
       first: Number(ordered[0]?.priceBefore ?? fallback),
       hasHistory: ordered.length > 1,
+      tradeCount: ordered.length,
     };
   }, [filteredTrades, market?.currentPrice]);
 
@@ -174,9 +175,12 @@ export function RpcMarketPage() {
             {isLoading && <div className="chart-empty-elegant"><strong>Carregando histórico</strong><span>Buscando dados do mercado RPC/R$.</span></div>}
             {!isLoading && (
               <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="line-chart">
-                <polyline points={chart.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" stroke="#38bdf8" strokeWidth="2.6" vectorEffect="non-scaling-stroke" />
-                {chart.points.length > 0 && <line className="current-price-line" x1="0" x2="84" y1={chart.points[chart.points.length - 1].y} y2={chart.points[chart.points.length - 1].y} />}
-                {chart.points.map((point) => <circle key={point.trade.id} cx={point.x} cy={point.y} r="1.2"><title>{`${new Date(point.trade.createdAt).toLocaleString('pt-BR')} · R$ ${formatPrice(Number(point.trade.priceAfter))}`}</title></circle>)}
+                {chart.tradeCount >= 2 && <polyline points={chart.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" stroke="#38bdf8" strokeWidth="2.6" vectorEffect="non-scaling-stroke" />}
+                {chart.tradeCount === 1 && <line x1="0" x2="84" y1={chart.points[0].y} y2={chart.points[0].y} stroke="#38bdf8" strokeWidth="2.6" vectorEffect="non-scaling-stroke" />}
+                {chart.tradeCount === 0 && <line x1="0" x2="84" y1="50" y2="50" stroke="#38bdf8" strokeWidth="2.6" vectorEffect="non-scaling-stroke" />}
+                {(chart.tradeCount > 0) && <line className="current-price-line" x1="0" x2="84" y1={chart.points[chart.points.length - 1].y} y2={chart.points[chart.points.length - 1].y} />}
+                {chart.tradeCount === 0 && <text x="2" y="45" fill="#94a3b8" fontSize="5">Preço inicial / atual do mercado</text>}
+                {chart.points.map((point) => <circle key={point.trade.id} cx={point.x} cy={point.y} r={chart.tradeCount === 1 ? '2.4' : '1.2'}><title>{`${new Date(point.trade.createdAt).toLocaleString('pt-BR')} · R$ ${formatPrice(Number(point.trade.priceAfter))}`}</title></circle>)}
               </svg>
             )}
           </div>

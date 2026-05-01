@@ -7,6 +7,8 @@ export async function authRoutes(app: FastifyInstance) {
   app.post('/auth/register', async (request: FastifyRequest, reply: FastifyReply) => {
     const schema = z.object({
       name: z.string().min(3),
+      characterName: z.string().min(3),
+      bankAccountNumber: z.string().min(3),
       email: z.string().email(),
       password: z.string().min(8),
     });
@@ -14,12 +16,14 @@ export async function authRoutes(app: FastifyInstance) {
     const body = schema.parse(request.body);
 
     try {
-      const user = await registerUser(body.name, body.email, body.password);
+      const user = await registerUser(body.name, body.characterName, body.bankAccountNumber, body.email, body.password);
       await app.logAdmin({ action: 'CREATE_ACCOUNT', entity: 'User', userId: user.id, reason: 'Cadastro inicial' });
 
       return reply.code(201).send({
         id: user.id,
         name: user.name,
+        characterName: user.characterName,
+        bankAccountNumber: user.bankAccountNumber,
         email: user.email,
       });
     } catch (error) {
@@ -51,6 +55,8 @@ export async function authRoutes(app: FastifyInstance) {
       user: {
         id: user.id,
         name: user.name,
+        characterName: user.characterName,
+        bankAccountNumber: user.bankAccountNumber,
         email: user.email,
         roles,
         isBlocked: user.isBlocked,

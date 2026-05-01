@@ -598,3 +598,76 @@ test('mercado RPC/R$ mantém singleton, cotação e integridade econômica', asy
     assert.equal(Number(trade.unitPrice).toFixed(8), expected.toFixed(8));
   }
 });
+
+test('cadastro salva characterName e bankAccountNumber e /auth/me retorna campos', async () => {
+  await resetDb();
+  await mkRole('USER');
+
+  const register = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { name: 'Player One', characterName: 'Kenshin', bankAccountNumber: 'RP-001', email: 'register@test.local', password: '12345678' } });
+  assert.equal(register.statusCode, 201, register.body);
+  const payload = register.json();
+  assert.equal(payload.characterName, 'Kenshin');
+  assert.equal(payload.bankAccountNumber, 'RP-001');
+
+  const login = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'register@test.local', password: '12345678' } });
+  assert.equal(login.statusCode, 200, login.body);
+  const tokenValue = login.json().token;
+
+  const me = await app.inject({ method: 'GET', url: '/api/auth/me', headers: { authorization: `Bearer ${tokenValue}` } });
+  assert.equal(me.statusCode, 200, me.body);
+  assert.equal(me.json().user.characterName, 'Kenshin');
+  assert.equal(me.json().user.bankAccountNumber, 'RP-001');
+
+  const invalidCharacter = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { name: 'Player Two', characterName: 'ab', bankAccountNumber: 'RP-002', email: 'invalid-char@test.local', password: '12345678' } });
+  assert.equal(invalidCharacter.statusCode, 400);
+
+  const invalidBank = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { name: 'Player Three', characterName: 'ValidName', bankAccountNumber: '12', email: 'invalid-bank@test.local', password: '12345678' } });
+  assert.equal(invalidBank.statusCode, 400);
+});
+
+test('permissões e regras de liquidez RPC/R$ com AdminLog', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const rAdmin = await mkRole('ADMIN');
+  const rChief = await mkRole('COIN_CHIEF_ADMIN');
+  const rSuper = await mkRole('SUPER_ADMIN');
+
+  const user = await mkUser('lq-user@test.local');
+  const admin = await mkUser('lq-admin@test.local');
+  const chief = await mkUser('lq-chief@test.local');
+  const sup = await mkUser('lq-super@test.local');
+
+  await prisma.userRole.createMany({ data: [
+    { userId: user.id, roleId: rUser.id },
+    { userId: admin.id, roleId: rAdmin.id },
+    { userId: chief.id, roleId: rChief.id },
+    { userId: sup.id, roleId: rSuper.id },
+  ] });
+
+  const userTk = await token(user.id, ['USER']);
+  const adminTk = await token(admin.id, ['ADMIN']);
+  const chiefTk = await token(chief.id, ['COIN_CHIEF_ADMIN']);
+  const superTk = await token(sup.id, ['SUPER_ADMIN']);
+
+  assert.equal((await app.inject({ method: 'POST', url: '/api/admin/rpc-market/liquidity/inject', headers: { authorization: `Bearer ${userTk}` }, payload: { fiatAmount: 100, reason: 'motivo longo user' } })).statusCode, 403);
+  assert.equal((await app.inject({ method: 'POST', url: '/api/admin/rpc-market/liquidity/inject', headers: { authorization: `Bearer ${adminTk}` }, payload: { fiatAmount: 100, reason: 'motivo longo admin' } })).statusCode, 403);
+
+  const inject = await app.inject({ method: 'POST', url: '/api/admin/rpc-market/liquidity/inject', headers: { authorization: `Bearer ${chiefTk}` }, payload: { fiatAmount: 1000, rpcAmount: 500, reason: 'injeção de liquidez teste' } });
+  assert.equal(inject.statusCode, 200, inject.body);
+
+  const overWithdrawFiat = await app.inject({ method: 'POST', url: '/api/admin/rpc-market/liquidity/withdraw', headers: { authorization: `Bearer ${superTk}` }, payload: { fiatAmount: 999999999, reason: 'tentativa inválida de retirada' } });
+  assert.equal(overWithdrawFiat.statusCode, 400);
+
+  const overWithdrawRpc = await app.inject({ method: 'POST', url: '/api/admin/rpc-market/liquidity/withdraw', headers: { authorization: `Bearer ${superTk}` }, payload: { rpcAmount: 999999999, reason: 'tentativa inválida de retirada rpc' } });
+  assert.equal(overWithdrawRpc.statusCode, 400);
+
+  const withdraw = await app.inject({ method: 'POST', url: '/api/admin/rpc-market/liquidity/withdraw', headers: { authorization: `Bearer ${superTk}` }, payload: { rpcAmount: 100, reason: 'retirada válida de liquidez' } });
+  assert.equal(withdraw.statusCode, 200, withdraw.body);
+
+  const state = await prisma.rpcMarketState.findUniqueOrThrow({ where: { id: 'RPC_MARKET_MAIN' } });
+  assert.equal(String(state.currentPrice), String(state.fiatReserve.div(state.rpcReserve).toDecimalPlaces(8)));
+
+  const logs = await prisma.adminLog.findMany({ where: { action: { in: ['RPC_MARKET_LIQUIDITY_INJECT', 'RPC_MARKET_LIQUIDITY_WITHDRAW'] } } });
+  assert.ok(logs.length >= 2);
+  assert.ok(logs.every((log) => !!log.previous && !!log.current));
+});
