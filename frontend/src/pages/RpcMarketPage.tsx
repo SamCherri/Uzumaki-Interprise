@@ -215,10 +215,56 @@ export function RpcMarketPage() {
     }
   }
 
+  function renderTradeTabs() {
+    return (
+      <div className="quick-actions">
+        <button className={activeSide === 'buy' ? 'quick-pill active' : 'quick-pill'} onClick={() => setActiveSide('buy')}>Comprar</button>
+        <button className={activeSide === 'sell' ? 'quick-pill active' : 'quick-pill'} onClick={() => setActiveSide('sell')}>Vender</button>
+      </div>
+    );
+  }
+
+  function renderExecutionNotice() {
+    return (
+      <>
+        <p className="info-text">Modo atual: execução imediata pelo preço estimado.</p>
+        <p className="info-text">Execução imediata · Preço pode variar conforme liquidez · Ordem limite em breve.</p>
+      </>
+    );
+  }
+
+  function renderTradeForm() {
+    if (activeSide === 'buy') {
+      return (
+        <form onSubmit={onBuy} className="form-grid nested-card buy-side">
+          <input value={fiatAmount} onChange={(e) => setFiatAmount(e.target.value)} placeholder="Entrada em R$" required />
+          {buyQuoteError && <p className="info-text">Não foi possível atualizar a cotação de compra: {buyQuoteError}</p>}
+          <p className="info-text">Saída estimada: {`${formatCurrency(Number(buyQuote?.estimatedRpcAmount ?? 0))} RPC`}</p>
+          <p className="info-text">Preço médio estimado: {`R$ ${formatPrice(Number(buyQuote?.effectiveUnitPrice ?? 0))}`}</p>
+          <p className="info-text">Taxa aplicada: 0%</p>
+          <p className="info-text">Total final: {`R$ ${formatCurrency(Number(fiatAmount || 0))}`}</p>
+          <button className="button-success" type="submit" disabled={!buyQuote || Number(fiatAmount) < 0.01}>Comprar agora</button>
+        </form>
+      );
+    }
+
+    return (
+      <form onSubmit={onSell} className="form-grid nested-card sell-side">
+        <input value={rpcAmount} onChange={(e) => setRpcAmount(e.target.value)} placeholder="Entrada em RPC" required />
+        {sellQuoteError && <p className="info-text">Não foi possível atualizar a cotação de venda: {sellQuoteError}</p>}
+        <p className="info-text">Saída estimada: {`R$ ${formatCurrency(Number(sellQuote?.estimatedFiatAmount ?? 0))}`}</p>
+        <p className="info-text">Preço médio estimado: {`R$ ${formatPrice(Number(sellQuote?.effectiveUnitPrice ?? 0))}`}</p>
+        <p className="info-text">Taxa aplicada: 0%</p>
+        <p className="info-text">Total final: {`R$ ${formatCurrency(Number(sellQuote?.estimatedFiatAmount ?? 0))}`}</p>
+        <button className="button-danger" type="submit" disabled={!sellQuote || Number(rpcAmount) < 0.01}>Vender agora</button>
+      </form>
+    );
+  }
+
   return (
-    <section className="card market-page market-shell">
-      <div className="trade-screen market-mobile-shell">
-        <header className="card trade-header market-pair-header market-compact-header market-asset-header">
+    <section className="card market-page market-shell market-page-v2">
+      <div className="trade-screen market-mobile-shell market-layout">
+        <header className="card trade-header market-pair-header market-compact-header market-asset-header market-sticky-header market-full-width">
           <div className="market-pair-title">
             <p className="company-emoji">💴 RPC/R$</p>
             <h3 className="trade-price-big">{`R$ ${formatPrice(Number(market?.currentPrice ?? 0))}`}</h3>
@@ -227,87 +273,77 @@ export function RpcMarketPage() {
             </p>
           </div>
           <div className="market-stats-row market-mini-stats">
-                        <div className="market-mini-stat-card"><span className="market-mini-stat-label">Saldo R$</span><strong>{formatCurrency(Number(wallet?.fiatAvailableBalance ?? 0))}</strong></div>
+            <div className="market-mini-stat-card"><span className="market-mini-stat-label">Saldo R$</span><strong>{formatCurrency(Number(wallet?.fiatAvailableBalance ?? 0))}</strong></div>
             <div className="market-mini-stat-card"><span className="market-mini-stat-label">Saldo RPC</span><strong>{formatCurrency(Number(wallet?.rpcAvailableBalance ?? 0))}</strong></div>
             <div className="market-mini-stat-card"><span className="market-mini-stat-label">Atualizado</span><strong>{market?.updatedAt ? new Date(market.updatedAt).toLocaleString('pt-BR') : '--'}</strong></div>
           </div>
         </header>
 
-        {error && <p className="status-message error">{error}</p>}
-        {message && <p className="status-message success">{message}</p>}
+        {error && <p className="status-message error market-full-width">{error}</p>}
+        {message && <p className="status-message success market-full-width">{message}</p>}
 
-        <section className="card nested-card market-price-tab market-tab-panel">
-          <h4>Preço RPC/R$</h4>
-          <div className="chart-timeframes">{timeframes.map((tf) => <button key={tf.key} className={activeTimeframe === tf.key ? 'quick-pill active' : 'quick-pill'} onClick={() => setActiveTimeframe(tf.key)}>{tf.label}</button>)}</div>
-          <p className="chart-period-summary">Período: {activeTimeframe}</p>
-          <div className="chart-wrap chart-wrap-highlight modern-chart-shell market-chart-card rpc-chart-shell">
-            {isLoading && <div className="chart-empty-elegant"><strong>Carregando histórico</strong><span>Buscando dados do mercado RPC/R$.</span></div>}
-            {!isLoading && (
-              <svg viewBox="0 0 100 100" preserveAspectRatio="none" className={`line-chart ${variationPercent >= 0 ? 'positive-chart' : 'negative-chart'}`}>
-                <defs>
-                  <linearGradient id="chartAreaGradient" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor="currentColor" stopOpacity="0.35" />
-                    <stop offset="100%" stopColor="currentColor" stopOpacity="0.02" />
-                  </linearGradient>
-                </defs>
-                {[20, 36, 52, 68, 84].map((lineY) => <line key={lineY} className="chart-grid-line" x1="6" x2="94" y1={lineY} y2={lineY} />)}
-                <line className="current-price-line" x1="6" x2="94" y1={chart.currentY} y2={chart.currentY} />
-                {chart.tradeCount >= 2 && <polygon className="chart-area-fill" points={chart.areaPoints} />}
-                {chart.tradeCount >= 2 && <polyline className="chart-main-line" points={chart.linePoints} fill="none" vectorEffect="non-scaling-stroke" />}
-                {chart.tradeCount <= 1 && <line className="chart-main-line" x1="6" x2="94" y1={chart.tradeCount === 1 ? chart.points[0].y : chart.currentY} y2={chart.tradeCount === 1 ? chart.points[0].y : chart.currentY} vectorEffect="non-scaling-stroke" />}
-                {chart.points.map((point) => <circle key={point.id} className={point.side === 'BUY_RPC' ? 'buy-point' : 'sell-point'} cx={point.x} cy={point.y} r={chart.tradeCount === 1 ? '2.5' : '1.4'}><title>{`${new Date(point.createdAt).toLocaleString('pt-BR')} · ${point.side === 'BUY_RPC' ? 'COMPRA' : 'VENDA'} · Preço: R$ ${formatPrice(point.price)} · RPC: ${formatCurrency(point.rpcAmount)} · Total: R$ ${formatCurrency(point.fiatAmount)}`}</title></circle>)}
-              </svg>
-            )}
+        <div className="market-main-column">
+          <section className="card nested-card market-price-tab market-tab-panel">
+            <h4>Preço RPC/R$</h4>
+            <div className="chart-timeframes">{timeframes.map((tf) => <button key={tf.key} className={activeTimeframe === tf.key ? 'quick-pill active' : 'quick-pill'} onClick={() => setActiveTimeframe(tf.key)}>{tf.label}</button>)}</div>
+            <p className="chart-period-summary">Período: {activeTimeframe}</p>
+            <div className="chart-wrap chart-wrap-highlight modern-chart-shell market-chart-card rpc-chart-shell">
+              {isLoading && <div className="chart-empty-elegant"><strong>Carregando histórico</strong><span>Buscando dados do mercado RPC/R$.</span></div>}
+              {!isLoading && (
+                <svg viewBox="0 0 100 100" preserveAspectRatio="none" className={`line-chart ${variationPercent >= 0 ? 'positive-chart' : 'negative-chart'}`}>
+                  <defs>
+                    <linearGradient id="chartAreaGradient" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor="currentColor" stopOpacity="0.35" />
+                      <stop offset="100%" stopColor="currentColor" stopOpacity="0.02" />
+                    </linearGradient>
+                  </defs>
+                  {[20, 36, 52, 68, 84].map((lineY) => <line key={lineY} className="chart-grid-line" x1="6" x2="94" y1={lineY} y2={lineY} />)}
+                  <line className="current-price-line" x1="6" x2="94" y1={chart.currentY} y2={chart.currentY} />
+                  {chart.tradeCount >= 2 && <polygon className="chart-area-fill" points={chart.areaPoints} />}
+                  {chart.tradeCount >= 2 && <polyline className="chart-main-line" points={chart.linePoints} fill="none" vectorEffect="non-scaling-stroke" />}
+                  {chart.tradeCount <= 1 && <line className="chart-main-line" x1="6" x2="94" y1={chart.tradeCount === 1 ? chart.points[0].y : chart.currentY} y2={chart.tradeCount === 1 ? chart.points[0].y : chart.currentY} vectorEffect="non-scaling-stroke" />}
+                  {chart.points.map((point) => <circle key={point.id} className={point.side === 'BUY_RPC' ? 'buy-point' : 'sell-point'} cx={point.x} cy={point.y} r={chart.tradeCount === 1 ? '2.5' : '1.4'}><title>{`${new Date(point.createdAt).toLocaleString('pt-BR')} · ${point.side === 'BUY_RPC' ? 'COMPRA' : 'VENDA'} · Preço: R$ ${formatPrice(point.price)} · RPC: ${formatCurrency(point.rpcAmount)} · Total: R$ ${formatCurrency(point.fiatAmount)}`}</title></circle>)}
+                </svg>
+              )}
+            </div>
+            <div className="chart-meta market-price-card"><div><span>Trades</span><strong>{chart.tradeCount}</strong></div><div><span>Volume R$</span><strong>{formatCurrency(chart.fiatVolume)}</strong></div><div><span>Volume RPC</span><strong>{formatCurrency(chart.rpcVolume)}</strong></div><div><span>Último</span><strong>R$ {formatPrice(chart.last)}</strong></div><div><span>Máximo</span><strong>R$ {formatPrice(chart.max)}</strong></div><div><span>Mínimo</span><strong>R$ {formatPrice(chart.min)}</strong></div></div>
+            <div className="volume-mini-chart">{chart.activityBars.length > 0 && <div className="volume-bars">{chart.activityBars.map((bar) => <div key={bar.id} className={bar.side === 'BUY_RPC' ? 'buy-point' : 'sell-point'} style={{ height: `${Math.max(12, (bar.fiatAmount / Math.max(chart.fiatVolume, 1)) * 150)}px` }} />)}</div>}</div>
+            {!isLoading && chart.emptyReason && <div className="chart-empty-elegant"><strong>{chart.emptyReason === 'Ainda não há negociações neste período.' ? 'Histórico insuficiente neste período' : chart.emptyReason}</strong><span>{chart.emptyReason}</span></div>}
+          </section>
+
+          <section className="card nested-card market-tab-panel">
+            <h4>Últimos trades</h4>
+            <div className="mobile-card-list">
+              {trades.length === 0 && <p className="empty-state">Sem negociações ainda.</p>}
+              {trades.slice(0, 20).map((trade) => (<article key={trade.id} className="summary-item compact-card market-order-card"><p><strong>{trade.side === 'BUY_RPC' ? 'COMPRA' : 'VENDA'}</strong> · {new Date(trade.createdAt).toLocaleTimeString('pt-BR')}</p><p>Preço: {`R$ ${formatPrice(Number(trade.unitPrice))}`}</p><p>Quantidade: {`${formatCurrency(Number(trade.rpcAmount))} RPC`}</p><p>Total: {`R$ ${formatCurrency(Number(trade.fiatAmount))}`}</p></article>))}
+            </div>
+          </section>
+        </div>
+
+        <aside className="market-side-column">
+          <section className="card nested-card market-tab-panel">
+            <h4>Painel de negociação</h4>
+            {renderTradeTabs()}
+            {renderExecutionNotice()}
+            {renderTradeForm()}
+          </section>
+          <section className="card nested-card market-book-tab market-tab-panel">
+            <h4>Profundidade baseada em liquidez real</h4>
+            <div className="order-book-grid">
+              <div className="summary-item buy-side"><span className="summary-label">Reserva RPC</span><strong>{`${formatCurrency(Number(market?.rpcReserve ?? 0))} RPC`}</strong></div>
+              <div className="summary-item sell-side"><span className="summary-label">Reserva R$</span><strong>{`R$ ${formatCurrency(Number(market?.fiatReserve ?? 0))}`}</strong></div>
+            </div>
+          </section>
+        </aside>
+
+        <section className={`mobile-sticky-trade ${isMobileTradeExpanded ? 'expanded' : ''}`}>
+          <div className="mobile-sticky-header">
+            {renderTradeTabs()}
+            <button className="small-button" type="button" onClick={() => setIsMobileTradeExpanded((v) => !v)}>{isMobileTradeExpanded ? 'Recolher' : 'Expandir'}</button>
           </div>
-          <div className="chart-meta market-price-card"><div><span>Trades</span><strong>{chart.tradeCount}</strong></div><div><span>Volume R$</span><strong>{formatCurrency(chart.fiatVolume)}</strong></div><div><span>Volume RPC</span><strong>{formatCurrency(chart.rpcVolume)}</strong></div><div><span>Último</span><strong>R$ {formatPrice(chart.last)}</strong></div><div><span>Máximo</span><strong>R$ {formatPrice(chart.max)}</strong></div><div><span>Mínimo</span><strong>R$ {formatPrice(chart.min)}</strong></div></div>
-          <div className="volume-mini-chart">{chart.activityBars.length > 0 && <div className="volume-bars">{chart.activityBars.map((bar) => <div key={bar.id} className={bar.side === 'BUY_RPC' ? 'buy-point' : 'sell-point'} style={{ height: `${Math.max(12, (bar.fiatAmount / Math.max(chart.fiatVolume, 1)) * 150)}px` }} />)}</div>}</div>
-          {!isLoading && chart.emptyReason && <div className="chart-empty-elegant"><strong>{chart.emptyReason === 'Ainda não há negociações neste período.' ? 'Histórico insuficiente neste período' : chart.emptyReason}</strong><span>{chart.emptyReason}</span></div>}
-        </section>
-
-        <section className="card nested-card market-tab-panel mobile-sticky-trade-panel">
-          <div className="trade-panel-title"><h4>Painel de negociação</h4><button className="small-button" type="button" onClick={() => setIsMobileTradeExpanded((v) => !v)}>{isMobileTradeExpanded ? 'Recolher' : 'Expandir'}</button></div>
-          <div className="quick-actions">
-            <button className={activeSide === 'buy' ? 'quick-pill active' : 'quick-pill'} onClick={() => setActiveSide('buy')}>Comprar</button>
-            <button className={activeSide === 'sell' ? 'quick-pill active' : 'quick-pill'} onClick={() => setActiveSide('sell')}>Vender</button>
-          </div>
-          <p className="info-text">Modo atual: execução imediata pelo preço estimado.</p>
-          <p className="info-text">Execução imediata · Preço pode variar conforme liquidez · Ordem limite em breve.</p>
-          {isMobileTradeExpanded && (activeSide === 'buy' ? (
-            <form onSubmit={onBuy} className="form-grid nested-card buy-side">
-              <input value={fiatAmount} onChange={(e) => setFiatAmount(e.target.value)} placeholder="Entrada em R$" required />
-              {buyQuoteError && <p className="info-text">Não foi possível atualizar a cotação de compra: {buyQuoteError}</p>}
-              <p className="info-text">Saída estimada: {`${formatCurrency(Number(buyQuote?.estimatedRpcAmount ?? 0))} RPC`}</p>
-              <p className="info-text">Preço médio estimado: {`R$ ${formatPrice(Number(buyQuote?.effectiveUnitPrice ?? 0))}`}</p>
-              <p className="info-text">Taxa aplicada: 0%</p>
-              <p className="info-text">Total final: {`R$ ${formatCurrency(Number(fiatAmount || 0))}`}</p>
-              <button className="button-success" type="submit" disabled={!buyQuote || Number(fiatAmount) < 0.01}>Comprar agora</button>
-            </form>
-          ) : (
-            <form onSubmit={onSell} className="form-grid nested-card sell-side">
-              <input value={rpcAmount} onChange={(e) => setRpcAmount(e.target.value)} placeholder="Entrada em RPC" required />
-              {sellQuoteError && <p className="info-text">Não foi possível atualizar a cotação de venda: {sellQuoteError}</p>}
-              <p className="info-text">Saída estimada: {`R$ ${formatCurrency(Number(sellQuote?.estimatedFiatAmount ?? 0))}`}</p>
-              <p className="info-text">Preço médio estimado: {`R$ ${formatPrice(Number(sellQuote?.effectiveUnitPrice ?? 0))}`}</p>
-              <p className="info-text">Taxa aplicada: 0%</p>
-              <p className="info-text">Total final: {`R$ ${formatCurrency(Number(sellQuote?.estimatedFiatAmount ?? 0))}`}</p>
-              <button className="button-danger" type="submit" disabled={!sellQuote || Number(rpcAmount) < 0.01}>Vender agora</button>
-            </form>
-          ))}
-        </section>
-
-        <section className="card nested-card market-book-tab market-tab-panel">
-          <h4>Profundidade baseada em liquidez real</h4>
-          <div className="order-book-grid">
-            <div className="summary-item buy-side"><span className="summary-label">Reserva RPC</span><strong>{`${formatCurrency(Number(market?.rpcReserve ?? 0))} RPC`}</strong></div>
-            <div className="summary-item sell-side"><span className="summary-label">Reserva R$</span><strong>{`R$ ${formatCurrency(Number(market?.fiatReserve ?? 0))}`}</strong></div>
-          </div>
-        </section>
-
-        <section className="card nested-card market-tab-panel">
-          <h4>Últimos trades</h4>
-          <div className="mobile-card-list">
-            {trades.length === 0 && <p className="empty-state">Sem negociações ainda.</p>}
-            {trades.slice(0, 20).map((trade) => (<article key={trade.id} className="summary-item compact-card market-order-card"><p><strong>{trade.side === 'BUY_RPC' ? 'COMPRA' : 'VENDA'}</strong> · {new Date(trade.createdAt).toLocaleTimeString('pt-BR')}</p><p>Preço: {`R$ ${formatPrice(Number(trade.unitPrice))}`}</p><p>Quantidade: {`${formatCurrency(Number(trade.rpcAmount))} RPC`}</p><p>Total: {`R$ ${formatCurrency(Number(trade.fiatAmount))}`}</p></article>))}
+          <div className="mobile-sticky-body">
+            {renderExecutionNotice()}
+            {renderTradeForm()}
           </div>
         </section>
       </div>
