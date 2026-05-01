@@ -56,6 +56,9 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
   const [withdrawFiat, setWithdrawFiat] = useState('');
   const [withdrawRpc, setWithdrawRpc] = useState('');
   const [withdrawReason, setWithdrawReason] = useState('');
+  const [isSubmittingLiquidityInject, setIsSubmittingLiquidityInject] = useState(false);
+  const [isSubmittingLiquidityWithdraw, setIsSubmittingLiquidityWithdraw] = useState(false);
+  const [liquidityError, setLiquidityError] = useState('');
   const roles = currentUserRoles.map((role) => role.toUpperCase());
   const canWithdrawPlatformProfit = roles.includes('SUPER_ADMIN') || roles.includes('COIN_CHIEF_ADMIN');
   const canIssueRpc = roles.includes('SUPER_ADMIN') || roles.includes('COIN_CHIEF_ADMIN');
@@ -68,13 +71,22 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
         api<PlatformAccount>('/admin/platform-account'),
         api<{ accounts: CompanyRevenueAccount[] }>('/admin/company-revenue-accounts'),
       ]);
-      const liquidityState = canManageRpcLiquidity
-        ? await api<RpcLiquidityState>('/admin/rpc-market/liquidity')
-        : null;
       setData(overview);
       setPlatformAccount(platform);
       setCompanyRevenueAccounts(companyRevenue.accounts);
-      setLiquidity(liquidityState);
+      if (canManageRpcLiquidity) {
+        try {
+          const liquidityState = await api<RpcLiquidityState>('/admin/rpc-market/liquidity');
+          setLiquidity(liquidityState);
+          setLiquidityError('');
+        } catch (liquidityErr) {
+          setLiquidity(null);
+          setLiquidityError((liquidityErr as Error).message || 'Não foi possível carregar os dados de liquidez no momento.');
+        }
+      } else {
+        setLiquidity(null);
+        setLiquidityError('');
+      }
       setError('');
       setMessage('');
     } catch (err) {
@@ -330,24 +342,25 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
 
 
 
-      {tab === 'liquidity' && (
+      {tab === 'liquidity' && canManageRpcLiquidity && (
         <>
           <h3 className="nested-card">Liquidez RPC/R$</h3>
           <p className="info-text">Adicionar R$ tende a valorizar RPC. Adicionar RPC tende a desvalorizar RPC. Adicionar ambos proporcionalmente aumenta liquidez sem alterar muito o preço. Esta ação é administrativa e registrada em log.</p>
+          {liquidityError && <p className="status-message error">{liquidityError}</p>}
           {liquidity && <div className="summary-grid"><div className="summary-item"><span className="summary-label">Reserva R$</span><strong>{liquidity.fiatReserve}</strong></div><div className="summary-item"><span className="summary-label">Reserva RPC</span><strong>{liquidity.rpcReserve}</strong></div><div className="summary-item"><span className="summary-label">Preço atual</span><strong>{liquidity.currentPrice}</strong></div><div className="summary-item"><span className="summary-label">Última atualização</span><strong>{new Date(liquidity.updatedAt).toLocaleString('pt-BR')}</strong></div><div className="summary-item"><span className="summary-label">Total compras</span><strong>{liquidity.totalBuys}</strong></div><div className="summary-item"><span className="summary-label">Total vendas</span><strong>{liquidity.totalSells}</strong></div><div className="summary-item"><span className="summary-label">Volume R$</span><strong>{liquidity.totalFiatVolume}</strong></div><div className="summary-item"><span className="summary-label">Volume RPC</span><strong>{liquidity.totalRpcVolume}</strong></div></div>}
           <h4 className="nested-card">Adicionar liquidez</h4>
-          <form className="form-grid" onSubmit={async (e) => { e.preventDefault(); try { await submitLiquidity('/admin/rpc-market/liquidity/inject', injectFiat, injectRpc, injectReason); setInjectFiat(''); setInjectRpc(''); setInjectReason(''); setMessage('Liquidez adicionada com sucesso.'); } catch (err) { setError((err as Error).message); } }}>
-            <input value={injectFiat} onChange={(e) => setInjectFiat(e.target.value)} placeholder="Valor R$" />
-            <input value={injectRpc} onChange={(e) => setInjectRpc(e.target.value)} placeholder="Valor RPC" />
+          <form className="form-grid" onSubmit={async (e) => { e.preventDefault(); setIsSubmittingLiquidityInject(true); try { await submitLiquidity('/admin/rpc-market/liquidity/inject', injectFiat, injectRpc, injectReason); setInjectFiat(''); setInjectRpc(''); setInjectReason(''); setMessage('Liquidez adicionada com sucesso.'); } catch (err) { setError((err as Error).message); } finally { setIsSubmittingLiquidityInject(false); } }}>
+            <input value={injectFiat} onChange={(e) => setInjectFiat(e.target.value)} placeholder="Valor R$" type="number" step="0.01" min="0" inputMode="decimal" />
+            <input value={injectRpc} onChange={(e) => setInjectRpc(e.target.value)} placeholder="Valor RPC" type="number" step="0.01" min="0" inputMode="decimal" />
             <input value={injectReason} onChange={(e) => setInjectReason(e.target.value)} placeholder="Motivo" required minLength={10} />
-            <button className="button-primary" type="submit">Confirmar adição</button>
+            <button className="button-primary" type="submit" disabled={isSubmittingLiquidityInject}>{isSubmittingLiquidityInject ? 'Processando...' : 'Confirmar adição'}</button>
           </form>
           <h4 className="nested-card">Remover liquidez</h4>
-          <form className="form-grid" onSubmit={async (e) => { e.preventDefault(); try { await submitLiquidity('/admin/rpc-market/liquidity/withdraw', withdrawFiat, withdrawRpc, withdrawReason); setWithdrawFiat(''); setWithdrawRpc(''); setWithdrawReason(''); setMessage('Liquidez removida com sucesso.'); } catch (err) { setError((err as Error).message); } }}>
-            <input value={withdrawFiat} onChange={(e) => setWithdrawFiat(e.target.value)} placeholder="Valor R$" />
-            <input value={withdrawRpc} onChange={(e) => setWithdrawRpc(e.target.value)} placeholder="Valor RPC" />
+          <form className="form-grid" onSubmit={async (e) => { e.preventDefault(); setIsSubmittingLiquidityWithdraw(true); try { await submitLiquidity('/admin/rpc-market/liquidity/withdraw', withdrawFiat, withdrawRpc, withdrawReason); setWithdrawFiat(''); setWithdrawRpc(''); setWithdrawReason(''); setMessage('Liquidez removida com sucesso.'); } catch (err) { setError((err as Error).message); } finally { setIsSubmittingLiquidityWithdraw(false); } }}>
+            <input value={withdrawFiat} onChange={(e) => setWithdrawFiat(e.target.value)} placeholder="Valor R$" type="number" step="0.01" min="0" inputMode="decimal" />
+            <input value={withdrawRpc} onChange={(e) => setWithdrawRpc(e.target.value)} placeholder="Valor RPC" type="number" step="0.01" min="0" inputMode="decimal" />
             <input value={withdrawReason} onChange={(e) => setWithdrawReason(e.target.value)} placeholder="Motivo" required minLength={10} />
-            <button className="button-danger" type="submit">Confirmar remoção</button>
+            <button className="button-danger" type="submit" disabled={isSubmittingLiquidityWithdraw}>{isSubmittingLiquidityWithdraw ? 'Processando...' : 'Confirmar remoção'}</button>
           </form>
         </>
       )}
