@@ -26,7 +26,7 @@ export async function globalSystemModeGuard(request: FastifyRequest, reply: Fast
   try {
     await request.jwtVerify();
   } catch {
-    return;
+    return reply.status(403).send({ message: 'O site está em Modo Teste. Esta área está temporariamente desabilitada.' });
   }
 
   const roles = ((request.user as { roles?: string[] } | undefined)?.roles ?? []).map((r) => r.toUpperCase());
