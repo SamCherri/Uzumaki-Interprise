@@ -675,3 +675,77 @@ test('permissões e regras de liquidez RPC/R$ com AdminLog', async () => {
   assert.ok(logs.length >= 2);
   assert.ok(logs.every((log) => !!log.previous && !!log.current));
 });
+
+test('modo teste global bloqueia rotas reais, mantém isolamento e registra logs administrativos', async () => {
+  await resetDb();
+
+  const rSuper = await mkRole('SUPER_ADMIN');
+  const rAdmin = await mkRole('ADMIN');
+  const rUser = await mkRole('USER');
+
+  const superAdmin = await mkUser('tm-super@test.local');
+  const admin = await mkUser('tm-admin@test.local');
+  const user = await mkUser('tm-user@test.local');
+
+  await prisma.userRole.createMany({ data: [
+    { userId: superAdmin.id, roleId: rSuper.id },
+    { userId: admin.id, roleId: rAdmin.id },
+    { userId: user.id, roleId: rUser.id },
+  ] });
+
+  const superTk = await token(superAdmin.id, ['SUPER_ADMIN']);
+  const adminTk = await token(admin.id, ['ADMIN']);
+  const userTk = await token(user.id, ['USER']);
+
+  const modeStart = await app.inject({ method: 'GET', url: '/api/system-mode' });
+  assert.equal(modeStart.statusCode, 200);
+  assert.equal(modeStart.json().mode, 'NORMAL');
+
+  assert.equal((await app.inject({ method: 'POST', url: '/api/admin/system-mode/test/enable', headers: { authorization: `Bearer ${userTk}` }, payload: { reason: 'tentativa sem permissão user' } })).statusCode, 403);
+  assert.equal((await app.inject({ method: 'POST', url: '/api/admin/system-mode/test/enable', headers: { authorization: `Bearer ${adminTk}` }, payload: { reason: 'tentativa sem permissão admin' } })).statusCode, 403);
+
+  const enable = await app.inject({ method: 'POST', url: '/api/admin/system-mode/test/enable', headers: { authorization: `Bearer ${superTk}` }, payload: { reason: 'ativando modo teste global' } });
+  assert.equal(enable.statusCode, 200, enable.body);
+
+  const blockedNoToken = await app.inject({ method: 'GET', url: '/api/rpc-market' });
+  assert.equal(blockedNoToken.statusCode, 403);
+  const blockedUser = await app.inject({ method: 'GET', url: '/api/rpc-market', headers: { authorization: `Bearer ${userTk}` } });
+  assert.equal(blockedUser.statusCode, 403);
+
+  const testMe = await app.inject({ method: 'GET', url: '/api/test-mode/me', headers: { authorization: `Bearer ${userTk}` } });
+  assert.equal(testMe.statusCode, 200, testMe.body);
+  assert.equal(Number(testMe.json().fiatBalance), 10000);
+
+  const reportInTest = await app.inject({ method: 'POST', url: '/api/test-mode/reports', headers: { authorization: `Bearer ${userTk}` }, payload: { type: 'BUG', location: 'x', description: 'erro de teste modo' } });
+  assert.equal(reportInTest.statusCode, 200, reportInTest.body);
+
+  const buy = await app.inject({ method: 'POST', url: '/api/test-mode/buy', headers: { authorization: `Bearer ${userTk}` }, payload: { fiatAmount: 100 } });
+  assert.equal(buy.statusCode, 200, buy.body);
+  const sell = await app.inject({ method: 'POST', url: '/api/test-mode/sell', headers: { authorization: `Bearer ${userTk}` }, payload: { rpcAmount: 10 } });
+  assert.equal(sell.statusCode, 200, sell.body);
+
+  const realWallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: user.id } });
+  const testWallet = await prisma.testModeWallet.findUniqueOrThrow({ where: { userId: user.id } });
+  assert.equal(Number(realWallet.fiatAvailableBalance), 0);
+  assert.ok(Number(testWallet.fiatBalance) >= 0);
+
+  assert.equal(await prisma.rpcExchangeTrade.count({ where: { userId: user.id } }), 0);
+  assert.equal(await prisma.rpcMarketState.count(), 0);
+
+  const resetUser = await app.inject({ method: 'POST', url: '/api/admin/test-mode/reset-user', headers: { authorization: `Bearer ${superTk}` }, payload: { userId: user.id, reason: 'reset de carteira de teste' } });
+  assert.equal(resetUser.statusCode, 200, resetUser.body);
+
+  const clearWrong = await app.inject({ method: 'POST', url: '/api/admin/test-mode/clear', headers: { authorization: `Bearer ${superTk}` }, payload: { reason: 'limpeza errada', confirmation: 'ERRADO' } });
+  assert.equal(clearWrong.statusCode, 400);
+  const clearOk = await app.inject({ method: 'POST', url: '/api/admin/test-mode/clear', headers: { authorization: `Bearer ${superTk}` }, payload: { reason: 'limpeza correta de teste', confirmation: 'LIMPAR MODO TESTE' } });
+  assert.equal(clearOk.statusCode, 200, clearOk.body);
+
+  const disable = await app.inject({ method: 'POST', url: '/api/admin/system-mode/normal/enable', headers: { authorization: `Bearer ${superTk}` }, payload: { reason: 'encerrando modo teste global' } });
+  assert.equal(disable.statusCode, 200, disable.body);
+
+  const reportInNormal = await app.inject({ method: 'POST', url: '/api/test-mode/reports', headers: { authorization: `Bearer ${userTk}` }, payload: { type: 'BUG', location: 'x', description: 'erro normal' } });
+  assert.equal(reportInNormal.statusCode, 403);
+
+  const logs = await prisma.adminLog.findMany({ where: { action: { in: ['SYSTEM_MODE_ENABLE_TEST', 'SYSTEM_MODE_ENABLE_NORMAL', 'TEST_MODE_RESET_USER', 'TEST_MODE_CLEAR'] } } });
+  assert.ok(logs.length >= 4);
+});

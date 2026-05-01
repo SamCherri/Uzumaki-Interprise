@@ -106,6 +106,9 @@ model User {
   reviewedWithdrawalRequests WithdrawalRequest[] @relation("withdrawal_request_reviewer")
   boostInjections CompanyBoostInjection[]
   rpcExchangeTrades RpcExchangeTrade[]
+  testModeWallet TestModeWallet?
+  testModeTrades TestModeTrade[]
+  testModeReports TestModeReport[]
 }
 
 model Role {
@@ -479,4 +482,67 @@ model RpcExchangeTrade {
 
   @@index([userId])
   @@index([createdAt])
+}
+
+
+model SystemModeConfig {
+  id                 String   @id
+  mode               String   @default("NORMAL")
+  testTitle          String?
+  testDescription    String?
+  testEnabledAt      DateTime?
+  testDisabledAt     DateTime?
+  testDisabledReason String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model TestModeWallet {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  fiatBalance Decimal  @default(10000.00) @db.Decimal(18, 2)
+  rpcBalance  Decimal  @default(0.00) @db.Decimal(18, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model TestModeMarketState {
+  id              String   @id
+  currentPrice    Decimal  @default(1.00000000) @db.Decimal(24, 8)
+  fiatReserve     Decimal  @default(1000000.00) @db.Decimal(18, 2)
+  rpcReserve      Decimal  @default(1000000.00) @db.Decimal(18, 2)
+  totalFiatVolume Decimal  @default(0) @db.Decimal(18, 2)
+  totalRpcVolume  Decimal  @default(0) @db.Decimal(18, 2)
+  totalBuys       Int      @default(0)
+  totalSells      Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model TestModeTrade {
+  id          String   @id @default(cuid())
+  userId      String
+  side        String
+  fiatAmount  Decimal  @db.Decimal(18, 2)
+  rpcAmount   Decimal  @db.Decimal(18, 2)
+  unitPrice   Decimal  @db.Decimal(24, 8)
+  priceBefore Decimal  @db.Decimal(24, 8)
+  priceAfter  Decimal  @db.Decimal(24, 8)
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model TestModeReport {
+  id           String   @id @default(cuid())
+  userId       String
+  type         String
+  location     String
+  description  String
+  status       String   @default("OPEN")
+  userSnapshot String?
+  adminNote    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
 }
