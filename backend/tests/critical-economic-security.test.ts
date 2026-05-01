@@ -38,6 +38,10 @@ async function resetDb() {
     prisma.rolePermission.deleteMany(),
     prisma.permission.deleteMany(),
     prisma.role.deleteMany(),
+    prisma.testModeReport.deleteMany(),
+    prisma.testModeTrade.deleteMany(),
+    prisma.testModeWallet.deleteMany(),
+    prisma.testModeMarketState.deleteMany(),
     prisma.user.deleteMany(),
     prisma.platformAccount.deleteMany(),
     prisma.treasuryAccount.deleteMany(),
@@ -781,4 +785,64 @@ test('modo normal bloqueia endpoint test-mode/me', async () => {
   const userToken = await token(user.id, ['USER']);
   const response = await app.inject({ method: 'GET', url: '/api/test-mode/me', headers: { authorization: `Bearer ${userToken}` } });
   assert.equal(response.statusCode, 403, response.body);
+});
+
+
+test('modo teste: preço, leaderboard, guardas e report types', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const user = await mkUser('tmode@test.local', 'TMode');
+  await prisma.userRole.create({ data: { userId: user.id, roleId: rUser.id } });
+
+  const superAdminRole = await mkRole('SUPER_ADMIN');
+  const admin = await mkUser('admin-tmode@test.local', 'Admin');
+  await prisma.userRole.create({ data: { userId: admin.id, roleId: superAdminRole.id } });
+
+  const adminToken = await token(admin.id, ['SUPER_ADMIN']);
+  const userToken = await token(user.id, ['USER']);
+
+  const setTest = await app.inject({ method: 'POST', url: '/api/admin/system-mode/test/enable', headers: { authorization: `Bearer ${adminToken}` }, payload: { reason: 'Ativando modo teste para teste crítico' } });
+  assert.equal(setTest.statusCode, 200, setTest.body);
+
+  const deniedMe = await app.inject({ method: 'GET', url: '/api/me', headers: { authorization: `Bearer ${userToken}` } });
+  assert.equal(deniedMe.statusCode, 403, deniedMe.body);
+
+  const deniedMarket = await app.inject({ method: 'GET', url: '/api/rpc-market', headers: { authorization: `Bearer ${userToken}` } });
+  assert.equal(deniedMarket.statusCode, 403, deniedMarket.body);
+
+  const testMe = await app.inject({ method: 'GET', url: '/api/test-mode/me', headers: { authorization: `Bearer ${userToken}` } });
+  assert.equal(testMe.statusCode, 200, testMe.body);
+
+  const beforeMarket = await app.inject({ method: 'GET', url: '/api/test-mode/market', headers: { authorization: `Bearer ${userToken}` } });
+  const beforePrice = Number(beforeMarket.json().currentPrice);
+
+  const buy = await app.inject({ method: 'POST', url: '/api/test-mode/buy', headers: { authorization: `Bearer ${userToken}` }, payload: { fiatAmount: 100 } });
+  assert.equal(buy.statusCode, 200, buy.body);
+  const afterBuyMarket = await app.inject({ method: 'GET', url: '/api/test-mode/market', headers: { authorization: `Bearer ${userToken}` } });
+  const afterBuyPrice = Number(afterBuyMarket.json().currentPrice);
+  assert.ok(afterBuyPrice > beforePrice);
+
+  const sell = await app.inject({ method: 'POST', url: '/api/test-mode/sell', headers: { authorization: `Bearer ${userToken}` }, payload: { rpcAmount: 1 } });
+  assert.equal(sell.statusCode, 200, sell.body);
+  const afterSellMarket = await app.inject({ method: 'GET', url: '/api/test-mode/market', headers: { authorization: `Bearer ${userToken}` } });
+  const afterSellPrice = Number(afterSellMarket.json().currentPrice);
+  assert.ok(afterSellPrice < afterBuyPrice);
+
+  const leaderboard = await app.inject({ method: 'GET', url: '/api/test-mode/leaderboard', headers: { authorization: `Bearer ${userToken}` } });
+  assert.equal(leaderboard.statusCode, 200, leaderboard.body);
+  const rows = leaderboard.json().leaderboard as Array<{ userId: string; estimatedTotalFiat: string }>;
+  assert.ok(rows.some((row) => row.userId === user.id));
+  const sorted = [...rows].sort((a, b) => Number(b.estimatedTotalFiat) - Number(a.estimatedTotalFiat));
+  assert.deepEqual(rows.map((r) => r.userId), sorted.map((r) => r.userId));
+
+  for (const type of ['BUG','VISUAL_ERROR','BALANCE_ERROR','CHEAT_SUSPECTED','SUGGESTION','OTHER']) {
+    const report = await app.inject({ method: 'POST', url: '/api/test-mode/reports', headers: { authorization: `Bearer ${userToken}` }, payload: { type, location: 'Tela', description: 'Teste' } });
+    assert.equal(report.statusCode, 201, report.body);
+  }
+
+  const setNormal = await app.inject({ method: 'POST', url: '/api/admin/system-mode/normal/enable', headers: { authorization: `Bearer ${adminToken}` }, payload: { reason: 'Voltando para modo normal no teste crítico' } });
+  assert.equal(setNormal.statusCode, 200, setNormal.body);
+
+  const reportBlockedInNormal = await app.inject({ method: 'POST', url: '/api/test-mode/reports', headers: { authorization: `Bearer ${userToken}` }, payload: { type: 'BUG', location: 'Tela', description: 'Teste em normal' } });
+  assert.equal(reportBlockedInNormal.statusCode, 403, reportBlockedInNormal.body);
 });
