@@ -17,7 +17,7 @@ type CompanyRevenueAccount = {
   totalReceivedFees: string | number;
   totalWithdrawn: string | number;
 };
-type ActiveTab = 'overview' | 'users' | 'brokers' | 'tokens' | 'withdrawals' | 'treasury' | 'liquidity' | 'revenues' | 'audit' | 'reports' | 'test-mode';
+type ActiveTab = 'overview' | 'users' | 'brokers' | 'tokens' | 'withdrawals' | 'treasury' | 'liquidity' | 'revenues' | 'audit' | 'test-mode';
 
 type AdminDashboardProps = {
   currentUserRoles: string[];
@@ -125,7 +125,6 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
     liquidity: 'Liquidez RPC/R$',
     revenues: 'Receitas',
     audit: 'Auditoria',
-    reports: 'Relatórios',
     'test-mode': 'Modo Teste',
   };
 
@@ -146,7 +145,6 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
     { key: 'treasury', label: 'Tesouraria administrativa', active: tab === 'treasury', onClick: () => setTab('treasury') },
     { key: 'revenues', label: 'Receitas', active: tab === 'revenues', onClick: () => setTab('revenues') },
     { key: 'audit', label: 'Auditoria', active: tab === 'audit', onClick: () => setTab('audit') },
-    { key: 'reports', label: 'Relatórios', active: tab === 'reports', onClick: () => setTab('reports') },
     { key: 'test-mode', label: 'Modo Teste', active: tab === 'test-mode', onClick: () => setTab('test-mode') },
   ];
   if (canManageRpcLiquidity) {
@@ -451,11 +449,11 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
 
           <h4>Reports do modo teste</h4>
           <div className="form-grid">
-            <input value={testReportStatusFilter} onChange={(e)=>setTestReportStatusFilter(e.target.value)} placeholder="Filtro status" />
-            <input value={testReportTypeFilter} onChange={(e)=>setTestReportTypeFilter(e.target.value)} placeholder="Filtro tipo" />
+            <select value={testReportStatusFilter} onChange={(e)=>setTestReportStatusFilter(e.target.value)}><option value=''>Todos status</option><option value='OPEN'>OPEN</option><option value='UNDER_REVIEW'>UNDER_REVIEW</option><option value='RESOLVED'>RESOLVED</option><option value='DISMISSED'>DISMISSED</option></select>
+            <select value={testReportTypeFilter} onChange={(e)=>setTestReportTypeFilter(e.target.value)}><option value=''>Todos tipos</option><option value='BUG'>BUG</option><option value='VISUAL_ERROR'>VISUAL_ERROR</option><option value='BALANCE_ERROR'>BALANCE_ERROR</option><option value='CHEAT_SUSPECTED'>CHEAT_SUSPECTED</option><option value='SUGGESTION'>SUGGESTION</option><option value='OTHER'>OTHER</option></select>
           </div>
           <div className="mobile-card-list">
-            {testReports.map((r)=> <article key={r.id} className="summary-item compact-card"><strong>{r.type} • {r.status}</strong><p>{r.description}</p><p>{r.location}</p><input placeholder="adminNote" defaultValue={r.adminNote ?? ''} onBlur={async(e)=>{await api(`/admin/test-mode/reports/${r.id}`,{method:'PATCH',body:JSON.stringify({status:r.status,adminNote:e.target.value})});}} /><select value={r.status} onChange={async(e)=>{await api(`/admin/test-mode/reports/${r.id}`,{method:'PATCH',body:JSON.stringify({status:e.target.value})}); await load();}}><option>OPEN</option><option>UNDER_REVIEW</option><option>RESOLVED</option><option>DISMISSED</option></select></article>) }
+            {testReports.map((r)=> <article key={r.id} className="summary-item compact-card"><strong>{r.type} • {r.status}</strong><p>{r.description}</p><p>{r.location}</p><input placeholder="adminNote" defaultValue={r.adminNote ?? ''} onBlur={async(e)=>{try { await api(`/admin/test-mode/reports/${r.id}`,{method:'PATCH',body:JSON.stringify({status:r.status,adminNote:e.target.value})}); setMessage('Report atualizado.'); } catch (err) { setError((err as Error).message); }}} /><select value={r.status} onChange={async(e)=>{try { await api(`/admin/test-mode/reports/${r.id}`,{method:'PATCH',body:JSON.stringify({status:e.target.value})}); await load(); setMessage('Status atualizado.'); } catch (err) { setError((err as Error).message); }}}><option>OPEN</option><option>UNDER_REVIEW</option><option>RESOLVED</option><option>DISMISSED</option></select></article>) }
           </div>
 
           {canManageTestMode && <div className="form-grid"><input value={resetUserRef} onChange={(e)=>setResetUserRef(e.target.value)} placeholder="userId ou email" /><button className="button-secondary" onClick={async()=>{await api('/admin/test-mode/reset-user',{method:'POST',body:JSON.stringify(resetUserRef.includes('@')?{email:resetUserRef,reason:testReason}:{userId:resetUserRef,reason:testReason})}); setMessage('Carteira de teste resetada.');}}>Resetar carteira de jogador</button><button className="button-secondary" onClick={async()=>{await api('/admin/test-mode/reset-market',{method:'POST',body:JSON.stringify({reason:testReason})}); setMessage('Mercado de teste resetado.');}}>Resetar mercado de teste</button></div>}

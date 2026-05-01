@@ -749,3 +749,36 @@ test('modo teste global bloqueia rotas reais, mantém isolamento e registra logs
   const logs = await prisma.adminLog.findMany({ where: { action: { in: ['SYSTEM_MODE_ENABLE_TEST', 'SYSTEM_MODE_ENABLE_NORMAL', 'TEST_MODE_RESET_USER', 'TEST_MODE_CLEAR'] } } });
   assert.ok(logs.length >= 4);
 });
+
+test('modo teste global bloqueia /api/me e /api/rpc-market para USER e permite /api/test-mode/me', async () => {
+  await resetDb();
+  const roleUser = await mkRole('USER');
+  const user = await mkUser('testmode-user@test.local');
+  await prisma.userRole.create({ data: { userId: user.id, roleId: roleUser.id } });
+  await prisma.systemModeConfig.upsert({ where: { id: 'SYSTEM_MODE_MAIN' }, update: { mode: 'TEST' }, create: { id: 'SYSTEM_MODE_MAIN', mode: 'TEST' } });
+
+  const userToken = await token(user.id, ['USER']);
+
+  const meBlocked = await app.inject({ method: 'GET', url: '/api/me', headers: { authorization: `Bearer ${userToken}` } });
+  assert.equal(meBlocked.statusCode, 403, meBlocked.body);
+
+  const marketBlocked = await app.inject({ method: 'GET', url: '/api/rpc-market', headers: { authorization: `Bearer ${userToken}` } });
+  assert.equal(marketBlocked.statusCode, 403, marketBlocked.body);
+
+  const withoutTokenBlocked = await app.inject({ method: 'GET', url: '/api/market/orders' });
+  assert.equal(withoutTokenBlocked.statusCode, 403, withoutTokenBlocked.body);
+
+  const testModeMeAllowed = await app.inject({ method: 'GET', url: '/api/test-mode/me', headers: { authorization: `Bearer ${userToken}` } });
+  assert.equal(testModeMeAllowed.statusCode, 200, testModeMeAllowed.body);
+});
+
+test('modo normal bloqueia endpoint test-mode/me', async () => {
+  await resetDb();
+  const roleUser = await mkRole('USER');
+  const user = await mkUser('normal-user@test.local');
+  await prisma.userRole.create({ data: { userId: user.id, roleId: roleUser.id } });
+  await prisma.systemModeConfig.upsert({ where: { id: 'SYSTEM_MODE_MAIN' }, update: { mode: 'NORMAL' }, create: { id: 'SYSTEM_MODE_MAIN', mode: 'NORMAL' } });
+  const userToken = await token(user.id, ['USER']);
+  const response = await app.inject({ method: 'GET', url: '/api/test-mode/me', headers: { authorization: `Bearer ${userToken}` } });
+  assert.equal(response.statusCode, 403, response.body);
+});
