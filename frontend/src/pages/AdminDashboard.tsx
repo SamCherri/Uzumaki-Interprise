@@ -56,15 +56,21 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
   const [withdrawFiat, setWithdrawFiat] = useState('');
   const [withdrawRpc, setWithdrawRpc] = useState('');
   const [withdrawReason, setWithdrawReason] = useState('');
+  const roles = currentUserRoles.map((role) => role.toUpperCase());
+  const canWithdrawPlatformProfit = roles.includes('SUPER_ADMIN') || roles.includes('COIN_CHIEF_ADMIN');
+  const canIssueRpc = roles.includes('SUPER_ADMIN') || roles.includes('COIN_CHIEF_ADMIN');
+  const canManageRpcLiquidity = roles.includes('SUPER_ADMIN') || roles.includes('COIN_CHIEF_ADMIN');
 
   async function load() {
     try {
-      const [overview, platform, companyRevenue, liquidityState] = await Promise.all([
+      const [overview, platform, companyRevenue] = await Promise.all([
         api<Overview>('/admin/overview'),
         api<PlatformAccount>('/admin/platform-account'),
         api<{ accounts: CompanyRevenueAccount[] }>('/admin/company-revenue-accounts'),
-        api<RpcLiquidityState>('/admin/rpc-market/liquidity'),
       ]);
+      const liquidityState = canManageRpcLiquidity
+        ? await api<RpcLiquidityState>('/admin/rpc-market/liquidity')
+        : null;
       setData(overview);
       setPlatformAccount(platform);
       setCompanyRevenueAccounts(companyRevenue.accounts);
@@ -76,11 +82,10 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
     }
   }
 
-  useEffect(() => { load(); }, []);
-
-  const roles = currentUserRoles.map((role) => role.toUpperCase());
-  const canWithdrawPlatformProfit = roles.includes('SUPER_ADMIN') || roles.includes('COIN_CHIEF_ADMIN');
-  const canIssueRpc = roles.includes('SUPER_ADMIN') || roles.includes('COIN_CHIEF_ADMIN');
+  useEffect(() => { load(); }, [canManageRpcLiquidity]);
+  useEffect(() => {
+    if (!canManageRpcLiquidity && tab === 'liquidity') setTab('overview');
+  }, [canManageRpcLiquidity, tab]);
 
   const adminTabLabels: Record<ActiveTab, string> = {
     overview: 'Visão geral',
@@ -110,11 +115,13 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
     { key: 'tokens', label: 'Tokens/Mercados', active: tab === 'tokens', onClick: () => setTab('tokens') },
     { key: 'withdrawals', label: 'Saques', active: tab === 'withdrawals', onClick: () => setTab('withdrawals') },
     { key: 'treasury', label: 'Tesouraria administrativa', active: tab === 'treasury', onClick: () => setTab('treasury') },
-    { key: 'liquidity', label: 'Liquidez RPC/R$', active: tab === 'liquidity', onClick: () => setTab('liquidity') },
     { key: 'revenues', label: 'Receitas', active: tab === 'revenues', onClick: () => setTab('revenues') },
     { key: 'audit', label: 'Auditoria', active: tab === 'audit', onClick: () => setTab('audit') },
     { key: 'reports', label: 'Relatórios', active: tab === 'reports', onClick: () => setTab('reports') },
   ];
+  if (canManageRpcLiquidity) {
+    adminDrawerItems.splice(6, 0, { key: 'liquidity', label: 'Liquidez RPC/R$', active: tab === 'liquidity', onClick: () => setTab('liquidity') });
+  }
 
   async function submitIssuance(event: FormEvent) {
     event.preventDefault();
@@ -241,7 +248,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
         <button className={tab === 'tokens' ? 'pill active' : 'pill'} onClick={() => setTab('tokens')}>Tokens/Mercados</button>
         <button className={tab === 'withdrawals' ? 'pill active' : 'pill'} onClick={() => setTab('withdrawals')}>Saques</button>
         <button className={tab === 'treasury' ? 'pill active' : 'pill'} onClick={() => setTab('treasury')}>Tesouraria</button>
-        <button className={tab === 'liquidity' ? 'pill active' : 'pill'} onClick={() => setTab('liquidity')}>Liquidez RPC/R$</button>
+        {canManageRpcLiquidity && <button className={tab === 'liquidity' ? 'pill active' : 'pill'} onClick={() => setTab('liquidity')}>Liquidez RPC/R$</button>}
         <button className={tab === 'revenues' ? 'pill active' : 'pill'} onClick={() => setTab('revenues')}>Receitas</button>
         <button className={tab === 'audit' ? 'pill active' : 'pill'} onClick={() => setTab('audit')}>Auditoria</button>
         <button className={tab === 'reports' ? 'pill active' : 'pill'} onClick={() => setTab('reports')}>Relatórios</button>

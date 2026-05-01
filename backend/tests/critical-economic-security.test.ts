@@ -651,6 +651,10 @@ test('permissões e regras de liquidez RPC/R$ com AdminLog', async () => {
 
   assert.equal((await app.inject({ method: 'POST', url: '/api/admin/rpc-market/liquidity/inject', headers: { authorization: `Bearer ${userTk}` }, payload: { fiatAmount: 100, reason: 'motivo longo user' } })).statusCode, 403);
   assert.equal((await app.inject({ method: 'POST', url: '/api/admin/rpc-market/liquidity/inject', headers: { authorization: `Bearer ${adminTk}` }, payload: { fiatAmount: 100, reason: 'motivo longo admin' } })).statusCode, 403);
+  assert.equal((await app.inject({ method: 'GET', url: '/api/admin/rpc-market/liquidity', headers: { authorization: `Bearer ${userTk}` } })).statusCode, 403);
+  assert.equal((await app.inject({ method: 'GET', url: '/api/admin/rpc-market/liquidity', headers: { authorization: `Bearer ${adminTk}` } })).statusCode, 403);
+  assert.equal((await app.inject({ method: 'GET', url: '/api/admin/rpc-market/liquidity', headers: { authorization: `Bearer ${chiefTk}` } })).statusCode, 200);
+  assert.equal((await app.inject({ method: 'GET', url: '/api/admin/rpc-market/liquidity', headers: { authorization: `Bearer ${superTk}` } })).statusCode, 200);
 
   const inject = await app.inject({ method: 'POST', url: '/api/admin/rpc-market/liquidity/inject', headers: { authorization: `Bearer ${chiefTk}` }, payload: { fiatAmount: 1000, rpcAmount: 500, reason: 'injeção de liquidez teste' } });
   assert.equal(inject.statusCode, 200, inject.body);
