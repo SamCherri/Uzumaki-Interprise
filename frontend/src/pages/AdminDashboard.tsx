@@ -18,7 +18,7 @@ type CompanyRevenueAccount = {
   totalReceivedFees: string | number;
   totalWithdrawn: string | number;
 };
-type ActiveTab = 'overview' | 'users' | 'brokers' | 'tokens' | 'withdrawals' | 'treasury' | 'liquidity' | 'revenues' | 'audit' | 'reports';
+type ActiveTab = 'overview' | 'users' | 'brokers' | 'tokens' | 'withdrawals' | 'treasury' | 'liquidity' | 'revenues' | 'audit' | 'reports' | 'test-mode';
 
 type AdminDashboardProps = {
   currentUserRoles: string[];
@@ -58,22 +58,28 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
   const [withdrawReason, setWithdrawReason] = useState('');
   const [isSubmittingLiquidityInject, setIsSubmittingLiquidityInject] = useState(false);
   const [isSubmittingLiquidityWithdraw, setIsSubmittingLiquidityWithdraw] = useState(false);
+  const [systemMode, setSystemMode] = useState<'NORMAL'|'TEST'>('NORMAL');
+  const [testReason, setTestReason] = useState('');
   const [liquidityError, setLiquidityError] = useState('');
   const roles = currentUserRoles.map((role) => role.toUpperCase());
   const canWithdrawPlatformProfit = roles.includes('SUPER_ADMIN') || roles.includes('COIN_CHIEF_ADMIN');
   const canIssueRpc = roles.includes('SUPER_ADMIN') || roles.includes('COIN_CHIEF_ADMIN');
   const canManageRpcLiquidity = roles.includes('SUPER_ADMIN') || roles.includes('COIN_CHIEF_ADMIN');
+  const canManageTestMode = roles.includes('SUPER_ADMIN') || roles.includes('COIN_CHIEF_ADMIN');
+  const canClearTestMode = roles.includes('SUPER_ADMIN');
 
   async function load() {
     try {
-      const [overview, platform, companyRevenue] = await Promise.all([
+      const [overview, platform, companyRevenue, modeData] = await Promise.all([
         api<Overview>('/admin/overview'),
         api<PlatformAccount>('/admin/platform-account'),
         api<{ accounts: CompanyRevenueAccount[] }>('/admin/company-revenue-accounts'),
+        api<{ mode: 'NORMAL'|'TEST' }>('/admin/system-mode'),
       ]);
       setData(overview);
       setPlatformAccount(platform);
       setCompanyRevenueAccounts(companyRevenue.accounts);
+      setSystemMode(modeData.mode);
       if (canManageRpcLiquidity) {
         try {
           const liquidityState = await api<RpcLiquidityState>('/admin/rpc-market/liquidity');
@@ -110,6 +116,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
     revenues: 'Receitas',
     audit: 'Auditoria',
     reports: 'Relatórios',
+    'test-mode': 'Modo Teste',
   };
 
 
@@ -130,6 +137,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
     { key: 'revenues', label: 'Receitas', active: tab === 'revenues', onClick: () => setTab('revenues') },
     { key: 'audit', label: 'Auditoria', active: tab === 'audit', onClick: () => setTab('audit') },
     { key: 'reports', label: 'Relatórios', active: tab === 'reports', onClick: () => setTab('reports') },
+    { key: 'test-mode', label: 'Modo Teste', active: tab === 'test-mode', onClick: () => setTab('test-mode') },
   ];
   if (canManageRpcLiquidity) {
     adminDrawerItems.splice(6, 0, { key: 'liquidity', label: 'Liquidez RPC/R$', active: tab === 'liquidity', onClick: () => setTab('liquidity') });
@@ -264,6 +272,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
         <button className={tab === 'revenues' ? 'pill active' : 'pill'} onClick={() => setTab('revenues')}>Receitas</button>
         <button className={tab === 'audit' ? 'pill active' : 'pill'} onClick={() => setTab('audit')}>Auditoria</button>
         <button className={tab === 'reports' ? 'pill active' : 'pill'} onClick={() => setTab('reports')}>Relatórios</button>
+        <button className={tab === 'test-mode' ? 'pill active' : 'pill'} onClick={() => setTab('test-mode')}>Modo Teste</button>
       </nav>
 
       {tab === 'overview' && data && (
@@ -424,6 +433,19 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
 
       {tab === 'audit' && <AdminAuditPanel />}
       {tab === 'reports' && <AdminReportsPanel />}
+
+      {tab === 'test-mode' && (
+        <section className="nested-card">
+          <h3>🧪 Modo Teste Global</h3>
+          <p>Status atual: <strong>{systemMode}</strong></p>
+          <input value={testReason} onChange={(e)=>setTestReason(e.target.value)} placeholder="Motivo (mín 10 caracteres)" minLength={10} />
+          {canManageTestMode && <div className="form-grid"><button className="button-primary" onClick={async()=>{await api('/admin/system-mode/test/enable',{method:'POST',body:JSON.stringify({reason:testReason})}); await load(); setMessage('Modo TEST ativado.');}}>Ativar Modo Teste</button><button className="button-secondary" onClick={async()=>{await api('/admin/system-mode/normal/enable',{method:'POST',body:JSON.stringify({reason:testReason})}); await load(); setMessage('Modo NORMAL ativado.');}}>Voltar para Modo Normal</button></div>}
+          <h4>Reports do modo teste</h4>
+          <AdminReportsPanel />
+          {canManageTestMode && <div className="form-grid"><button className="button-secondary" onClick={async()=>{const userRef=prompt('userId ou email do jogador')||''; await api('/admin/test-mode/reset-user',{method:'POST',body:JSON.stringify(userRef.includes('@')?{email:userRef,reason:testReason}:{userId:userRef,reason:testReason})}); setMessage('Carteira de teste resetada.');}}>Resetar carteira de jogador</button><button className="button-secondary" onClick={async()=>{await api('/admin/test-mode/reset-market',{method:'POST',body:JSON.stringify({reason:testReason})}); setMessage('Mercado de teste resetado.');}}>Resetar mercado de teste</button></div>}
+          {canClearTestMode && <button className="button-danger" onClick={async()=>{await api('/admin/test-mode/clear',{method:'POST',body:JSON.stringify({reason:testReason,confirmation:'LIMPAR MODO TESTE'})}); setMessage('Dados de teste limpos.');}}>Limpar dados de teste</button>}
+        </section>
+      )}
     </section>
   );
 }

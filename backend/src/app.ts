@@ -17,6 +17,7 @@ import { projectBoostRoutes } from './routes/project-boosts.js';
 import { rpcMarketRoutes } from './routes/rpc-market.js';
 import { systemModeRoutes } from './routes/system-mode.js';
 import { testModeRoutes } from './routes/test-mode.js';
+import { globalSystemModeGuard } from './plugins/system-mode-guard.js';
 
 export function buildApp() {
   const app = Fastify({ logger: true });
@@ -27,6 +28,7 @@ export function buildApp() {
     credentials: true,
   });
   app.register(authPlugin);
+  app.addHook('preHandler', globalSystemModeGuard);
 
   app.decorate('logAdmin', async (input: { action: string; entity: string; userId?: string; reason?: string; previous?: string; current?: string }) => {
     await prisma.adminLog.create({
