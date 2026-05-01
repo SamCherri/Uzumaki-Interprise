@@ -28,6 +28,26 @@ function requireBroker(reply: FastifyReply, roles: string[]) {
   return true;
 }
 
+async function resolveUniqueUserByRef(tx: Prisma.TransactionClient, ref: string) {
+  const trimmedRef = ref.trim();
+  const candidates = await tx.user.findMany({
+    where: {
+      OR: [
+        { bankAccountNumber: { equals: trimmedRef } },
+        { characterName: { equals: trimmedRef, mode: 'insensitive' } },
+        { name: { equals: trimmedRef, mode: 'insensitive' } },
+        { email: { equals: trimmedRef.toLowerCase(), mode: 'insensitive' } },
+      ],
+    },
+    include: { wallet: true },
+    take: 2,
+  });
+
+  if (candidates.length === 0) throw new Error('Usuário não encontrado.');
+  if (candidates.length > 1) throw new Error('Referência ambígua. Use a Conta RP exata ou o email técnico.');
+  return candidates[0];
+}
+
 export async function brokerRoutes(app: FastifyInstance) {
   app.get('/broker/balance', { preHandler: [app.authenticate] }, async (request, reply) => {
     const authRequest = request as AuthRequest;
@@ -88,11 +108,11 @@ export async function brokerRoutes(app: FastifyInstance) {
 
       const normalizedEmail = body.userEmail?.trim().toLowerCase();
       const normalizedRef = body.userRef?.trim();
-      const targetUser = normalizedEmail
-        ? await tx.user.findUnique({ where: { email: normalizedEmail }, include: { wallet: true } })
-        : body.userId
-          ? await tx.user.findUnique({ where: { id: body.userId }, include: { wallet: true } })
-          : await tx.user.findFirst({ where: { OR: [{ bankAccountNumber: normalizedRef }, { characterName: { equals: normalizedRef, mode: 'insensitive' } }, { name: { equals: normalizedRef, mode: 'insensitive' } }, { email: { equals: normalizedRef?.toLowerCase(), mode: 'insensitive' } }] }, include: { wallet: true } });
+      const targetUser = body.userId
+        ? await tx.user.findUnique({ where: { id: body.userId }, include: { wallet: true } })
+        : normalizedEmail
+          ? await tx.user.findUnique({ where: { email: normalizedEmail }, include: { wallet: true } })
+          : await resolveUniqueUserByRef(tx, normalizedRef ?? '');
       if (!targetUser) {
         throw new Error('Usuário de destino não encontrado.');
       }

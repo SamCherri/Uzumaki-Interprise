@@ -335,6 +335,72 @@ test('admin deposita R$ direto em jogador com débito atômico da tesouraria', a
   assert.equal(forbidden.statusCode, 403, forbidden.body);
 });
 
+test('operações sensíveis bloqueiam referência ambígua e preservam id/email técnico', async () => {
+  await resetDb();
+  const rSuper = await mkRole('SUPER_ADMIN');
+  const rBroker = await mkRole('VIRTUAL_BROKER');
+  const rAdmin = await mkRole('ADMIN');
+  const rUser = await mkRole('USER');
+
+  const superAdmin = await mkUser('super-amb@test.local', 'Super Amb');
+  const userA = await mkUser('player-amb-a@test.local', 'Player Amb');
+  const userB = await mkUser('player-amb-b@test.local', 'Player Amb');
+  const uniqueUser = await mkUser('player-unique@test.local', 'Player Unique');
+  const brokerA = await mkUser('broker-amb-a@test.local', 'Broker Amb');
+  const brokerB = await mkUser('broker-amb-b@test.local', 'Broker Amb');
+  const brokerSender = await mkUser('broker-sender@test.local', 'Broker Sender');
+  const adminA = await mkUser('admin-amb-a@test.local', 'Admin Amb');
+  const adminB = await mkUser('admin-amb-b@test.local', 'Admin Amb');
+
+  await prisma.userRole.createMany({ data: [
+    { userId: superAdmin.id, roleId: rSuper.id },
+    { userId: userA.id, roleId: rUser.id },
+    { userId: userB.id, roleId: rUser.id },
+    { userId: uniqueUser.id, roleId: rUser.id },
+    { userId: brokerA.id, roleId: rBroker.id },
+    { userId: brokerB.id, roleId: rBroker.id },
+    { userId: brokerSender.id, roleId: rBroker.id },
+    { userId: adminA.id, roleId: rAdmin.id },
+    { userId: adminB.id, roleId: rAdmin.id },
+  ] });
+
+  await prisma.user.update({ where: { id: userA.id }, data: { characterName: 'Duplicado RP' } });
+  await prisma.user.update({ where: { id: userB.id }, data: { characterName: 'Duplicado RP' } });
+  await prisma.user.update({ where: { id: uniqueUser.id }, data: { bankAccountNumber: 'RP-UNICO-001' } });
+  await prisma.user.update({ where: { id: brokerA.id }, data: { name: 'Corretor Duplicado' } });
+  await prisma.user.update({ where: { id: brokerB.id }, data: { name: 'Corretor Duplicado' } });
+  await prisma.user.update({ where: { id: adminA.id }, data: { name: 'Admin Duplicado' } });
+  await prisma.user.update({ where: { id: adminB.id }, data: { name: 'Admin Duplicado' } });
+
+  await prisma.treasuryAccount.create({ data: { balance: 1000 } });
+  await prisma.platformAccount.create({ data: { balance: 900, totalReceivedFees: 900, totalWithdrawn: 0 } });
+  await prisma.brokerAccount.create({ data: { userId: brokerSender.id, available: 500, receivedTotal: 500 } });
+
+  const superToken = await token(superAdmin.id, ['SUPER_ADMIN']);
+  const brokerToken = await token(brokerSender.id, ['VIRTUAL_BROKER']);
+
+  const uniqueByRef = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${superToken}` }, payload: { userRef: 'RP-UNICO-001', amount: 50, reason: 'depósito por ref única' } });
+  assert.equal(uniqueByRef.statusCode, 201, uniqueByRef.body);
+
+  const ambiguousUserRef = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${superToken}` }, payload: { userRef: 'Duplicado RP', amount: 10, reason: 'deve bloquear' } });
+  assert.equal(ambiguousUserRef.statusCode, 400, ambiguousUserRef.body);
+  assert.match(ambiguousUserRef.body, /referência ambígua/i);
+
+  const ambiguousBrokerRef = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-broker', headers: { authorization: `Bearer ${superToken}` }, payload: { brokerRef: 'Corretor Duplicado', amount: 20, reason: 'deve bloquear' } });
+  assert.equal(ambiguousBrokerRef.statusCode, 400, ambiguousBrokerRef.body);
+  assert.match(ambiguousBrokerRef.body, /referência ambígua/i);
+
+  const ambiguousBrokerUserRef = await app.inject({ method: 'POST', url: '/api/broker/transfer-to-user', headers: { authorization: `Bearer ${brokerToken}` }, payload: { userRef: 'Duplicado RP', amount: 10, reason: 'deve bloquear' } });
+  assert.equal(ambiguousBrokerUserRef.statusCode, 400, ambiguousBrokerUserRef.body);
+  assert.match(ambiguousBrokerUserRef.body, /referência ambígua/i);
+
+  const emailStillWorks = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${superToken}` }, payload: { userEmail: 'player-unique@test.local', amount: 10, reason: 'email técnico' } });
+  assert.equal(emailStillWorks.statusCode, 201, emailStillWorks.body);
+
+  const idStillWorks = await app.inject({ method: 'POST', url: '/api/admin/platform-account/withdraw-to-admin', headers: { authorization: `Bearer ${superToken}` }, payload: { adminId: adminA.id, amount: 20, reason: 'saque admin por id' } });
+  assert.equal(idStillWorks.statusCode, 201, idStillWorks.body);
+});
+
 test('super admin retira lucro da Exchange para carteira administrativa', async () => {
   await resetDb();
   const rSuper = await mkRole('SUPER_ADMIN');
