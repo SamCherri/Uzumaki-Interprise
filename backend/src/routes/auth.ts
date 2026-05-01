@@ -91,9 +91,9 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.post('/auth/login', async (request: FastifyRequest, reply: FastifyReply) => {
     const schema = z.object({ email: z.string().email(), password: z.string().min(8) });
-    const body = schema.parse(request.body);
 
     try {
+      const body = schema.parse(request.body);
       const user = await loginUser(body.email, body.password);
       const roles = user.roles.map((item: { role: { key: string } }) => item.role.key);
 
@@ -102,6 +102,9 @@ export async function authRoutes(app: FastifyInstance) {
 
       return { token, user: { id: user.id, name: user.name, email: user.email, roles } };
     } catch (error) {
+      if (error instanceof ZodError) {
+        return reply.code(400).send({ message: 'Dados de login inválidos.' });
+      }
       return reply.code(400).send({ message: (error as Error).message });
     }
   });
