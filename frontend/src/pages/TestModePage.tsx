@@ -4,8 +4,8 @@ import { api, getCurrentUser } from '../services/api';
 type Wallet = { fiatBalance: string; rpcBalance: string };
 type Market = { currentPrice: string };
 type Trade = { id: string; unitPrice?: string; priceAfter?: string; createdAt: string };
-type LeaderboardRow = { userId: string; characterName: string; fiatBalance: string; rpcBalance: string; estimatedTotal: string };
-type Quote = { estimatedQuantity?: string; estimatedFiat?: string; effectivePrice: string; priceAfter: string };
+type LeaderboardRow = { userId: string; name?: string | null; characterName?: string | null; fiatBalance: string; rpcBalance: string; estimatedTotalFiat: string };
+type Quote = { estimatedRpcAmount?: string; estimatedFiatAmount?: string; effectiveUnitPrice: string; estimatedPriceAfter: string };
 
 export function TestModePage() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
@@ -35,13 +35,13 @@ export function TestModePage() {
         api<Wallet>('/test-mode/me'),
         api<Market>('/test-mode/market'),
         api<{ trades: Trade[] }>('/test-mode/trades?limit=200'),
-        api<LeaderboardRow[]>('/test-mode/leaderboard'),
+        api<{ leaderboard: LeaderboardRow[] }>('/test-mode/leaderboard'),
         getCurrentUser().catch(() => null),
       ]);
       setWallet(w);
       setMarket(m);
       setTrades(t.trades ?? []);
-      setLeaderboard(l);
+      setLeaderboard(l.leaderboard ?? []);
       setMe(meData?.user ? { id: meData.user.id } : null);
     } catch (e) {
       setError((e as Error).message || 'Falha ao carregar Modo Teste.');
@@ -55,13 +55,13 @@ export function TestModePage() {
   useEffect(() => {
     const fiat = Number(fiatAmount);
     if (!fiat || fiat <= 0) { setBuyQuote(null); return; }
-    void api<Quote>('/test-mode/quote-buy', { method: 'POST', body: JSON.stringify({ fiatAmount: fiat }) }).then(setBuyQuote).catch(() => setBuyQuote(null));
+    void api<Quote>(`/test-mode/quote-buy?fiatAmount=${encodeURIComponent(String(fiat))}`).then(setBuyQuote).catch(() => setBuyQuote(null));
   }, [fiatAmount]);
 
   useEffect(() => {
     const rpc = Number(rpcAmount);
     if (!rpc || rpc <= 0) { setSellQuote(null); return; }
-    void api<Quote>('/test-mode/quote-sell', { method: 'POST', body: JSON.stringify({ rpcAmount: rpc }) }).then(setSellQuote).catch(() => setSellQuote(null));
+    void api<Quote>(`/test-mode/quote-sell?rpcAmount=${encodeURIComponent(String(rpc))}`).then(setSellQuote).catch(() => setSellQuote(null));
   }, [rpcAmount]);
 
   const total = useMemo(() => wallet && market ? Number(wallet.fiatBalance) + Number(wallet.rpcBalance) * Number(market.currentPrice) : 0, [wallet, market]);
@@ -132,16 +132,16 @@ export function TestModePage() {
     <p>Saldo teste R$: {wallet?.fiatBalance ?? '-'}</p><p>Saldo teste RPC: {wallet?.rpcBalance ?? '-'}</p><p>Patrimônio estimado: R$ {total.toFixed(2)}</p><p>Preço atual RPC/R$: {market?.currentPrice ?? '-'}</p>
 
     <div className="nested-card"><h3>Comprar RPC teste</h3><input value={fiatAmount} onChange={(e)=>setFiatAmount(e.target.value)} />
-      {buyQuote && <p>Qtd. estimada: {buyQuote.estimatedQuantity ?? '-'} | Preço efetivo: {buyQuote.effectivePrice} | Preço após: {buyQuote.priceAfter}</p>}
+      {buyQuote && <p>Qtd. estimada: {buyQuote.estimatedRpcAmount ?? '-'} | Preço efetivo: {buyQuote.effectiveUnitPrice} | Preço após: {buyQuote.estimatedPriceAfter}</p>}
       <button disabled={isBuying} onClick={handleBuy}>{isBuying ? 'Comprando...' : 'Comprar RPC de teste'}</button></div>
 
     <div className="nested-card"><h3>Vender RPC teste</h3><input value={rpcAmount} onChange={(e)=>setRpcAmount(e.target.value)} />
-      {sellQuote && <p>R$ estimado: {sellQuote.estimatedFiat ?? '-'} | Preço efetivo: {sellQuote.effectivePrice} | Preço após: {sellQuote.priceAfter}</p>}
+      {sellQuote && <p>R$ estimado: {sellQuote.estimatedFiatAmount ?? '-'} | Preço efetivo: {sellQuote.effectiveUnitPrice} | Preço após: {sellQuote.estimatedPriceAfter}</p>}
       <button disabled={isSelling} onClick={handleSell}>{isSelling ? 'Vendendo...' : 'Vender RPC de teste'}</button></div>
 
     <article className="nested-card"><h3>Ranking do modo teste</h3>
       {leaderboard.map((row, idx) => <div key={row.userId} style={{ fontWeight: row.userId === me?.id ? 700 : 400 }}>
-        #{idx + 1} {row.characterName} • R$ {row.fiatBalance} • RPC {row.rpcBalance} • Patrimônio {row.estimatedTotal}
+        #{idx + 1} {row.characterName ?? row.name ?? 'Jogador'} • R$ {row.fiatBalance} • RPC {row.rpcBalance} • Patrimônio {row.estimatedTotalFiat}
       </div>)}
     </article>
 
