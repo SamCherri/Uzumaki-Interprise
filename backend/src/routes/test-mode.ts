@@ -87,6 +87,41 @@ export async function testModeRoutes(app: FastifyInstance) {
     } catch (e) { return badRequest(reply, e); }
   });
 
+
+  app.post('/test-mode/bot-tick', { preHandler: [app.authenticate] }, async (_request, reply) => {
+    try {
+      if (!(await assertTestMode(reply))) return;
+      return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await tx.testModeMarketState.upsert({ where: { id: MARKET_ID }, update: {}, create: { id: MARKET_ID } });
+        await tx.$queryRaw`SELECT id FROM "TestModeMarketState" WHERE id = ${MARKET_ID} FOR UPDATE`;
+        const market = await tx.testModeMarketState.findUniqueOrThrow({ where: { id: MARKET_ID } });
+
+        const side: 'BUY' | 'SELL' = Math.random() < 0.5 ? 'BUY' : 'SELL';
+        const priceBefore = market.currentPrice;
+
+        if (side === 'BUY') {
+          const maxBuy = Decimal.min(new Decimal('250'), market.fiatReserve.mul(new Decimal('0.005'))).toDecimalPlaces(2);
+          const minBuy = new Decimal('20');
+          if (maxBuy.lt(minBuy)) return reply.status(400).send({ message: 'Liquidez insuficiente para tick de compra.' });
+          const fiatAmount = Decimal.max(minBuy, new Decimal((Math.random() * (Number(maxBuy.minus(minBuy)) || 0)).toFixed(2)).add(minBuy)).toDecimalPlaces(2);
+          const quote = buildBuyQuote(market, fiatAmount);
+          if (quote.rpcAmount.lt(MIN_AMOUNT)) return reply.status(400).send({ message: 'Liquidez insuficiente para tick de compra.' });
+          await tx.testModeMarketState.update({ where: { id: MARKET_ID }, data: { currentPrice: quote.priceAfter, fiatReserve: quote.newFiatReserve, rpcReserve: quote.newRpcReserve, totalFiatVolume: { increment: fiatAmount }, totalRpcVolume: { increment: quote.rpcAmount }, totalBuys: { increment: 1 } } });
+          return { side, fiatAmount, rpcAmount: quote.rpcAmount, priceBefore, priceAfter: quote.priceAfter, currentPrice: quote.priceAfter };
+        }
+
+        const maxSell = Decimal.min(new Decimal('25'), market.rpcReserve.mul(new Decimal('0.005'))).toDecimalPlaces(2);
+        const minSell = new Decimal('2');
+        if (maxSell.lt(minSell)) return reply.status(400).send({ message: 'Liquidez insuficiente para tick de venda.' });
+        const rpcAmount = Decimal.max(minSell, new Decimal((Math.random() * (Number(maxSell.minus(minSell)) || 0)).toFixed(2)).add(minSell)).toDecimalPlaces(2);
+        const quote = buildSellQuote(market, rpcAmount);
+        if (quote.fiatAmount.lt(MIN_AMOUNT)) return reply.status(400).send({ message: 'Liquidez insuficiente para tick de venda.' });
+        await tx.testModeMarketState.update({ where: { id: MARKET_ID }, data: { currentPrice: quote.priceAfter, fiatReserve: quote.newFiatReserve, rpcReserve: quote.newRpcReserve, totalFiatVolume: { increment: quote.fiatAmount }, totalRpcVolume: { increment: rpcAmount }, totalSells: { increment: 1 } } });
+        return { side, fiatAmount: quote.fiatAmount, rpcAmount, priceBefore, priceAfter: quote.priceAfter, currentPrice: quote.priceAfter };
+      });
+    } catch (e) { return badRequest(reply, e); }
+  });
+
   app.get('/test-mode/leaderboard', { preHandler: [app.authenticate] }, async (_request, reply) => { if (!(await assertTestMode(reply))) return; const market = await ensureMarket(); const wallets = await prisma.testModeWallet.findMany({ include: { user: true } }); const leaderboard = wallets.map((w: (typeof wallets)[number]) => ({ userId: w.userId, name: w.user.name, characterName: w.user.characterName, fiatBalance: w.fiatBalance, rpcBalance: w.rpcBalance, estimatedTotalFiat: w.fiatBalance.add(w.rpcBalance.mul(market.currentPrice)) })).sort((a: { estimatedTotalFiat: Decimal }, b: { estimatedTotalFiat: Decimal }) => b.estimatedTotalFiat.comparedTo(a.estimatedTotalFiat)).map((item: { userId: string; name: string | null; characterName: string | null; fiatBalance: Decimal; rpcBalance: Decimal; estimatedTotalFiat: Decimal }, i: number) => ({ ...item, position: i + 1 })); return { leaderboard }; });
   app.post('/test-mode/reports', { preHandler: [app.authenticate] }, async (request, reply) => { try { if (!(await assertTestMode(reply))) return; const body = z.object({ type: z.enum(['BUG', 'VISUAL_ERROR', 'BALANCE_ERROR', 'CHEAT_SUSPECTED', 'SUGGESTION', 'OTHER']), location: z.string().min(2), description: z.string().min(5) }).parse(request.body ?? {}); const userId = (request.user as { sub: string }).sub; const wallet = await ensureWallet(userId); const market = await ensureMarket(); const report = await prisma.testModeReport.create({ data: { userId, ...body, userSnapshot: JSON.stringify({ fiatBalance: wallet.fiatBalance.toString(), rpcBalance: wallet.rpcBalance.toString(), currentPrice: market.currentPrice.toString() }) } }); return reply.status(201).send(report); } catch (e) { return badRequest(reply, e); } });
 

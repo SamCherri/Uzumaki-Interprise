@@ -10,11 +10,12 @@ import { WithdrawalsPage } from './pages/WithdrawalsPage';
 import { ProjectOwnerPanel } from './pages/ProjectOwnerPanel';
 import { RpcMarketPage } from './pages/RpcMarketPage';
 import { TestModePage } from './pages/TestModePage';
+import { TestModeRankingPage } from './pages/TestModeRankingPage';
 import { api, getCurrentUser, CurrentUserResponse } from './services/api';
 import { SideDrawer, SideDrawerItem } from './components/SideDrawer';
 
 type PublicTab = 'login' | 'register';
-type PrivateScreen = 'home' | 'markets' | 'wallet' | 'rpc-market' | 'withdrawals' | 'company-request' | 'admin' | 'broker' | 'my-projects' | 'test-mode';
+type PrivateScreen = 'home' | 'markets' | 'wallet' | 'rpc-market' | 'withdrawals' | 'company-request' | 'admin' | 'broker' | 'my-projects' | 'test-mode' | 'test-ranking';
 
 type ViewerRoles = {
   canSeeAdmin: boolean;
@@ -109,7 +110,7 @@ export function App() {
       return;
     }
 
-    if (!roles.canSeeAdmin && systemMode === 'NORMAL' && screen === 'test-mode') {
+    if (!roles.canSeeAdmin && systemMode === 'NORMAL' && (screen === 'test-mode' || screen === 'test-ranking')) {
       setScreen('home');
     }
   }, [isTestModeRestrictedUser, roles.canSeeAdmin, screen, systemMode, token]);
@@ -224,7 +225,10 @@ export function App() {
 
   const globalDrawerItems = useMemo<SideDrawerItem[]>(() => {
     const items: SideDrawerItem[] = [
-      ...(shouldShowTestModeEntry ? [{ key: 'test-mode', label: 'Modo Teste', icon: '🧪', active: screen === 'test-mode', onClick: () => setScreen('test-mode'), section: 'main' } as SideDrawerItem] : []),
+      ...(shouldShowTestModeEntry ? [
+        { key: 'test-mode', label: 'Modo Teste', icon: '🧪', active: screen === 'test-mode', onClick: () => setScreen('test-mode'), section: 'main' } as SideDrawerItem,
+        { key: 'test-ranking', label: 'Ranking Teste', icon: '🏆', active: screen === 'test-ranking', onClick: () => setScreen('test-ranking'), section: 'main' } as SideDrawerItem,
+      ] : []),
       ...((isTestModeRestrictedUser
         ? []
         : [
@@ -329,6 +333,7 @@ export function App() {
       />
 
       {shouldShowTestModeEntry && screen === 'test-mode' && <TestModePage />}
+      {shouldShowTestModeEntry && screen === 'test-ranking' && <TestModeRankingPage />}
       {!isTestModeRestrictedUser && screen === 'home' && (
         <section className="card">
           {showInstallCard && (

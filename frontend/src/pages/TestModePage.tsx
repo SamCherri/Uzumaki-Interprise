@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { api, getCurrentUser } from '../services/api';
 
 type Wallet = { fiatBalance: string; rpcBalance: string; userId?: string };
@@ -36,6 +36,7 @@ export function TestModePage() {
   const [reportType, setReportType] = useState('BUG');
   const [reportLocation, setReportLocation] = useState('');
   const [reportDescription, setReportDescription] = useState('');
+  const isInitialLoadDoneRef = useRef(false);
 
   async function loadAll() {
     setLoading(true);
@@ -59,11 +60,20 @@ export function TestModePage() {
       setError((e as Error).message || 'Falha ao carregar Modo Teste.');
     } finally {
       setLoading(false);
+      isInitialLoadDoneRef.current = true;
     }
   }
 
   useEffect(() => {
     void loadAll();
+  }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (!isInitialLoadDoneRef.current || document.visibilityState !== 'visible') return;
+      void api('/test-mode/bot-tick', { method: 'POST' }).then(() => loadAll()).catch(() => undefined);
+    }, 30000);
+    return () => window.clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -140,7 +150,7 @@ export function TestModePage() {
     }
   }
 
-  return <section className="card market-page market-shell"><p className="warning">Modo Teste ativo. Nenhuma operação desta tela afeta a Exchange principal.</p>
+  return <section className="card market-page market-shell"><p className="warning">Modo Teste ativo. Nenhuma operação desta tela afeta a Exchange principal.</p><p className="info-text">O mercado de teste possui movimentações simuladas para ajudar os jogadores a testar lucro, prejuízo e bugs.</p>
     {loading && <p>Carregando dados do modo teste...</p>}{error && <p className="status-message error">{error}</p>}{message && <p className="status-message success">{message}</p>}
     <div className="trade-screen market-mobile-shell">
       <header className="card trade-header market-pair-header"><p className="company-emoji">🧪 Modo Teste RPC/R$</p><h3 className="trade-price-big">R$ {Number(market?.currentPrice ?? 0).toFixed(4)}</h3><div className="market-stats-row"><div className="market-mini-stat-card"><span className="market-mini-stat-label">Saldo R$ teste</span><strong>R$ {Number(wallet?.fiatBalance ?? 0).toFixed(2)}</strong></div><div className="market-mini-stat-card"><span className="market-mini-stat-label">Saldo RPC teste</span><strong>{Number(wallet?.rpcBalance ?? 0).toFixed(2)} RPC</strong></div><div className="market-mini-stat-card"><span className="market-mini-stat-label">Patrimônio estimado</span><strong>R$ {total.toFixed(2)}</strong></div><div className="market-mini-stat-card"><span className="market-mini-stat-label">Atualizado</span><strong>{market?.updatedAt ? new Date(market.updatedAt).toLocaleString('pt-BR') : '--'}</strong></div></div></header>
