@@ -15,6 +15,7 @@ const app = buildApp();
 
 async function resetDb() {
   await prisma.$transaction([
+    prisma.rpcLimitOrder.deleteMany(),
     prisma.rpcExchangeTrade.deleteMany(),
     prisma.rpcMarketState.deleteMany(),
     prisma.feeDistribution.deleteMany(),
