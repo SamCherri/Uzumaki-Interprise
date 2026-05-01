@@ -120,7 +120,7 @@ async function processEligibleRpcLimitOrders(options?: { maxOrders?: number }) {
       if (moved.count !== 1) return;
       await creditRpcMarketFee(tx, feeAmount, order.userId, `Taxa RPC limite SELL executada: ${order.id}`);
       await tx.rpcMarketState.update({ where: { id: RPC_MARKET_STATE_ID }, data: { fiatReserve: quote.newFiatReserve, rpcReserve: quote.newRpcReserve, currentPrice: quote.priceAfter, totalFiatVolume: { increment: quote.fiatAmount }, totalRpcVolume: { increment: order.rpcAmount }, totalSells: { increment: 1 } } });
-      await tx.rpcExchangeTrade.create({ data: { userId: order.userId, side: 'SELL_RPC', fiatAmount: quote.fiatAmount, rpcAmount: order.rpcAmount, unitPrice: quote.unitPrice, priceBefore: quote.priceBefore, priceAfter: quote.priceAfter } });
+      await tx.rpcExchangeTrade.create({ data: { userId: order.userId, side: 'SELL_RPC', fiatAmount: netFiatAmount, rpcAmount: order.rpcAmount, unitPrice: netFiatAmount.div(order.rpcAmount).toDecimalPlaces(PRICE_SCALE), priceBefore: quote.priceBefore, priceAfter: quote.priceAfter } });
       await tx.transaction.create({ data: { walletId: wallet.id, type: 'RPC_LIMIT_SELL_FILLED', amount: quote.fiatAmount, description: `Ordem limite RPC SELL executada: ${order.id}` } });
       await tx.transaction.create({ data: { walletId: wallet.id, type: 'RPC_LIMIT_SELL_FEE', amount: feeAmount, description: `Taxa ordem limite RPC SELL: ${order.id}` } });
       await tx.rpcLimitOrder.update({ where: { id: order.id }, data: { status: 'FILLED', executedAt: new Date(), filledFiatAmount: quote.fiatAmount, filledRpcAmount: order.rpcAmount, lockedRpcAmount: new Decimal('0') } });
@@ -446,7 +446,7 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
         if (updatedWallet.count !== 1) throw new Error('Saldo insuficiente.');
         await creditRpcMarketFee(tx, feeAmount, (request.user as { sub: string }).sub, 'Taxa RPC mercado SELL');
         await tx.rpcMarketState.update({ where: { id: RPC_MARKET_STATE_ID }, data: { fiatReserve: quote.newFiatReserve, rpcReserve: quote.newRpcReserve, currentPrice: quote.priceAfter, totalFiatVolume: { increment: quote.fiatAmount }, totalRpcVolume: { increment: rpcAmount }, totalSells: { increment: 1 } } });
-        await tx.rpcExchangeTrade.create({ data: { userId: (request.user as { sub: string }).sub, side: 'SELL_RPC', fiatAmount: grossFiatAmount, rpcAmount, unitPrice: netFiatAmount.div(rpcAmount).toDecimalPlaces(PRICE_SCALE), priceBefore: quote.priceBefore, priceAfter: quote.priceAfter } });
+        await tx.rpcExchangeTrade.create({ data: { userId: (request.user as { sub: string }).sub, side: 'SELL_RPC', fiatAmount: netFiatAmount, rpcAmount, unitPrice: netFiatAmount.div(rpcAmount).toDecimalPlaces(PRICE_SCALE), priceBefore: quote.priceBefore, priceAfter: quote.priceAfter } });
         await tx.transaction.create({ data: { walletId: wallet.id, type: 'RPC_MARKET_SELL', amount: netFiatAmount, description: 'Venda de RPC por R$ (líquido)' } });
         await tx.transaction.create({ data: { walletId: wallet.id, type: 'RPC_MARKET_SELL_FEE', amount: feeAmount, description: 'Taxa da Exchange na venda RPC/R$' } });
         const latestWallet = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
