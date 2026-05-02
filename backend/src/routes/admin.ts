@@ -282,6 +282,7 @@ export async function adminRoutes(app: FastifyInstance) {
       });
 
       const parsed = schema.parse(request.body);
+      await assertAdminPassword(authRequest.user.sub, parsed.adminPassword);
       const userEmail = parsed.userEmail?.trim().toLowerCase();
       const userRef = parsed.userRef?.trim();
 
