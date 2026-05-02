@@ -19,60 +19,72 @@ async function resetDb() {
 test('JWT_SECRET obrigatório em produção', async () => {
   const originalNodeEnv = process.env.NODE_ENV;
   const originalJwt = process.env.JWT_SECRET;
-  process.env.NODE_ENV = 'production';
-  delete process.env.JWT_SECRET;
-  const app = buildApp();
-  await assert.rejects(() => app.ready(), /JWT_SECRET é obrigatório em produção/);
-  process.env.NODE_ENV = originalNodeEnv;
-  process.env.JWT_SECRET = originalJwt;
+  let app: ReturnType<typeof buildApp> | null = null;
+  try {
+    process.env.NODE_ENV = 'production';
+    delete process.env.JWT_SECRET;
+    app = buildApp();
+    await assert.rejects(() => app.ready(), /JWT_SECRET é obrigatório em produção/);
+  } finally {
+    if (app) await app.close().catch(() => undefined);
+    process.env.NODE_ENV = originalNodeEnv;
+    process.env.JWT_SECRET = originalJwt;
+  }
 });
 
 test('WEB_ORIGIN obrigatório em produção', async () => {
   const originalNodeEnv = process.env.NODE_ENV;
   const originalJwt = process.env.JWT_SECRET;
   const originalWeb = process.env.WEB_ORIGIN;
-  process.env.NODE_ENV = 'production';
-  process.env.JWT_SECRET = 'secret';
-  process.env.WEB_ORIGIN = '   ';
-  assert.throws(() => buildApp(), /WEB_ORIGIN é obrigatório em produção/);
-  process.env.NODE_ENV = originalNodeEnv;
-  process.env.JWT_SECRET = originalJwt;
-  process.env.WEB_ORIGIN = originalWeb;
+  try {
+    process.env.NODE_ENV = 'production';
+    process.env.JWT_SECRET = 'secret';
+    process.env.WEB_ORIGIN = '   ';
+    assert.throws(() => buildApp(), /WEB_ORIGIN é obrigatório em produção/);
+  } finally {
+    process.env.NODE_ENV = originalNodeEnv;
+    process.env.JWT_SECRET = originalJwt;
+    process.env.WEB_ORIGIN = originalWeb;
+  }
 });
 
 test('login inválido bloqueia temporariamente e login válido zera contador', async () => {
+  const originalNodeEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = 'test';
   const app = buildApp();
-  await app.ready();
-  await resetDb();
+  try {
+    await app.ready();
+    await resetDb();
 
-  const role = await prisma.role.create({ data: { key: 'USER', name: 'USER' } });
-  const ok = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { name: 'User Teste', characterName: 'Personagem', bankAccountNumber: '12345', email: 'lock@test.local', password: '12345678' } });
-  assert.equal(ok.statusCode, 201, ok.body);
-  const user = await prisma.user.findUniqueOrThrow({ where: { email: 'lock@test.local' } });
-  assert.equal(role.key, 'USER');
+    const role = await prisma.role.create({ data: { key: 'USER', name: 'USER' } });
+    const ok = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { name: 'User Teste', characterName: 'Personagem', bankAccountNumber: '12345', email: 'lock@test.local', password: '12345678' } });
+    assert.equal(ok.statusCode, 201, ok.body);
+    const user = await prisma.user.findUniqueOrThrow({ where: { email: 'lock@test.local' } });
+    assert.equal(role.key, 'USER');
 
-  for (let i = 0; i < 4; i++) {
-    const bad = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'lock@test.local', password: 'senha-errada' } });
-    assert.equal(bad.statusCode, 401);
-    assert.equal(bad.json().message, 'Credenciais inválidas.');
+    for (let i = 0; i < 4; i++) {
+      const bad = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'lock@test.local', password: 'senha-errada' } });
+      assert.equal(bad.statusCode, 401);
+      assert.equal(bad.json().message, 'Credenciais inválidas.');
+    }
+
+    const locked = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'lock@test.local', password: 'senha-errada' } });
+    assert.equal(locked.statusCode, 401);
+    assert.equal(locked.json().message, 'Muitas tentativas inválidas. Tente novamente mais tarde.');
+
+    const unlockedNow = await prisma.user.update({ where: { id: user.id }, data: { loginLockedUntil: new Date(Date.now() - 1000) } });
+    assert.ok(unlockedNow);
+
+    const success = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'lock@test.local', password: '12345678' } });
+    assert.equal(success.statusCode, 200, success.body);
+
+    const refreshed = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    assert.equal(refreshed.failedLoginAttempts, 0);
+    assert.equal(refreshed.loginLockedUntil, null);
+  } finally {
+    await app.close().catch(() => undefined);
+    process.env.NODE_ENV = originalNodeEnv;
   }
-
-  const locked = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'lock@test.local', password: 'senha-errada' } });
-  assert.equal(locked.statusCode, 401);
-  assert.equal(locked.json().message, 'Muitas tentativas inválidas. Tente novamente mais tarde.');
-
-  const unlockedNow = await prisma.user.update({ where: { id: user.id }, data: { loginLockedUntil: new Date(Date.now() - 1000) } });
-  assert.ok(unlockedNow);
-
-  const success = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'lock@test.local', password: '12345678' } });
-  assert.equal(success.statusCode, 200, success.body);
-
-  const refreshed = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
-  assert.equal(refreshed.failedLoginAttempts, 0);
-  assert.equal(refreshed.loginLockedUntil, null);
-
-  await app.close();
 });
 
 test('rate limit retorna 429 em endpoint sensível', async () => {
@@ -96,7 +108,7 @@ test('rate limit retorna 429 em endpoint sensível', async () => {
     assert.ok(limitedResponse, 'Esperava receber HTTP 429 após excesso de tentativas.');
     assert.deepEqual(limitedResponse!.json(), { message: 'Muitas tentativas. Aguarde alguns instantes e tente novamente.' });
   } finally {
-    await app.close();
+    await app.close().catch(() => undefined);
     process.env.NODE_ENV = originalNodeEnv;
   }
 });
