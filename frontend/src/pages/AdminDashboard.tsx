@@ -5,6 +5,7 @@ import { AdminUsersPanel } from './AdminUsersPanel';
 import { AdminTokensPanel } from './AdminTokensPanel';
 import { AdminAuditPanel } from './AdminAuditPanel';
 import { SideDrawer, SideDrawerItem } from '../components/SideDrawer';
+import { ConfirmActionModal } from '../components/ConfirmActionModal';
 
 type Overview = { users: number; companies: number; logs: number; treasuryBalance: string | number };
 type PlatformAccount = { balance: string | number; totalReceivedFees: string | number; totalWithdrawn: string | number; updatedAt: string | null };
@@ -19,6 +20,15 @@ type CompanyRevenueAccount = {
 };
 type ActiveTab = 'overview' | 'users' | 'brokers' | 'tokens' | 'withdrawals' | 'treasury' | 'liquidity' | 'revenues' | 'audit' | 'test-mode';
 
+type AdminConfirmAction =
+  | 'issuance'
+  | 'broker-transfer'
+  | 'user-deposit'
+  | 'platform-withdraw'
+  | 'liquidity-inject'
+  | 'liquidity-withdraw'
+  | 'system-normal';
+
 type AdminDashboardProps = {
   currentUserRoles: string[];
   onPermissionsUpdated: () => Promise<void>;
@@ -32,9 +42,11 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
   const [companyRevenueAccounts, setCompanyRevenueAccounts] = useState<CompanyRevenueAccount[]>([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [isSubmittingIssuance, setIsSubmittingIssuance] = useState(false);
-  const [isSubmittingBrokerTransfer, setIsSubmittingBrokerTransfer] = useState(false);
-  const [isSubmittingUserDeposit, setIsSubmittingUserDeposit] = useState(false);
+
+  const [pendingAdminAction, setPendingAdminAction] = useState<AdminConfirmAction | null>(null);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminConfirmText, setAdminConfirmText] = useState('');
+  const [adminModalLoading, setAdminModalLoading] = useState(false);
 
   const [issuanceAmount, setIssuanceAmount] = useState('');
   const [issuanceReason, setIssuanceReason] = useState('');
@@ -47,7 +59,6 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
   const [platformWithdrawRef, setPlatformWithdrawRef] = useState('');
   const [platformWithdrawAmount, setPlatformWithdrawAmount] = useState('');
   const [platformWithdrawReason, setPlatformWithdrawReason] = useState('');
-  const [isSubmittingPlatformWithdraw, setIsSubmittingPlatformWithdraw] = useState(false);
   const [isAdminDrawerOpen, setIsAdminDrawerOpen] = useState(false);
   const [injectFiat, setInjectFiat] = useState('');
   const [injectRpc, setInjectRpc] = useState('');
@@ -55,8 +66,6 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
   const [withdrawFiat, setWithdrawFiat] = useState('');
   const [withdrawRpc, setWithdrawRpc] = useState('');
   const [withdrawReason, setWithdrawReason] = useState('');
-  const [isSubmittingLiquidityInject, setIsSubmittingLiquidityInject] = useState(false);
-  const [isSubmittingLiquidityWithdraw, setIsSubmittingLiquidityWithdraw] = useState(false);
   const [systemMode, setSystemMode] = useState<'NORMAL'|'TEST'>('NORMAL');
   const [testReason, setTestReason] = useState('');
   const [liquidityError, setLiquidityError] = useState('');
@@ -153,100 +162,105 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
 
   async function submitIssuance(event: FormEvent) {
     event.preventDefault();
-    setError('');
-    setMessage('');
-    setIsSubmittingIssuance(true);
-
-    try {
-      await api('/admin/treasury/issuance', { method: 'POST', body: JSON.stringify({ amount: issuanceAmount, reason: issuanceReason }) });
-      setIssuanceAmount('');
-      setIssuanceReason('');
-      await load();
-      setMessage('RPC emitido na tesouraria com sucesso.');
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setIsSubmittingIssuance(false);
-    }
+    setPendingAdminAction('issuance');
   }
 
   async function submitBrokerTransfer(event: FormEvent) {
     event.preventDefault();
-    setError('');
-    setMessage('');
-    setIsSubmittingBrokerTransfer(true);
-
-    try {
-      await api('/admin/treasury/transfer-to-broker', { method: 'POST', body: JSON.stringify({ brokerRef, amount: brokerAmount, reason: brokerReason }) });
-      setBrokerRef('');
-      setBrokerAmount('');
-      setBrokerReason('');
-      await load();
-      setMessage('R$ enviado ao corretor com sucesso.');
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setIsSubmittingBrokerTransfer(false);
-    }
+    setPendingAdminAction('broker-transfer');
   }
-
-
 
   async function submitPlatformWithdraw(event: FormEvent) {
     event.preventDefault();
-    setError('');
-    setMessage('');
-    setIsSubmittingPlatformWithdraw(true);
-
-    try {
-      await api('/admin/platform-account/withdraw-to-admin', {
-        method: 'POST',
-        body: JSON.stringify({
-          adminRef: platformWithdrawRef,
-          amount: platformWithdrawAmount,
-          reason: platformWithdrawReason,
-        }),
-      });
-      setPlatformWithdrawRef('');
-      setPlatformWithdrawAmount('');
-      setPlatformWithdrawReason('');
-      await load();
-      setMessage('Lucro da Exchange transferido com sucesso.');
-    } catch (err) {
-      setError((err as Error).message || 'Não foi possível transferir o lucro da Exchange.');
-    } finally {
-      setIsSubmittingPlatformWithdraw(false);
-    }
-  }
-
-
-
-  async function submitLiquidity(path: '/admin/rpc-market/liquidity/inject' | '/admin/rpc-market/liquidity/withdraw', fiatAmount: string, rpcAmount: string, reason: string) {
-    await api(path, { method: 'POST', body: JSON.stringify({ fiatAmount: fiatAmount || undefined, rpcAmount: rpcAmount || undefined, reason }) });
-    await load();
+    setPendingAdminAction('platform-withdraw');
   }
 
   async function submitUserDeposit(event: FormEvent) {
     event.preventDefault();
+    setPendingAdminAction('user-deposit');
+  }
+
+  function clearAdminConfirmState() {
+    setPendingAdminAction(null);
+    setAdminPassword('');
+    setAdminConfirmText('');
+  }
+
+  function closeAdminConfirmModal() {
+    if (adminModalLoading) return;
+    clearAdminConfirmState();
+  }
+
+  function adminActionRequiresConfirm(action: AdminConfirmAction | null) {
+    return action !== null && action !== 'liquidity-inject';
+  }
+
+  function getAdminActionTitle(action: AdminConfirmAction | null) {
+    switch (action) {
+      case 'issuance': return 'Confirmar emissão de RPC';
+      case 'broker-transfer': return 'Confirmar envio de R$ ao corretor';
+      case 'user-deposit': return 'Confirmar depósito de R$ no jogador';
+      case 'platform-withdraw': return 'Confirmar retirada de lucro da Exchange';
+      case 'liquidity-inject': return 'Confirmar adição de liquidez';
+      case 'liquidity-withdraw': return 'Confirmar remoção de liquidez';
+      case 'system-normal': return 'Confirmar retorno ao modo normal';
+      default: return 'Confirmar ação administrativa';
+    }
+  }
+
+  function getAdminActionDescription(action: AdminConfirmAction | null) {
+    switch (action) {
+      case 'issuance': return 'Essa ação cria RPC na tesouraria administrativa e altera o balanço da simulação.';
+      case 'broker-transfer': return 'Essa ação transfere R$ da tesouraria para um corretor autorizado.';
+      case 'user-deposit': return 'Essa ação deposita R$ diretamente na carteira de um jogador.';
+      case 'platform-withdraw': return 'Essa ação transfere lucro da conta da Exchange para uma carteira administrativa.';
+      case 'liquidity-inject': return 'Essa ação adiciona liquidez ao mercado RPC/R$ e altera as reservas.';
+      case 'liquidity-withdraw': return 'Essa ação remove liquidez do mercado RPC/R$ e pode impactar reservas/preço.';
+      case 'system-normal': return 'Essa ação altera o modo global do sistema para NORMAL e será registrada na auditoria.';
+      default: return 'Revise os dados antes de confirmar.';
+    }
+  }
+
+  async function confirmPendingAdminAction() {
+    if (!pendingAdminAction) return;
     setError('');
     setMessage('');
-    setIsSubmittingUserDeposit(true);
+    setAdminModalLoading(true);
+
+    if (!adminPassword.trim()) {
+      setError('Confirme sua senha para continuar.');
+      setAdminModalLoading(false);
+      return;
+    }
 
     try {
-      await api('/admin/treasury/transfer-to-user', {
-        method: 'POST',
-        body: JSON.stringify({ userRef: userDepositRef, amount: userDepositAmount, reason: userDepositReason }),
-      });
-      setUserDepositRef('');
-      setUserDepositAmount('');
-      setUserDepositReason('');
+      switch (pendingAdminAction) {
+        case 'issuance':
+          await api('/admin/treasury/issuance', { method: 'POST', body: JSON.stringify({ amount: issuanceAmount, reason: issuanceReason, adminPassword }) });
+          setIssuanceAmount(''); setIssuanceReason(''); setMessage('RPC emitido na tesouraria com sucesso.'); break;
+        case 'broker-transfer':
+          await api('/admin/treasury/transfer-to-broker', { method: 'POST', body: JSON.stringify({ brokerRef, amount: brokerAmount, reason: brokerReason, adminPassword }) });
+          setBrokerRef(''); setBrokerAmount(''); setBrokerReason(''); setMessage('R$ enviado ao corretor com sucesso.'); break;
+        case 'user-deposit':
+          await api('/admin/treasury/transfer-to-user', { method: 'POST', body: JSON.stringify({ userRef: userDepositRef, amount: userDepositAmount, reason: userDepositReason, adminPassword }) });
+          setUserDepositRef(''); setUserDepositAmount(''); setUserDepositReason(''); setMessage('R$ depositado na carteira do jogador com sucesso.'); break;
+        case 'platform-withdraw':
+          await api('/admin/platform-account/withdraw-to-admin', { method: 'POST', body: JSON.stringify({ adminRef: platformWithdrawRef, amount: platformWithdrawAmount, reason: platformWithdrawReason, adminPassword }) });
+          setPlatformWithdrawRef(''); setPlatformWithdrawAmount(''); setPlatformWithdrawReason(''); setMessage('Lucro da Exchange transferido com sucesso.'); break;
+        case 'liquidity-inject':
+          await api('/admin/rpc-market/liquidity/inject', { method: 'POST', body: JSON.stringify({ fiatAmount: injectFiat || undefined, rpcAmount: injectRpc || undefined, reason: injectReason, adminPassword }) });
+          setInjectFiat(''); setInjectRpc(''); setInjectReason(''); setMessage('Liquidez adicionada com sucesso.'); break;
+        case 'liquidity-withdraw':
+          await api('/admin/rpc-market/liquidity/withdraw', { method: 'POST', body: JSON.stringify({ fiatAmount: withdrawFiat || undefined, rpcAmount: withdrawRpc || undefined, reason: withdrawReason, adminPassword }) });
+          setWithdrawFiat(''); setWithdrawRpc(''); setWithdrawReason(''); setMessage('Liquidez removida com sucesso.'); break;
+        case 'system-normal':
+          await api('/admin/system-mode/normal/enable', { method: 'POST', body: JSON.stringify({ reason: testReason, adminPassword }) });
+          setMessage('Modo NORMAL ativado.');
+          break;
+      }
+      clearAdminConfirmState();
       await load();
-      setMessage('R$ depositado na carteira do jogador com sucesso.');
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setIsSubmittingUserDeposit(false);
-    }
+    } catch (err) { setError((err as Error).message); } finally { setAdminModalLoading(false); }
   }
 
   return (
@@ -332,7 +346,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
           <form onSubmit={submitIssuance} className="form-grid">
             <input value={issuanceAmount} onChange={(e) => setIssuanceAmount(e.target.value)} placeholder="Quantidade" required />
             <input value={issuanceReason} onChange={(e) => setIssuanceReason(e.target.value)} placeholder="Motivo" required />
-            <button className="button-primary" type="submit" disabled={isSubmittingIssuance}>{isSubmittingIssuance ? 'Processando...' : 'Emitir RPC'}</button>
+            <button className="button-primary" type="submit" disabled={Boolean(pendingAdminAction) || adminModalLoading}>Emitir RPC</button>
           </form>
           ) : (
             <p className="status-message error">Você pode acessar a tesouraria, mas apenas SUPER_ADMIN ou ADM Chefe da Moeda pode emitir RPC.</p>
@@ -344,7 +358,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
             <input value={brokerRef} onChange={(e) => setBrokerRef(e.target.value)} placeholder="Conta RP, personagem, nome ou email técnico do corretor" required />
             <input value={brokerAmount} onChange={(e) => setBrokerAmount(e.target.value)} placeholder="Valor em R$" required />
             <input value={brokerReason} onChange={(e) => setBrokerReason(e.target.value)} placeholder="Observação" required />
-            <button className="button-primary" type="submit" disabled={isSubmittingBrokerTransfer}>{isSubmittingBrokerTransfer ? 'Processando...' : 'Enviar R$ ao corretor'}</button>
+            <button className="button-primary" type="submit" disabled={Boolean(pendingAdminAction) || adminModalLoading}>Enviar R$ ao corretor</button>
           </form>
 
           <h3 className="nested-card">Depositar R$ em jogador</h3>
@@ -353,7 +367,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
             <input value={userDepositRef} onChange={(e) => setUserDepositRef(e.target.value)} placeholder="Conta RP, personagem, nome ou email técnico do jogador" required />
             <input value={userDepositAmount} onChange={(e) => setUserDepositAmount(e.target.value)} placeholder="Valor em R$" required />
             <input value={userDepositReason} onChange={(e) => setUserDepositReason(e.target.value)} placeholder="Motivo" required />
-            <button className="button-primary" type="submit" disabled={isSubmittingUserDeposit}>{isSubmittingUserDeposit ? 'Processando...' : 'Depositar R$ no jogador'}</button>
+            <button className="button-primary" type="submit" disabled={Boolean(pendingAdminAction) || adminModalLoading}>Depositar R$ no jogador</button>
           </form>
         </>
       )}
@@ -367,18 +381,18 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
           {liquidityError && <p className="status-message error">{liquidityError}</p>}
           {liquidity && <div className="summary-grid"><div className="summary-item"><span className="summary-label">Reserva R$</span><strong>{liquidity.fiatReserve}</strong></div><div className="summary-item"><span className="summary-label">Reserva RPC</span><strong>{liquidity.rpcReserve}</strong></div><div className="summary-item"><span className="summary-label">Preço atual</span><strong>{liquidity.currentPrice}</strong></div><div className="summary-item"><span className="summary-label">Última atualização</span><strong>{new Date(liquidity.updatedAt).toLocaleString('pt-BR')}</strong></div><div className="summary-item"><span className="summary-label">Total compras</span><strong>{liquidity.totalBuys}</strong></div><div className="summary-item"><span className="summary-label">Total vendas</span><strong>{liquidity.totalSells}</strong></div><div className="summary-item"><span className="summary-label">Volume R$</span><strong>{liquidity.totalFiatVolume}</strong></div><div className="summary-item"><span className="summary-label">Volume RPC</span><strong>{liquidity.totalRpcVolume}</strong></div></div>}
           <h4 className="nested-card">Adicionar liquidez</h4>
-          <form className="form-grid" onSubmit={async (e) => { e.preventDefault(); setIsSubmittingLiquidityInject(true); try { await submitLiquidity('/admin/rpc-market/liquidity/inject', injectFiat, injectRpc, injectReason); setInjectFiat(''); setInjectRpc(''); setInjectReason(''); setMessage('Liquidez adicionada com sucesso.'); } catch (err) { setError((err as Error).message); } finally { setIsSubmittingLiquidityInject(false); } }}>
+          <form className="form-grid" onSubmit={(e) => { e.preventDefault(); setPendingAdminAction('liquidity-inject'); }}>
             <input value={injectFiat} onChange={(e) => setInjectFiat(e.target.value)} placeholder="Valor R$" type="number" step="0.01" min="0" inputMode="decimal" />
             <input value={injectRpc} onChange={(e) => setInjectRpc(e.target.value)} placeholder="Valor RPC" type="number" step="0.01" min="0" inputMode="decimal" />
             <input value={injectReason} onChange={(e) => setInjectReason(e.target.value)} placeholder="Motivo" required minLength={10} />
-            <button className="button-primary" type="submit" disabled={isSubmittingLiquidityInject}>{isSubmittingLiquidityInject ? 'Processando...' : 'Confirmar adição'}</button>
+            <button className="button-primary" type="submit" disabled={Boolean(pendingAdminAction) || adminModalLoading}>Confirmar adição</button>
           </form>
           <h4 className="nested-card">Remover liquidez</h4>
-          <form className="form-grid" onSubmit={async (e) => { e.preventDefault(); setIsSubmittingLiquidityWithdraw(true); try { await submitLiquidity('/admin/rpc-market/liquidity/withdraw', withdrawFiat, withdrawRpc, withdrawReason); setWithdrawFiat(''); setWithdrawRpc(''); setWithdrawReason(''); setMessage('Liquidez removida com sucesso.'); } catch (err) { setError((err as Error).message); } finally { setIsSubmittingLiquidityWithdraw(false); } }}>
+          <form className="form-grid" onSubmit={(e) => { e.preventDefault(); setPendingAdminAction('liquidity-withdraw'); }}>
             <input value={withdrawFiat} onChange={(e) => setWithdrawFiat(e.target.value)} placeholder="Valor R$" type="number" step="0.01" min="0" inputMode="decimal" />
             <input value={withdrawRpc} onChange={(e) => setWithdrawRpc(e.target.value)} placeholder="Valor RPC" type="number" step="0.01" min="0" inputMode="decimal" />
             <input value={withdrawReason} onChange={(e) => setWithdrawReason(e.target.value)} placeholder="Motivo" required minLength={10} />
-            <button className="button-danger" type="submit" disabled={isSubmittingLiquidityWithdraw}>{isSubmittingLiquidityWithdraw ? 'Processando...' : 'Confirmar remoção'}</button>
+            <button className="button-danger" type="submit" disabled={Boolean(pendingAdminAction) || adminModalLoading}>Confirmar remoção</button>
           </form>
         </>
       )}
@@ -420,8 +434,8 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
                   placeholder="Motivo"
                   required
                 />
-                <button className="button-primary" type="submit" disabled={isSubmittingPlatformWithdraw}>
-                  {isSubmittingPlatformWithdraw ? 'Processando...' : 'Transferir lucro'}
+                <button className="button-primary" type="submit" disabled={Boolean(pendingAdminAction) || adminModalLoading}>
+                  Transferir lucro
                 </button>
               </form>
             </>
@@ -448,7 +462,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
           <h3>🧪 Modo Teste Global</h3>
           <p>Status atual: <strong>{systemMode}</strong></p>
           <input value={testReason} onChange={(e)=>setTestReason(e.target.value)} placeholder="Motivo obrigatório (mínimo 10 caracteres)" minLength={10} />
-          {canManageTestMode && <div className="form-grid"><button className="button-primary" onClick={async()=>{await api('/admin/system-mode/test/enable',{method:'POST',body:JSON.stringify({reason:testReason})}); await load(); setMessage('Modo TEST ativado.');}}>Ativar Modo Teste</button><button className="button-secondary" onClick={async()=>{await api('/admin/system-mode/normal/enable',{method:'POST',body:JSON.stringify({reason:testReason})}); await load(); setMessage('Modo NORMAL ativado.');}}>Voltar para Modo Normal</button></div>}
+          {canManageTestMode && <div className="form-grid"><button className="button-primary" onClick={async()=>{await api('/admin/system-mode/test/enable',{method:'POST',body:JSON.stringify({reason:testReason})}); await load(); setMessage('Modo TEST ativado.');}}>Ativar Modo Teste</button><button className="button-secondary" onClick={()=>setPendingAdminAction('system-normal')}>Voltar para Modo Normal</button></div>}
 
           <h4>Reports do modo teste</h4>
           <div className="form-grid">
@@ -463,6 +477,38 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
           {canClearTestMode && <div className="form-grid"><input value={clearConfirmation} onChange={(e)=>setClearConfirmation(e.target.value)} placeholder="Digite: LIMPAR MODO TESTE" /><button className="button-danger" onClick={async()=>{await api('/admin/test-mode/clear',{method:'POST',body:JSON.stringify({reason:testReason,confirmation:clearConfirmation})}); setMessage('Dados de teste limpos.');}}>Limpar dados de teste</button></div>}
         </section>
       )}
+
+      <ConfirmActionModal
+        open={Boolean(pendingAdminAction)}
+        title={getAdminActionTitle(pendingAdminAction)}
+        description={getAdminActionDescription(pendingAdminAction)}
+        danger={adminActionRequiresConfirm(pendingAdminAction)}
+        requireConfirmText={adminActionRequiresConfirm(pendingAdminAction) ? 'CONFIRMAR' : undefined}
+        confirmTextValue={adminConfirmText}
+        isLoading={adminModalLoading}
+        confirmLabel="Confirmar ação"
+        cancelLabel="Cancelar"
+        onCancel={closeAdminConfirmModal}
+        onConfirm={confirmPendingAdminAction}
+        extraFields={
+          <>
+            <input
+              type="password"
+              value={adminPassword}
+              onChange={(event) => setAdminPassword(event.target.value)}
+              placeholder="Senha do administrador"
+              autoComplete="current-password"
+            />
+            {adminActionRequiresConfirm(pendingAdminAction) && (
+              <input
+                value={adminConfirmText}
+                onChange={(event) => setAdminConfirmText(event.target.value)}
+                placeholder="Digite CONFIRMAR"
+              />
+            )}
+          </>
+        }
+      />
     </section>
   );
 }
