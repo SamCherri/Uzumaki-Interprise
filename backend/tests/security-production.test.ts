@@ -50,7 +50,7 @@ test('login inválido bloqueia temporariamente e login válido zera contador', a
   const ok = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { name: 'User Teste', characterName: 'Personagem', bankAccountNumber: '12345', email: 'lock@test.local', password: '12345678' } });
   assert.equal(ok.statusCode, 201, ok.body);
   const user = await prisma.user.findUniqueOrThrow({ where: { email: 'lock@test.local' } });
-  await prisma.userRole.create({ data: { userId: user.id, roleId: role.id } });
+  assert.equal(role.key, 'USER');
 
   for (let i = 0; i < 4; i++) {
     const bad = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'lock@test.local', password: 'senha-errada' } });
@@ -73,4 +73,30 @@ test('login inválido bloqueia temporariamente e login válido zera contador', a
   assert.equal(refreshed.loginLockedUntil, null);
 
   await app.close();
+});
+
+test('rate limit retorna 429 em endpoint sensível', async () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'development';
+  const app = buildApp();
+  try {
+    await app.ready();
+    let limitedResponse: Awaited<ReturnType<typeof app.inject>> | null = null;
+    for (let i = 0; i < 12; i++) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/auth/login',
+        payload: { email: 'nao-existe@test.local', password: '12345678' },
+      });
+      if (response.statusCode === 429) {
+        limitedResponse = response;
+        break;
+      }
+    }
+    assert.ok(limitedResponse, 'Esperava receber HTTP 429 após excesso de tentativas.');
+    assert.deepEqual(limitedResponse!.json(), { message: 'Muitas tentativas. Aguarde alguns instantes e tente novamente.' });
+  } finally {
+    await app.close();
+    process.env.NODE_ENV = originalNodeEnv;
+  }
 });

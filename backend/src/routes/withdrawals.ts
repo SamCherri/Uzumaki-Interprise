@@ -253,7 +253,7 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
     return { withdrawals };
   });
 
-  app.post('/admin/withdrawals/:id/mark-processing', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/admin/withdrawals/:id/mark-processing', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 25, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
 
@@ -312,7 +312,7 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/admin/withdrawals/:id/complete', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/admin/withdrawals/:id/complete', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 25, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
 
@@ -391,7 +391,7 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/admin/withdrawals/:id/reject', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/admin/withdrawals/:id/reject', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 25, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
 

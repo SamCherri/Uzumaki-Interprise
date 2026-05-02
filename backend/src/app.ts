@@ -35,7 +35,11 @@ export function buildApp() {
   app.register(rateLimit, {
     global: false,
     skipOnError: false,
-    errorResponseBuilder: () => ({ message: 'Muitas tentativas. Aguarde alguns instantes e tente novamente.' }),
+    errorResponseBuilder: () => ({
+      statusCode: 429,
+      error: 'Too Many Requests',
+      message: 'Muitas tentativas. Aguarde alguns instantes e tente novamente.',
+    }),
     enableDraftSpec: true,
   });
   app.register(authPlugin);

@@ -334,7 +334,7 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/admin/rpc-market/orders/process', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/admin/rpc-market/orders/process', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
     const roles = ((request.user as { roles?: string[] }).roles ?? []).map((role) => role.toUpperCase());
     if (!isRoleAllowedToProcess(roles)) return reply.status(403).send({ message: 'Sem permissão.' });
     const body = z.object({ maxOrders: z.coerce.number().int().min(1).max(20).optional() }).parse(request.body ?? {});
@@ -365,7 +365,7 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
     reason: z.string().min(10),
   }).refine((value) => (value.fiatAmount ?? 0) > 0 || (value.rpcAmount ?? 0) > 0, { message: 'Informe fiatAmount ou rpcAmount maior que zero.' });
 
-  app.post('/admin/rpc-market/liquidity/inject', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/admin/rpc-market/liquidity/inject', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 15, timeWindow: '1 minute' } } }, async (request, reply) => {
     const roles = ((request.user as { roles?: string[] }).roles ?? []).map((role) => role.toUpperCase());
     if (!hasAdminLiquidityRole(roles)) return reply.status(403).send({ message: 'Sem permissão para gerenciar liquidez RPC/R$.' });
     try {
@@ -394,7 +394,7 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/admin/rpc-market/liquidity/withdraw', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/admin/rpc-market/liquidity/withdraw', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 15, timeWindow: '1 minute' } } }, async (request, reply) => {
     const roles = ((request.user as { roles?: string[] }).roles ?? []).map((role) => role.toUpperCase());
     if (!hasAdminLiquidityRole(roles)) return reply.status(403).send({ message: 'Sem permissão para gerenciar liquidez RPC/R$.' });
     try {

@@ -144,7 +144,7 @@ export async function adminUsersRoutes(app: FastifyInstance) {
     };
   });
 
-  app.patch('/users/:id/roles', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.patch('/users/:id/roles', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 25, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const actorRoles = authRequest.user.roles ?? [];
     if (!ensureAdmin(reply, actorRoles)) return;
@@ -214,7 +214,7 @@ export async function adminUsersRoutes(app: FastifyInstance) {
     }
   });
 
-  app.patch('/users/:id/block', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.patch('/users/:id/block', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 25, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const actorRoles = authRequest.user.roles ?? [];
     if (!ensureAdmin(reply, actorRoles)) return;
@@ -246,7 +246,7 @@ export async function adminUsersRoutes(app: FastifyInstance) {
     }
   });
 
-  app.patch('/users/:id/unblock', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.patch('/users/:id/unblock', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 25, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const actorRoles = authRequest.user.roles ?? [];
     if (!ensureAdmin(reply, actorRoles)) return;
