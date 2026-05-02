@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ConfirmActionModal } from '../components/ConfirmActionModal';
 import { api } from '../services/api';
 import { translateWithdrawalStatus } from '../utils/labels';
 
@@ -20,6 +21,10 @@ type Withdrawal = {
 export function AdminWithdrawalsPanel() {
   const [items, setItems] = useState<Withdrawal[]>([]);
   const [error, setError] = useState('');
+  const [modalAction, setModalAction] = useState<{ id: string; endpoint: 'mark-processing' | 'complete' | 'reject' } | null>(null);
+  const [adminNote, setAdminNote] = useState('');
+  const [confirmTextValue, setConfirmTextValue] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function load() {
     try {
@@ -35,13 +40,35 @@ export function AdminWithdrawalsPanel() {
     load();
   }, []);
 
-  async function action(id: string, endpoint: 'mark-processing' | 'complete' | 'reject') {
-    const adminNote = window.prompt('Observação do ADM (opcional):') ?? '';
-    await api(`/admin/withdrawals/${id}/${endpoint}`, {
-      method: 'POST',
-      body: JSON.stringify({ adminNote }),
-    });
-    await load();
+  function openActionModal(id: string, endpoint: 'mark-processing' | 'complete' | 'reject') {
+    setModalAction({ id, endpoint });
+    setAdminNote('');
+    setConfirmTextValue('');
+  }
+
+  function closeActionModal() {
+    if (isSubmitting) return;
+    setModalAction(null);
+    setAdminNote('');
+    setConfirmTextValue('');
+  }
+
+  async function confirmAction() {
+    if (!modalAction) return;
+    setIsSubmitting(true);
+    setError('');
+    try {
+      await api(`/admin/withdrawals/${modalAction.id}/${modalAction.endpoint}`, {
+        method: 'POST',
+        body: JSON.stringify({ adminNote: adminNote.trim() }),
+      });
+      closeActionModal();
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -66,14 +93,14 @@ export function AdminWithdrawalsPanel() {
             {['COMPLETED', 'REJECTED', 'CANCELED'].includes(item.status) ? null : (
               <div className="action-grid">
                 {item.status === 'PENDING' && (
-                  <button className="button-primary" type="button" onClick={() => action(item.id, 'mark-processing')}>
+                  <button className="button-primary" type="button" onClick={() => openActionModal(item.id, 'mark-processing')} disabled={isSubmitting}>
                     Marcar em processamento
                   </button>
                 )}
-                <button className="button-success" type="button" onClick={() => action(item.id, 'complete')}>
+                <button className="button-success" type="button" onClick={() => openActionModal(item.id, 'complete')} disabled={isSubmitting}>
                   Concluir saque
                 </button>
-                <button className="button-danger" type="button" onClick={() => action(item.id, 'reject')}>
+                <button className="button-danger" type="button" onClick={() => openActionModal(item.id, 'reject')} disabled={isSubmitting}>
                   Rejeitar
                 </button>
               </div>
@@ -81,6 +108,30 @@ export function AdminWithdrawalsPanel() {
           </article>
         ))}
       </div>
+      <ConfirmActionModal
+        open={Boolean(modalAction)}
+        title={modalAction?.endpoint === 'complete' ? 'Concluir saque' : modalAction?.endpoint === 'reject' ? 'Rejeitar saque' : 'Marcar saque em processamento'}
+        description={modalAction?.endpoint === 'complete' ? 'Esta ação conclui o saque e não deve ser usada sem conferência.' : modalAction?.endpoint === 'reject' ? 'Esta ação rejeita o saque do usuário.' : 'Atualiza o status do saque para processamento.'}
+        danger={modalAction?.endpoint !== 'mark-processing'}
+        requireConfirmText={modalAction?.endpoint === 'mark-processing' ? undefined : 'CONFIRMAR'}
+        confirmTextValue={confirmTextValue}
+        isLoading={isSubmitting}
+        confirmLabel={modalAction?.endpoint === 'complete' ? 'Concluir saque' : modalAction?.endpoint === 'reject' ? 'Rejeitar saque' : 'Marcar em processamento'}
+        onCancel={closeActionModal}
+        onConfirm={confirmAction}
+        extraFields={<>
+          <label className="admin-modal-field">
+            <span>Observação do ADM (opcional)</span>
+            <textarea value={adminNote} onChange={(event) => setAdminNote(event.target.value)} disabled={isSubmitting} placeholder="Adicione um contexto para auditoria" />
+          </label>
+          {modalAction?.endpoint !== 'mark-processing' && (
+            <label className="admin-modal-field">
+              <span>Confirmação *</span>
+              <input type="text" value={confirmTextValue} onChange={(event) => setConfirmTextValue(event.target.value)} placeholder="Digite CONFIRMAR" disabled={isSubmitting} required />
+            </label>
+          )}
+        </>}
+      />
     </section>
   );
 }
