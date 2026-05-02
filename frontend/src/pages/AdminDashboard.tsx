@@ -65,6 +65,8 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
   const [testReportTypeFilter, setTestReportTypeFilter] = useState('');
   const [resetUserRef, setResetUserRef] = useState('');
   const [clearConfirmation, setClearConfirmation] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminConfirmText, setAdminConfirmText] = useState('');
   const roles = currentUserRoles.map((role) => role.toUpperCase());
   const canWithdrawPlatformProfit = roles.includes('SUPER_ADMIN') || roles.includes('COIN_CHIEF_ADMIN');
   const canIssueRpc = roles.includes('SUPER_ADMIN') || roles.includes('COIN_CHIEF_ADMIN');
@@ -155,10 +157,11 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
     event.preventDefault();
     setError('');
     setMessage('');
+    if (adminConfirmText !== 'CONFIRMAR') { setError('Digite CONFIRMAR para emitir RPC.'); return; }
     setIsSubmittingIssuance(true);
 
     try {
-      await api('/admin/treasury/issuance', { method: 'POST', body: JSON.stringify({ amount: issuanceAmount, reason: issuanceReason }) });
+      await api('/admin/treasury/issuance', { method: 'POST', body: JSON.stringify({ amount: issuanceAmount, reason: issuanceReason, adminPassword }) });
       setIssuanceAmount('');
       setIssuanceReason('');
       await load();
@@ -174,10 +177,11 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
     event.preventDefault();
     setError('');
     setMessage('');
+    if (adminConfirmText !== 'CONFIRMAR') { setError('Digite CONFIRMAR para enviar ao corretor.'); return; }
     setIsSubmittingBrokerTransfer(true);
 
     try {
-      await api('/admin/treasury/transfer-to-broker', { method: 'POST', body: JSON.stringify({ brokerRef, amount: brokerAmount, reason: brokerReason }) });
+      await api('/admin/treasury/transfer-to-broker', { method: 'POST', body: JSON.stringify({ brokerRef, amount: brokerAmount, reason: brokerReason, adminPassword }) });
       setBrokerRef('');
       setBrokerAmount('');
       setBrokerReason('');
@@ -196,6 +200,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
     event.preventDefault();
     setError('');
     setMessage('');
+    if (adminConfirmText !== 'CONFIRMAR') { setError('Digite CONFIRMAR para transferir lucro.'); return; }
     setIsSubmittingPlatformWithdraw(true);
 
     try {
@@ -205,6 +210,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
           adminRef: platformWithdrawRef,
           amount: platformWithdrawAmount,
           reason: platformWithdrawReason,
+          adminPassword,
         }),
       });
       setPlatformWithdrawRef('');
@@ -222,7 +228,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
 
 
   async function submitLiquidity(path: '/admin/rpc-market/liquidity/inject' | '/admin/rpc-market/liquidity/withdraw', fiatAmount: string, rpcAmount: string, reason: string) {
-    await api(path, { method: 'POST', body: JSON.stringify({ fiatAmount: fiatAmount || undefined, rpcAmount: rpcAmount || undefined, reason }) });
+    await api(path, { method: 'POST', body: JSON.stringify({ fiatAmount: fiatAmount || undefined, rpcAmount: rpcAmount || undefined, reason, adminPassword }) });
     await load();
   }
 
@@ -230,12 +236,13 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
     event.preventDefault();
     setError('');
     setMessage('');
+    if (adminConfirmText !== 'CONFIRMAR') { setError('Digite CONFIRMAR para depositar no jogador.'); return; }
     setIsSubmittingUserDeposit(true);
 
     try {
       await api('/admin/treasury/transfer-to-user', {
         method: 'POST',
-        body: JSON.stringify({ userRef: userDepositRef, amount: userDepositAmount, reason: userDepositReason }),
+        body: JSON.stringify({ userRef: userDepositRef, amount: userDepositAmount, reason: userDepositReason, adminPassword }),
       });
       setUserDepositRef('');
       setUserDepositAmount('');
@@ -332,6 +339,8 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
           <form onSubmit={submitIssuance} className="form-grid">
             <input value={issuanceAmount} onChange={(e) => setIssuanceAmount(e.target.value)} placeholder="Quantidade" required />
             <input value={issuanceReason} onChange={(e) => setIssuanceReason(e.target.value)} placeholder="Motivo" required />
+            <input type="password" value={adminPassword} onChange={(e)=>setAdminPassword(e.target.value)} placeholder="Senha do administrador" required />
+            <input value={adminConfirmText} onChange={(e)=>setAdminConfirmText(e.target.value)} placeholder="Digite CONFIRMAR" required />
             <button className="button-primary" type="submit" disabled={isSubmittingIssuance}>{isSubmittingIssuance ? 'Processando...' : 'Emitir RPC'}</button>
           </form>
           ) : (
@@ -344,6 +353,8 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
             <input value={brokerRef} onChange={(e) => setBrokerRef(e.target.value)} placeholder="Conta RP, personagem, nome ou email técnico do corretor" required />
             <input value={brokerAmount} onChange={(e) => setBrokerAmount(e.target.value)} placeholder="Valor em R$" required />
             <input value={brokerReason} onChange={(e) => setBrokerReason(e.target.value)} placeholder="Observação" required />
+            <input type="password" value={adminPassword} onChange={(e)=>setAdminPassword(e.target.value)} placeholder="Senha do administrador" required />
+            <input value={adminConfirmText} onChange={(e)=>setAdminConfirmText(e.target.value)} placeholder="Digite CONFIRMAR" required />
             <button className="button-primary" type="submit" disabled={isSubmittingBrokerTransfer}>{isSubmittingBrokerTransfer ? 'Processando...' : 'Enviar R$ ao corretor'}</button>
           </form>
 
@@ -353,6 +364,8 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
             <input value={userDepositRef} onChange={(e) => setUserDepositRef(e.target.value)} placeholder="Conta RP, personagem, nome ou email técnico do jogador" required />
             <input value={userDepositAmount} onChange={(e) => setUserDepositAmount(e.target.value)} placeholder="Valor em R$" required />
             <input value={userDepositReason} onChange={(e) => setUserDepositReason(e.target.value)} placeholder="Motivo" required />
+            <input type="password" value={adminPassword} onChange={(e)=>setAdminPassword(e.target.value)} placeholder="Senha do administrador" required />
+            <input value={adminConfirmText} onChange={(e)=>setAdminConfirmText(e.target.value)} placeholder="Digite CONFIRMAR" required />
             <button className="button-primary" type="submit" disabled={isSubmittingUserDeposit}>{isSubmittingUserDeposit ? 'Processando...' : 'Depositar R$ no jogador'}</button>
           </form>
         </>
@@ -371,6 +384,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
             <input value={injectFiat} onChange={(e) => setInjectFiat(e.target.value)} placeholder="Valor R$" type="number" step="0.01" min="0" inputMode="decimal" />
             <input value={injectRpc} onChange={(e) => setInjectRpc(e.target.value)} placeholder="Valor RPC" type="number" step="0.01" min="0" inputMode="decimal" />
             <input value={injectReason} onChange={(e) => setInjectReason(e.target.value)} placeholder="Motivo" required minLength={10} />
+            <input type="password" value={adminPassword} onChange={(e)=>setAdminPassword(e.target.value)} placeholder="Senha do administrador" required />
             <button className="button-primary" type="submit" disabled={isSubmittingLiquidityInject}>{isSubmittingLiquidityInject ? 'Processando...' : 'Confirmar adição'}</button>
           </form>
           <h4 className="nested-card">Remover liquidez</h4>
@@ -378,6 +392,8 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
             <input value={withdrawFiat} onChange={(e) => setWithdrawFiat(e.target.value)} placeholder="Valor R$" type="number" step="0.01" min="0" inputMode="decimal" />
             <input value={withdrawRpc} onChange={(e) => setWithdrawRpc(e.target.value)} placeholder="Valor RPC" type="number" step="0.01" min="0" inputMode="decimal" />
             <input value={withdrawReason} onChange={(e) => setWithdrawReason(e.target.value)} placeholder="Motivo" required minLength={10} />
+            <input type="password" value={adminPassword} onChange={(e)=>setAdminPassword(e.target.value)} placeholder="Senha do administrador" required />
+            <input value={adminConfirmText} onChange={(e)=>setAdminConfirmText(e.target.value)} placeholder="Digite CONFIRMAR" required />
             <button className="button-danger" type="submit" disabled={isSubmittingLiquidityWithdraw}>{isSubmittingLiquidityWithdraw ? 'Processando...' : 'Confirmar remoção'}</button>
           </form>
         </>
@@ -420,6 +436,8 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
                   placeholder="Motivo"
                   required
                 />
+                <input type="password" value={adminPassword} onChange={(e)=>setAdminPassword(e.target.value)} placeholder="Senha do administrador" required />
+                <input value={adminConfirmText} onChange={(e)=>setAdminConfirmText(e.target.value)} placeholder="Digite CONFIRMAR" required />
                 <button className="button-primary" type="submit" disabled={isSubmittingPlatformWithdraw}>
                   {isSubmittingPlatformWithdraw ? 'Processando...' : 'Transferir lucro'}
                 </button>
@@ -448,7 +466,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
           <h3>🧪 Modo Teste Global</h3>
           <p>Status atual: <strong>{systemMode}</strong></p>
           <input value={testReason} onChange={(e)=>setTestReason(e.target.value)} placeholder="Motivo obrigatório (mínimo 10 caracteres)" minLength={10} />
-          {canManageTestMode && <div className="form-grid"><button className="button-primary" onClick={async()=>{await api('/admin/system-mode/test/enable',{method:'POST',body:JSON.stringify({reason:testReason})}); await load(); setMessage('Modo TEST ativado.');}}>Ativar Modo Teste</button><button className="button-secondary" onClick={async()=>{await api('/admin/system-mode/normal/enable',{method:'POST',body:JSON.stringify({reason:testReason})}); await load(); setMessage('Modo NORMAL ativado.');}}>Voltar para Modo Normal</button></div>}
+          {canManageTestMode && <div className="form-grid"><button className="button-primary" onClick={async()=>{await api('/admin/system-mode/test/enable',{method:'POST',body:JSON.stringify({reason:testReason, adminPassword})}); await load(); setMessage('Modo TEST ativado.');}}>Ativar Modo Teste</button><button className="button-secondary" onClick={async()=>{if(adminConfirmText!=='CONFIRMAR'){setError('Digite CONFIRMAR para voltar ao modo normal.');return;} await api('/admin/system-mode/normal/enable',{method:'POST',body:JSON.stringify({reason:testReason, adminPassword})}); await load(); setMessage('Modo NORMAL ativado.');}}>Voltar para Modo Normal</button></div>}
 
           <h4>Reports do modo teste</h4>
           <div className="form-grid">
@@ -459,7 +477,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
             {testReports.map((r)=> <article key={r.id} className="summary-item compact-card"><strong>{r.type} • {r.status}</strong><p>{r.description}</p><p>{r.location}</p><input placeholder="adminNote" defaultValue={r.adminNote ?? ''} onBlur={async(e)=>{try { await api(`/admin/test-mode/reports/${r.id}`,{method:'PATCH',body:JSON.stringify({status:r.status,adminNote:e.target.value})}); setMessage('Report atualizado.'); } catch (err) { setError((err as Error).message); }}} /><select value={r.status} onChange={async(e)=>{try { await api(`/admin/test-mode/reports/${r.id}`,{method:'PATCH',body:JSON.stringify({status:e.target.value})}); await load(); setMessage('Status atualizado.'); } catch (err) { setError((err as Error).message); }}}><option>OPEN</option><option>UNDER_REVIEW</option><option>RESOLVED</option><option>DISMISSED</option></select></article>) }
           </div>
 
-          {canManageTestMode && <div className="form-grid"><input value={resetUserRef} onChange={(e)=>setResetUserRef(e.target.value)} placeholder="userId ou email" /><button className="button-secondary" onClick={async()=>{await api('/admin/test-mode/reset-user',{method:'POST',body:JSON.stringify(resetUserRef.includes('@')?{email:resetUserRef,reason:testReason}:{userId:resetUserRef,reason:testReason})}); setMessage('Carteira de teste resetada.');}}>Resetar carteira de jogador</button><button className="button-secondary" onClick={async()=>{await api('/admin/test-mode/reset-market',{method:'POST',body:JSON.stringify({reason:testReason})}); setMessage('Mercado de teste resetado.');}}>Resetar mercado de teste</button></div>}
+          {canManageTestMode && <div className="form-grid"><input value={resetUserRef} onChange={(e)=>setResetUserRef(e.target.value)} placeholder="userId ou email" /><button className="button-secondary" onClick={async()=>{await api('/admin/test-mode/reset-user',{method:'POST',body:JSON.stringify(resetUserRef.includes('@')?{email:resetUserRef,reason:testReason}:{userId:resetUserRef,reason:testReason})}); setMessage('Carteira de teste resetada.');}}>Resetar carteira de jogador</button><button className="button-secondary" onClick={async()=>{await api('/admin/test-mode/reset-market',{method:'POST',body:JSON.stringify({reason:testReason, adminPassword})}); setMessage('Mercado de teste resetado.');}}>Resetar mercado de teste</button></div>}
           {canClearTestMode && <div className="form-grid"><input value={clearConfirmation} onChange={(e)=>setClearConfirmation(e.target.value)} placeholder="Digite: LIMPAR MODO TESTE" /><button className="button-danger" onClick={async()=>{await api('/admin/test-mode/clear',{method:'POST',body:JSON.stringify({reason:testReason,confirmation:clearConfirmation})}); setMessage('Dados de teste limpos.');}}>Limpar dados de teste</button></div>}
         </section>
       )}

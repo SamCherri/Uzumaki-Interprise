@@ -419,6 +419,7 @@ export async function adminRoutes(app: FastifyInstance) {
         adminId: z.string().min(1).optional(),
         amount: amountSchema,
         reason: z.string().trim().min(3),
+        adminPassword: z.string().min(1),
       }).superRefine((value, ctx) => {
         if (!value.adminEmail && !value.adminId && !value.adminRef) {
           ctx.addIssue({
