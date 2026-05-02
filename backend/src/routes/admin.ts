@@ -169,6 +169,7 @@ export async function adminRoutes(app: FastifyInstance) {
         }
       });
       const body = schema.parse(request.body);
+      await assertAdminPassword(authRequest.user.sub, body.adminPassword);
       const brokerRef = body.brokerRef?.trim();
 
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -269,6 +270,7 @@ export async function adminRoutes(app: FastifyInstance) {
         userRef: z.string().min(1).optional(),
         amount: amountSchema,
         reason: z.string().trim().min(3),
+        adminPassword: z.string().min(1),
       }).superRefine((value, ctx) => {
         if (!value.userId && !value.userEmail && !value.userRef) {
           ctx.addIssue({
@@ -428,6 +430,7 @@ export async function adminRoutes(app: FastifyInstance) {
       });
 
       const parsed = schema.parse(request.body);
+      await assertAdminPassword(authRequest.user.sub, parsed.adminPassword);
       const targetEmail = parsed.adminEmail?.trim().toLowerCase();
       const adminRef = parsed.adminRef?.trim();
 

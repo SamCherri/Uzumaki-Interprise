@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../services/api';
+import { ConfirmActionModal } from '../components/ConfirmActionModal';
 import { translateRole } from '../utils/labels';
 
 type UserRow = {
@@ -48,6 +49,10 @@ export function AdminUsersPanel({ onPermissionsUpdated, mode = 'users' }: AdminU
 
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingRoles, setEditingRoles] = useState<string[]>(['USER']);
+  const [blockTarget, setBlockTarget] = useState<{userId:string; mode:'block'|'unblock'}|null>(null);
+  const [blockReason, setBlockReason] = useState('');
+  const [blockConfirm, setBlockConfirm] = useState('');
+  const [blockLoading, setBlockLoading] = useState(false);
 
   async function loadUsers() {
     setLoading(true);
@@ -104,11 +109,14 @@ export function AdminUsersPanel({ onPermissionsUpdated, mode = 'users' }: AdminU
     await loadUsers();
   }
 
-  async function blockOrUnblock(userId: string, mode: 'block' | 'unblock') {
-    const reason = window.prompt(mode === 'block' ? 'Motivo do bloqueio:' : 'Motivo do desbloqueio:');
-    if (!reason) return;
-    await api(`/admin/users/${userId}/${mode}`, { method: 'PATCH', body: JSON.stringify({ reason }) });
-    await loadUsers();
+  async function confirmBlockAction() {
+    if (!blockTarget || !blockReason.trim()) return;
+    setBlockLoading(true);
+    try {
+      await api(`/admin/users/${blockTarget.userId}/${blockTarget.mode}`, { method: 'PATCH', body: JSON.stringify({ reason: blockReason.trim() }) });
+      setBlockTarget(null); setBlockReason(''); setBlockConfirm('');
+      await loadUsers();
+    } finally { setBlockLoading(false); }
   }
 
   async function removeBrokerRole(user: UserRow) {
@@ -156,9 +164,9 @@ export function AdminUsersPanel({ onPermissionsUpdated, mode = 'users' }: AdminU
             <div className="action-grid">
               <button type="button" className="button-primary" onClick={() => startEditingRoles(user)}>Editar permissões</button>
               {user.isBlocked ? (
-                <button type="button" className="button-success" onClick={() => blockOrUnblock(user.id, 'unblock')}>Desbloquear</button>
+                <button type="button" className="button-success" onClick={() => setBlockTarget({ userId: user.id, mode: 'unblock' })}>Desbloquear</button>
               ) : (
-                <button type="button" className="button-danger" onClick={() => blockOrUnblock(user.id, 'block')}>Bloquear</button>
+                <button type="button" className="button-danger" onClick={() => setBlockTarget({ userId: user.id, mode: 'block' })}>Bloquear</button>
               )}
             </div>
 
@@ -199,6 +207,18 @@ export function AdminUsersPanel({ onPermissionsUpdated, mode = 'users' }: AdminU
         ))}
         {brokers.length === 0 && <p className="empty-state">Nenhum corretor encontrado.</p>}
       </div>
+      <ConfirmActionModal
+        open={Boolean(blockTarget)}
+        title={blockTarget?.mode === 'block' ? 'Confirmar bloqueio de usuário' : 'Confirmar desbloqueio de usuário'}
+        description="Essa ação altera o acesso do usuário e será auditada."
+        danger={blockTarget?.mode === 'block'}
+        requireConfirmText={blockTarget?.mode === 'block' ? 'CONFIRMAR' : undefined}
+        confirmTextValue={blockConfirm}
+        isLoading={blockLoading}
+        onCancel={() => { if (blockLoading) return; setBlockTarget(null); setBlockReason(''); setBlockConfirm(''); }}
+        onConfirm={confirmBlockAction}
+        extraFields={<><input value={blockReason} onChange={(e)=>setBlockReason(e.target.value)} placeholder="Motivo" />{blockTarget?.mode === 'block' && <input value={blockConfirm} onChange={(e)=>setBlockConfirm(e.target.value)} placeholder="Digite CONFIRMAR" />}</>}
+      />
     </section>
   );
 }
