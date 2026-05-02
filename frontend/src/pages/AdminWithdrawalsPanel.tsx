@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ConfirmActionModal } from '../components/ConfirmActionModal';
 import { api } from '../services/api';
 import { translateWithdrawalStatus } from '../utils/labels';
 
@@ -20,6 +21,10 @@ type Withdrawal = {
 export function AdminWithdrawalsPanel() {
   const [items, setItems] = useState<Withdrawal[]>([]);
   const [error, setError] = useState('');
+  const [pending, setPending] = useState<{id:string; endpoint:'mark-processing'|'complete'|'reject'} | null>(null);
+  const [adminNote, setAdminNote] = useState('');
+  const [confirmText, setConfirmText] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function load() {
     try {
@@ -35,13 +40,16 @@ export function AdminWithdrawalsPanel() {
     load();
   }, []);
 
-  async function action(id: string, endpoint: 'mark-processing' | 'complete' | 'reject') {
-    const adminNote = window.prompt('Observação do ADM (opcional):') ?? '';
-    await api(`/admin/withdrawals/${id}/${endpoint}`, {
-      method: 'POST',
-      body: JSON.stringify({ adminNote }),
-    });
-    await load();
+  async function runAction() {
+    if (!pending) return;
+    setIsSubmitting(true);
+    try {
+      await api(`/admin/withdrawals/${pending.id}/${pending.endpoint}`, { method: 'POST', body: JSON.stringify({ adminNote }) });
+      setPending(null);
+      setAdminNote('');
+      setConfirmText('');
+      await load();
+    } finally { setIsSubmitting(false); }
   }
 
   return (
@@ -66,14 +74,14 @@ export function AdminWithdrawalsPanel() {
             {['COMPLETED', 'REJECTED', 'CANCELED'].includes(item.status) ? null : (
               <div className="action-grid">
                 {item.status === 'PENDING' && (
-                  <button className="button-primary" type="button" onClick={() => action(item.id, 'mark-processing')}>
+                  <button className="button-primary" type="button" onClick={() => setPending({ id: item.id, endpoint: 'mark-processing' })}>
                     Marcar em processamento
                   </button>
                 )}
-                <button className="button-success" type="button" onClick={() => action(item.id, 'complete')}>
+                <button className="button-success" type="button" onClick={() => setPending({ id: item.id, endpoint: 'complete' })}>
                   Concluir saque
                 </button>
-                <button className="button-danger" type="button" onClick={() => action(item.id, 'reject')}>
+                <button className="button-danger" type="button" onClick={() => setPending({ id: item.id, endpoint: 'reject' })}>
                   Rejeitar
                 </button>
               </div>
@@ -81,6 +89,18 @@ export function AdminWithdrawalsPanel() {
           </article>
         ))}
       </div>
+      <ConfirmActionModal
+        open={Boolean(pending)}
+        title="Confirmar ação em saque"
+        description="Essa ação altera o estado do saque e será registrada na auditoria administrativa."
+        danger={pending?.endpoint === 'complete' || pending?.endpoint === 'reject'}
+        requireConfirmText={pending?.endpoint === 'complete' || pending?.endpoint === 'reject' ? 'CONFIRMAR' : undefined}
+        confirmTextValue={confirmText}
+        isLoading={isSubmitting}
+        onCancel={() => { if (isSubmitting) return; setPending(null); setAdminNote(''); setConfirmText(''); }}
+        onConfirm={runAction}
+        extraFields={<><input value={adminNote} onChange={(e)=>setAdminNote(e.target.value)} placeholder="Observação do ADM (opcional)" />{(pending?.endpoint === 'complete' || pending?.endpoint === 'reject') && <input value={confirmText} onChange={(e)=>setConfirmText(e.target.value)} placeholder="Digite CONFIRMAR" />}</>}
+      />
     </section>
   );
 }

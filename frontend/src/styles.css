@@ -768,3 +768,9 @@ input[type="checkbox"] {
 @media (max-width: 919px) {
   .market-side-column { display: none; }
 }
+
+
+.confirm-modal-overlay { position: fixed; inset: 0; background: rgba(2,6,23,.72); display:flex; align-items:flex-end; justify-content:center; z-index:9999; padding:12px; }
+.confirm-modal { width:min(100%,560px); background:#0f172a; border:1px solid rgba(148,163,184,.24); border-radius:16px; padding:16px; display:grid; gap:10px; }
+.confirm-modal.danger { border-color: rgba(248,113,113,.6); box-shadow: 0 0 0 1px rgba(248,113,113,.35) inset; }
+@media (min-width: 768px) { .confirm-modal-overlay { align-items: center; } }

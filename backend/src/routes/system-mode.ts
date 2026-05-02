@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { ZodError, z } from 'zod';
 import { ensureSystemModeConfig, isAdminRole, SYSTEM_MODE_ID } from '../plugins/system-mode-guard.js';
 import { prisma } from '../lib/prisma.js';
+import { assertAdminPassword } from '../services/admin-security-service.js';
 
 const CONTROL_ROLES = new Set(['SUPER_ADMIN', 'COIN_CHIEF_ADMIN']);
 const hasControlRole = (roles: string[]) => roles.some((role) => CONTROL_ROLES.has(role.toUpperCase()));
@@ -32,7 +33,8 @@ export async function systemModeRoutes(app: FastifyInstance) {
     try {
       const roles = ((request.user as { roles?: string[] }).roles ?? []);
       if (!hasControlRole(roles)) return reply.status(403).send({ message: 'Sem permissão.' });
-      const body = z.object({ reason: z.string().min(10) }).parse(request.body ?? {});
+      const body = z.object({ reason: z.string().min(10), adminPassword: z.string().min(1) }).parse(request.body ?? {});
+      await assertAdminPassword((request.user as { sub: string }).sub, body.adminPassword);
       const previous = await ensureSystemModeConfig();
       const current = await prisma.systemModeConfig.update({ where: { id: SYSTEM_MODE_ID }, data: { mode: 'NORMAL', testDisabledAt: new Date(), testDisabledReason: body.reason } });
       await app.logAdmin({ userId: (request.user as { sub: string }).sub, action: 'SYSTEM_MODE_ENABLE_NORMAL', entity: 'SystemModeConfig', reason: body.reason, previous: JSON.stringify(previous), current: JSON.stringify(current) });

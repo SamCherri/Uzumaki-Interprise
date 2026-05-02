@@ -3,6 +3,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { assertAdminPassword } from '../services/admin-security-service.js';
 
 type AuthRequest = FastifyRequest & { user: { sub: string; roles?: string[] } };
 
@@ -93,8 +94,10 @@ export async function adminRoutes(app: FastifyInstance) {
       const schema = z.object({
         amount: amountSchema,
         reason: z.string().min(3),
+        adminPassword: z.string().min(1),
       });
       const body = schema.parse(request.body);
+      await assertAdminPassword(authRequest.user.sub, body.adminPassword);
 
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const treasury = await tx.treasuryAccount.findFirstOrThrow();
@@ -155,6 +158,7 @@ export async function adminRoutes(app: FastifyInstance) {
         brokerRef: z.string().min(1).optional(),
         amount: amountSchema,
         reason: z.string().min(3),
+        adminPassword: z.string().min(1),
       }).superRefine((value, ctx) => {
         if (!value.brokerEmail && !value.brokerUserId && !value.brokerRef) {
           ctx.addIssue({

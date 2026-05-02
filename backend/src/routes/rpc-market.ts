@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { assertAdminPassword } from '../services/admin-security-service.js';
 import { RPC_MARKET_BUY_FEE_PERCENT, RPC_MARKET_SELL_FEE_PERCENT } from '../constants/fee-rules.js';
 import { ensurePlatformAccount } from '../services/fee-distribution-service.js';
 
@@ -363,6 +364,7 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
     fiatAmount: z.coerce.number().min(0.01).optional(),
     rpcAmount: z.coerce.number().min(0.01).optional(),
     reason: z.string().min(10),
+    adminPassword: z.string().optional(),
   }).refine((value) => (value.fiatAmount ?? 0) > 0 || (value.rpcAmount ?? 0) > 0, { message: 'Informe fiatAmount ou rpcAmount maior que zero.' });
 
   app.post('/admin/rpc-market/liquidity/inject', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 15, timeWindow: '1 minute' } } }, async (request, reply) => {
@@ -371,6 +373,7 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
     try {
       const body = liquiditySchema.parse(request.body ?? {});
       const actorUserId = (request.user as { sub: string }).sub;
+      await assertAdminPassword(actorUserId, body.adminPassword);
       const fiatAmount = toDecimal(body.fiatAmount ?? 0).toDecimalPlaces(2);
       const rpcAmount = toDecimal(body.rpcAmount ?? 0).toDecimalPlaces(2);
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -385,7 +388,7 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
         const nextPrice = nextFiat.div(nextRpc).toDecimalPlaces(PRICE_SCALE);
         const updated = await tx.rpcMarketState.update({ where: { id: RPC_MARKET_STATE_ID }, data: { fiatReserve: nextFiat, rpcReserve: nextRpc, currentPrice: nextPrice } });
         const current = { currentPrice: updated.currentPrice.toString(), fiatReserve: updated.fiatReserve.toString(), rpcReserve: updated.rpcReserve.toString(), totalFiatVolume: updated.totalFiatVolume.toString(), totalRpcVolume: updated.totalRpcVolume.toString(), totalBuys: updated.totalBuys, totalSells: updated.totalSells, updatedAt: updated.updatedAt.toISOString(), fiatInjected: fiatAmount.toString(), rpcInjected: rpcAmount.toString() };
-        await tx.adminLog.create({ data: { userId: actorUserId, action: 'RPC_MARKET_LIQUIDITY_INJECT', entity: 'RpcMarketState', reason: body.reason.trim(), previous: JSON.stringify(previous), current: JSON.stringify(current) } });
+        await tx.adminLog.create({ data: { userId: actorUserId, action: 'RPC_MARKET_LIQUIDITY_INJECT', entity: 'RpcMarketState', reason: body.reason.trim(), previous: JSON.stringify(previous), current: JSON.stringify(current), ip: request.ip, userAgent: request.headers['user-agent'] ?? null } });
         return updated;
       });
       return { message: 'Liquidez adicionada com sucesso.', state: result };
@@ -400,6 +403,7 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
     try {
       const body = liquiditySchema.parse(request.body ?? {});
       const actorUserId = (request.user as { sub: string }).sub;
+      await assertAdminPassword(actorUserId, body.adminPassword);
       const fiatAmount = toDecimal(body.fiatAmount ?? 0).toDecimalPlaces(2);
       const rpcAmount = toDecimal(body.rpcAmount ?? 0).toDecimalPlaces(2);
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -414,7 +418,7 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
         const nextPrice = nextFiat.div(nextRpc).toDecimalPlaces(PRICE_SCALE);
         const updated = await tx.rpcMarketState.update({ where: { id: RPC_MARKET_STATE_ID }, data: { fiatReserve: nextFiat, rpcReserve: nextRpc, currentPrice: nextPrice } });
         const current = { currentPrice: updated.currentPrice.toString(), fiatReserve: updated.fiatReserve.toString(), rpcReserve: updated.rpcReserve.toString(), totalFiatVolume: updated.totalFiatVolume.toString(), totalRpcVolume: updated.totalRpcVolume.toString(), totalBuys: updated.totalBuys, totalSells: updated.totalSells, updatedAt: updated.updatedAt.toISOString(), fiatWithdrawn: fiatAmount.toString(), rpcWithdrawn: rpcAmount.toString() };
-        await tx.adminLog.create({ data: { userId: actorUserId, action: 'RPC_MARKET_LIQUIDITY_WITHDRAW', entity: 'RpcMarketState', reason: body.reason.trim(), previous: JSON.stringify(previous), current: JSON.stringify(current) } });
+        await tx.adminLog.create({ data: { userId: actorUserId, action: 'RPC_MARKET_LIQUIDITY_WITHDRAW', entity: 'RpcMarketState', reason: body.reason.trim(), previous: JSON.stringify(previous), current: JSON.stringify(current), ip: request.ip, userAgent: request.headers['user-agent'] ?? null } });
         return updated;
       });
       return { message: 'Liquidez removida com sucesso.', state: result };
