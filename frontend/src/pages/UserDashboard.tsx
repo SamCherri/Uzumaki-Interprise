@@ -18,7 +18,13 @@ type HoldingsResponse = {
   totalCompanies: number;
 };
 
-export function UserDashboard({ onOpenRpcMarket }: { onOpenRpcMarket?: () => void }) {
+export function UserDashboard({
+  onOpenRpcMarket,
+  onOpenCompanyMarket,
+}: {
+  onOpenRpcMarket?: (action?: 'buy' | 'sell') => void;
+  onOpenCompanyMarket?: (companyId: string) => void;
+}) {
   const [data, setData] = useState<HoldingsResponse | null>(null);
   const [error, setError] = useState('');
 
@@ -72,8 +78,8 @@ export function UserDashboard({ onOpenRpcMarket }: { onOpenRpcMarket?: () => voi
           <p className="info-text">Use R$ para comprar RPC ou solicitar saque.</p>
           <p className="info-text">Para sacar, venda seus RPC por R$ e solicite o saque.</p>
           <div className="home-grid nested-card">
-            <button className="button-primary" type="button" onClick={onOpenRpcMarket}>Comprar RPC com R$</button>
-            <button className="button-primary" type="button" onClick={onOpenRpcMarket}>Vender RPC por R$</button>
+            <button className="button-primary" type="button" onClick={() => onOpenRpcMarket?.('buy')}>Comprar RPC com R$</button>
+            <button className="button-primary" type="button" onClick={() => onOpenRpcMarket?.('sell')}>Vender RPC por R$</button>
           </div>
           <p className="info-text">Use RPC para negociar tokens/projetos.</p>
 
@@ -87,7 +93,14 @@ export function UserDashboard({ onOpenRpcMarket }: { onOpenRpcMarket?: () => voi
                 <p className="info-text">Preço médio: {formatPrice(Number(holding.averageBuyPrice))} RPC</p>
                 <p className="info-text">Preço atual: {formatPrice(Number(holding.currentPrice))} RPC</p>
                 <p className="info-text">Valor estimado: {formatCurrency(Number(holding.estimatedValue))} RPC</p>
-                <button className="quick-pill" type="button" disabled>Ver mercado</button>
+                <button
+                  className="quick-pill"
+                  type="button"
+                  onClick={() => onOpenCompanyMarket?.(holding.companyId)}
+                  disabled={!holding.companyId}
+                >
+                  {holding.companyId ? 'Ver mercado' : 'Mercado indisponível'}
+                </button>
               </article>
             ))}
           </div>

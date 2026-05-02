@@ -64,6 +64,7 @@ function decodeRolesFromToken(token: string | null): ViewerRoles {
 }
 
 export function App() {
+  const [rpcMarketAction, setRpcMarketAction] = useState<'buy' | 'sell' | null>(null);
   const [token, setToken] = useState(() => localStorage.getItem('token'));
   const [publicTab, setPublicTab] = useState<PublicTab>('login');
   const [screen, setScreen] = useState<PrivateScreen>('home');
@@ -420,8 +421,19 @@ export function App() {
       )}
 
       {!isTestModeRestrictedUser && screen === 'markets' && <CompaniesPage />}
-      {!isTestModeRestrictedUser && screen === 'wallet' && <UserDashboard onOpenRpcMarket={() => setScreen('rpc-market')} />}
-      {!isTestModeRestrictedUser && screen === 'rpc-market' && <RpcMarketPage />}
+      {!isTestModeRestrictedUser && screen === 'wallet' && (
+        <UserDashboard
+          onOpenRpcMarket={(action) => {
+            setRpcMarketAction(action ?? null);
+            setScreen('rpc-market');
+          }}
+          onOpenCompanyMarket={(companyId) => {
+            localStorage.setItem('rpc-exchange-open-company-market-id', companyId);
+            setScreen('markets');
+          }}
+        />
+      )}
+      {!isTestModeRestrictedUser && screen === 'rpc-market' && <RpcMarketPage initialTradeFlow={rpcMarketAction} onTradeFlowHandled={() => setRpcMarketAction(null)} />}
       {!isTestModeRestrictedUser && screen === 'withdrawals' && <WithdrawalsPage />}
       {!isTestModeRestrictedUser && screen === 'company-request' && <CompanyRequestPage />}
       {!isTestModeRestrictedUser && screen === 'my-projects' && canSeeMyProjects && <ProjectOwnerPanel />}
