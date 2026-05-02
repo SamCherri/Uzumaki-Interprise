@@ -10,18 +10,49 @@ const [{ buildApp }, { prisma }] = await Promise.all([
 ]);
 
 async function resetDb() {
-  await prisma.userRole.deleteMany();
-  await prisma.role.deleteMany();
-  await prisma.wallet.deleteMany();
-  await prisma.user.deleteMany();
+  await prisma.$transaction([
+    prisma.rpcLimitOrder.deleteMany(),
+    prisma.rpcExchangeTrade.deleteMany(),
+    prisma.rpcMarketState.deleteMany(),
+    prisma.feeDistribution.deleteMany(),
+    prisma.trade.deleteMany(),
+    prisma.marketOrder.deleteMany(),
+    prisma.companyOperation.deleteMany(),
+    prisma.companyHolding.deleteMany(),
+    prisma.companyInitialOffer.deleteMany(),
+    prisma.companyRevenueAccount.deleteMany(),
+    prisma.companyBoostInjection.deleteMany(),
+    prisma.companyBoostAccount.deleteMany(),
+    prisma.company.deleteMany(),
+    prisma.coinTransfer.deleteMany(),
+    prisma.coinIssuance.deleteMany(),
+    prisma.transaction.deleteMany(),
+    prisma.withdrawalRequest.deleteMany(),
+    prisma.adminLog.deleteMany(),
+    prisma.brokerAccount.deleteMany(),
+    prisma.wallet.deleteMany(),
+    prisma.userRole.deleteMany(),
+    prisma.rolePermission.deleteMany(),
+    prisma.permission.deleteMany(),
+    prisma.role.deleteMany(),
+    prisma.testModeReport.deleteMany(),
+    prisma.testModeTrade.deleteMany(),
+    prisma.testModeWallet.deleteMany(),
+    prisma.testModeMarketState.deleteMany(),
+    prisma.user.deleteMany(),
+    prisma.platformAccount.deleteMany(),
+    prisma.treasuryAccount.deleteMany(),
+  ]);
 }
 
 test('JWT_SECRET obrigatório em produção', async () => {
   const originalNodeEnv = process.env.NODE_ENV;
   const originalJwt = process.env.JWT_SECRET;
+  const originalWeb = process.env.WEB_ORIGIN;
   let app: ReturnType<typeof buildApp> | null = null;
   try {
     process.env.NODE_ENV = 'production';
+    process.env.WEB_ORIGIN = 'https://example.com';
     delete process.env.JWT_SECRET;
     app = buildApp();
     await assert.rejects(() => app.ready(), /JWT_SECRET é obrigatório em produção/);
@@ -29,6 +60,7 @@ test('JWT_SECRET obrigatório em produção', async () => {
     if (app) await app.close().catch(() => undefined);
     process.env.NODE_ENV = originalNodeEnv;
     process.env.JWT_SECRET = originalJwt;
+    process.env.WEB_ORIGIN = originalWeb;
   }
 });
 
@@ -89,6 +121,8 @@ test('login inválido bloqueia temporariamente e login válido zera contador', a
 
 test('rate limit retorna 429 em endpoint sensível', async () => {
   const originalNodeEnv = process.env.NODE_ENV;
+  const originalJwt = process.env.JWT_SECRET;
+  const originalWeb = process.env.WEB_ORIGIN;
   process.env.NODE_ENV = 'development';
   const app = buildApp();
   try {
@@ -110,5 +144,7 @@ test('rate limit retorna 429 em endpoint sensível', async () => {
   } finally {
     await app.close().catch(() => undefined);
     process.env.NODE_ENV = originalNodeEnv;
+    process.env.JWT_SECRET = originalJwt;
+    process.env.WEB_ORIGIN = originalWeb;
   }
 });
