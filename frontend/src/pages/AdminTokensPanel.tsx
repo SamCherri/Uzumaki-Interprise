@@ -31,6 +31,7 @@ export function AdminTokensPanel({ currentUserRoles }: { currentUserRoles: strin
   const [modalState, setModalState] = useState<TokenModalState>(null);
   const [isSubmittingModal, setIsSubmittingModal] = useState(false);
   const [deleteTokenId, setDeleteTokenId] = useState<string | null>(null);
+  const [deleteTokenConfirmText, setDeleteTokenConfirmText] = useState('');
   const [isDeletingToken, setIsDeletingToken] = useState(false);
   const isSuperAdmin = useMemo(() => currentUserRoles.map((role) => role.toUpperCase()).includes('SUPER_ADMIN'), [currentUserRoles]);
 
@@ -90,11 +91,13 @@ export function AdminTokensPanel({ currentUserRoles }: { currentUserRoles: strin
 
   function openDeleteTokenModal(id: string) {
     setDeleteTokenId(id);
+    setDeleteTokenConfirmText('');
   }
 
   function closeDeleteTokenModal() {
     if (isDeletingToken) return;
     setDeleteTokenId(null);
+    setDeleteTokenConfirmText('');
   }
 
   async function confirmDeleteToken() {
@@ -150,11 +153,24 @@ export function AdminTokensPanel({ currentUserRoles }: { currentUserRoles: strin
         description="Esta ação só é permitida para mercados sem histórico econômico e remove o token em definitivo."
         danger
         requireConfirmText="CONFIRMAR"
-        confirmTextValue="CONFIRMAR"
+        confirmTextValue={deleteTokenConfirmText}
         isLoading={isDeletingToken}
         confirmLabel="Excluir definitivamente"
         onCancel={closeDeleteTokenModal}
         onConfirm={confirmDeleteToken}
+        extraFields={
+          <label className="admin-modal-field">
+            <span>Confirmação *</span>
+            <input
+              type="text"
+              value={deleteTokenConfirmText}
+              onChange={(event) => setDeleteTokenConfirmText(event.target.value)}
+              placeholder="Digite CONFIRMAR"
+              disabled={isDeletingToken}
+              required
+            />
+          </label>
+        }
       />
       {modalState && (
         <AdminActionModal
