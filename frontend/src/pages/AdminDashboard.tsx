@@ -226,6 +226,13 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
     setError('');
     setMessage('');
     setAdminModalLoading(true);
+
+    if (!adminPassword.trim()) {
+      setError('Confirme sua senha para continuar.');
+      setAdminModalLoading(false);
+      return;
+    }
+
     try {
       switch (pendingAdminAction) {
         case 'issuance':
