@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { AdminActionModal } from '../components/AdminActionModal';
+import { ConfirmActionModal } from '../components/ConfirmActionModal';
 import { api } from '../services/api';
 import { translateCompanyStatus } from '../utils/labels';
 
@@ -29,6 +30,8 @@ export function AdminTokensPanel({ currentUserRoles }: { currentUserRoles: strin
   const [message, setMessage] = useState('');
   const [modalState, setModalState] = useState<TokenModalState>(null);
   const [isSubmittingModal, setIsSubmittingModal] = useState(false);
+  const [deleteTokenId, setDeleteTokenId] = useState<string | null>(null);
+  const [isDeletingToken, setIsDeletingToken] = useState(false);
   const isSuperAdmin = useMemo(() => currentUserRoles.map((role) => role.toUpperCase()).includes('SUPER_ADMIN'), [currentUserRoles]);
 
   const emptyForm = { founderEmail: '', name: '', ticker: '', description: '', sector: '', totalTokens: '', ownerSharePercent: '', publicOfferPercent: '', initialPrice: '', buyFeePercent: '', sellFeePercent: '' };
@@ -85,11 +88,30 @@ export function AdminTokensPanel({ currentUserRoles }: { currentUserRoles: strin
     }
   }
 
-  async function deleteToken(id: string) {
-    setError(''); setMessage('');
-    if (!window.confirm('Esta ação só é permitida para mercados sem histórico econômico. Deseja continuar?')) return;
-    try { await api(`/admin/tokens/${id}`, { method: 'DELETE' }); setMessage('Token removido definitivamente.'); await loadTokens();
-    } catch (err) { setError((err as Error).message); }
+  function openDeleteTokenModal(id: string) {
+    setDeleteTokenId(id);
+  }
+
+  function closeDeleteTokenModal() {
+    if (isDeletingToken) return;
+    setDeleteTokenId(null);
+  }
+
+  async function confirmDeleteToken() {
+    if (!deleteTokenId) return;
+    setError('');
+    setMessage('');
+    setIsDeletingToken(true);
+    try {
+      await api(`/admin/tokens/${deleteTokenId}`, { method: 'DELETE' });
+      setMessage('Token removido definitivamente.');
+      closeDeleteTokenModal();
+      await loadTokens();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsDeletingToken(false);
+    }
   }
 
   return (
@@ -121,7 +143,19 @@ export function AdminTokensPanel({ currentUserRoles }: { currentUserRoles: strin
         <button className="button-success" type="submit">Criar token</button>
       </form>
 
-      <div className="mobile-card-list nested-card">{tokens.map((token) => (<article key={token.id} className="summary-item compact-card"><strong>{token.name} ({token.ticker})</strong><p>Status: {translateCompanyStatus(token.status)}</p><p>Dono: {token.founder.name} ({token.founder.email})</p><p>Preço atual: {token.currentPrice}</p><p>Total tokens: {token.totalTokens} · Disponível: {token.availableTokens}</p><div className="action-grid">{token.status === 'PENDING' && <><button className="button-success" type="button" onClick={() => approveOrRejectToken(token.id, 'approve')}>Aprovar listagem</button><button className="button-danger" type="button" onClick={() => approveOrRejectToken(token.id, 'reject')}>Rejeitar listagem</button></>}{token.status === 'ACTIVE' && <><button className="button-primary" type="button" onClick={() => setModalState({ type: 'suspend', tokenId: token.id })}>Pausar mercado</button><button className="button-danger" type="button" onClick={() => setModalState({ type: 'close', tokenId: token.id })}>Encerrar mercado</button><button className="button-primary" type="button" onClick={() => setModalState({ type: 'owner', tokenId: token.id })}>Trocar dono</button></>}{token.status === 'SUSPENDED' && <><button className="button-success" type="button" onClick={() => setModalState({ type: 'reactivate', tokenId: token.id })}>Reativar mercado</button><button className="button-danger" type="button" onClick={() => setModalState({ type: 'close', tokenId: token.id })}>Encerrar mercado</button><button className="button-primary" type="button" onClick={() => setModalState({ type: 'owner', tokenId: token.id })}>Trocar dono</button></>}{token.status === 'CLOSED' && <><button className="button-danger" type="button" onClick={() => deleteToken(token.id)}>Excluir definitivamente</button><p className="info-text">A exclusão só é permitida se o backend confirmar ausência de histórico econômico.</p>{isSuperAdmin && <><button className="button-danger" type="button" onClick={() => setModalState({ type: 'forceDelete', token })}>Excluir teste definitivamente</button><p className="info-text">Ação irreversível para limpeza de dados de teste com histórico.</p></>}</>}</div></article>))}</div>
+      <div className="mobile-card-list nested-card">{tokens.map((token) => (<article key={token.id} className="summary-item compact-card"><strong>{token.name} ({token.ticker})</strong><p>Status: {translateCompanyStatus(token.status)}</p><p>Dono: {token.founder.name} ({token.founder.email})</p><p>Preço atual: {token.currentPrice}</p><p>Total tokens: {token.totalTokens} · Disponível: {token.availableTokens}</p><div className="action-grid">{token.status === 'PENDING' && <><button className="button-success" type="button" onClick={() => approveOrRejectToken(token.id, 'approve')}>Aprovar listagem</button><button className="button-danger" type="button" onClick={() => approveOrRejectToken(token.id, 'reject')}>Rejeitar listagem</button></>}{token.status === 'ACTIVE' && <><button className="button-primary" type="button" onClick={() => setModalState({ type: 'suspend', tokenId: token.id })}>Pausar mercado</button><button className="button-danger" type="button" onClick={() => setModalState({ type: 'close', tokenId: token.id })}>Encerrar mercado</button><button className="button-primary" type="button" onClick={() => setModalState({ type: 'owner', tokenId: token.id })}>Trocar dono</button></>}{token.status === 'SUSPENDED' && <><button className="button-success" type="button" onClick={() => setModalState({ type: 'reactivate', tokenId: token.id })}>Reativar mercado</button><button className="button-danger" type="button" onClick={() => setModalState({ type: 'close', tokenId: token.id })}>Encerrar mercado</button><button className="button-primary" type="button" onClick={() => setModalState({ type: 'owner', tokenId: token.id })}>Trocar dono</button></>}{token.status === 'CLOSED' && <><button className="button-danger" type="button" onClick={() => openDeleteTokenModal(token.id)} disabled={isDeletingToken}>Excluir definitivamente</button><p className="info-text">A exclusão só é permitida se o backend confirmar ausência de histórico econômico.</p>{isSuperAdmin && <><button className="button-danger" type="button" onClick={() => setModalState({ type: 'forceDelete', token })}>Excluir teste definitivamente</button><p className="info-text">Ação irreversível para limpeza de dados de teste com histórico.</p></>}</>}</div></article>))}</div>
+      <ConfirmActionModal
+        open={Boolean(deleteTokenId)}
+        title="Excluir token definitivamente"
+        description="Esta ação só é permitida para mercados sem histórico econômico e remove o token em definitivo."
+        danger
+        requireConfirmText="CONFIRMAR"
+        confirmTextValue="CONFIRMAR"
+        isLoading={isDeletingToken}
+        confirmLabel="Excluir definitivamente"
+        onCancel={closeDeleteTokenModal}
+        onConfirm={confirmDeleteToken}
+      />
       {modalState && (
         <AdminActionModal
           title={modalState.type === 'suspend' ? 'Suspender projeto' : modalState.type === 'reactivate' ? 'Reativar projeto' : modalState.type === 'close' ? 'Encerrar projeto' : modalState.type === 'forceDelete' ? 'Excluir teste definitivamente' : 'Trocar dono do projeto'}

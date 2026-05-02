@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { ConfirmActionModal } from '../components/ConfirmActionModal';
 import { api } from '../services/api';
 import { translateRole } from '../utils/labels';
 
@@ -48,6 +49,10 @@ export function AdminUsersPanel({ onPermissionsUpdated, mode = 'users' }: AdminU
 
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingRoles, setEditingRoles] = useState<string[]>(['USER']);
+  const [actionModal, setActionModal] = useState<{ userId: string; mode: 'block' | 'unblock' } | null>(null);
+  const [actionReason, setActionReason] = useState('');
+  const [actionConfirmText, setActionConfirmText] = useState('');
+  const [isSubmittingAction, setIsSubmittingAction] = useState(false);
 
   async function loadUsers() {
     setLoading(true);
@@ -104,11 +109,40 @@ export function AdminUsersPanel({ onPermissionsUpdated, mode = 'users' }: AdminU
     await loadUsers();
   }
 
-  async function blockOrUnblock(userId: string, mode: 'block' | 'unblock') {
-    const reason = window.prompt(mode === 'block' ? 'Motivo do bloqueio:' : 'Motivo do desbloqueio:');
-    if (!reason) return;
-    await api(`/admin/users/${userId}/${mode}`, { method: 'PATCH', body: JSON.stringify({ reason }) });
-    await loadUsers();
+  function openBlockModal(userId: string, mode: 'block' | 'unblock') {
+    setActionModal({ userId, mode });
+    setActionReason('');
+    setActionConfirmText('');
+  }
+
+  function closeBlockModal() {
+    if (isSubmittingAction) return;
+    setActionModal(null);
+    setActionReason('');
+    setActionConfirmText('');
+  }
+
+  async function confirmBlockAction() {
+    if (!actionModal) return;
+    if (!actionReason.trim()) {
+      setError('Informe o motivo para continuar.');
+      return;
+    }
+
+    setIsSubmittingAction(true);
+    setError('');
+    try {
+      await api(`/admin/users/${actionModal.userId}/${actionModal.mode}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ reason: actionReason.trim() }),
+      });
+      closeBlockModal();
+      await loadUsers();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsSubmittingAction(false);
+    }
   }
 
   async function removeBrokerRole(user: UserRow) {
@@ -156,9 +190,9 @@ export function AdminUsersPanel({ onPermissionsUpdated, mode = 'users' }: AdminU
             <div className="action-grid">
               <button type="button" className="button-primary" onClick={() => startEditingRoles(user)}>Editar permissões</button>
               {user.isBlocked ? (
-                <button type="button" className="button-success" onClick={() => blockOrUnblock(user.id, 'unblock')}>Desbloquear</button>
+                <button type="button" className="button-success" onClick={() => openBlockModal(user.id, 'unblock')} disabled={isSubmittingAction}>Desbloquear</button>
               ) : (
-                <button type="button" className="button-danger" onClick={() => blockOrUnblock(user.id, 'block')}>Bloquear</button>
+                <button type="button" className="button-danger" onClick={() => openBlockModal(user.id, 'block')} disabled={isSubmittingAction}>Bloquear</button>
               )}
             </div>
 
@@ -199,6 +233,28 @@ export function AdminUsersPanel({ onPermissionsUpdated, mode = 'users' }: AdminU
         ))}
         {brokers.length === 0 && <p className="empty-state">Nenhum corretor encontrado.</p>}
       </div>
+      <ConfirmActionModal
+        open={Boolean(actionModal)}
+        title={actionModal?.mode === 'block' ? 'Bloquear usuário' : 'Desbloquear usuário'}
+        description={actionModal?.mode === 'block' ? 'Esta ação impede o acesso do usuário até novo desbloqueio.' : 'Esta ação libera novamente o acesso do usuário.'}
+        danger
+        requireConfirmText="CONFIRMAR"
+        confirmTextValue={actionConfirmText}
+        isLoading={isSubmittingAction}
+        confirmLabel={actionModal?.mode === 'block' ? 'Bloquear usuário' : 'Desbloquear usuário'}
+        onCancel={closeBlockModal}
+        onConfirm={confirmBlockAction}
+        extraFields={<>
+          <label className="admin-modal-field">
+            <span>Motivo *</span>
+            <textarea value={actionReason} onChange={(event) => setActionReason(event.target.value)} placeholder={actionModal?.mode === 'block' ? 'Ex: violação de regra administrativa' : 'Ex: revisão concluída'} disabled={isSubmittingAction} required />
+          </label>
+          <label className="admin-modal-field">
+            <span>Confirmação *</span>
+            <input type="text" value={actionConfirmText} onChange={(event) => setActionConfirmText(event.target.value)} placeholder="Digite CONFIRMAR" disabled={isSubmittingAction} required />
+          </label>
+        </>}
+      />
     </section>
   );
 }
