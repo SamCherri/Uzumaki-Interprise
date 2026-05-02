@@ -475,7 +475,7 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
 }
 
 export async function marketRoutes(app: FastifyInstance) {
-  app.post('/market/orders', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/market/orders', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
 
     try {
@@ -612,7 +612,7 @@ export async function marketRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/market/orders/:id/cancel', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/market/orders/:id/cancel', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
 
     try {

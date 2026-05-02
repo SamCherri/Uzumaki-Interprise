@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import { FastifyReply, FastifyRequest } from 'fastify';
 import authPlugin from './plugins/auth.js';
 import { authRoutes } from './routes/auth.js';
@@ -23,9 +24,23 @@ export function buildApp() {
   const app = Fastify({ logger: true });
 
   const webOrigin = process.env.WEB_ORIGIN;
+  const isProduction = process.env.NODE_ENV === 'production';
+  if (isProduction && !webOrigin?.trim()) {
+    throw new Error('WEB_ORIGIN é obrigatório em produção.');
+  }
   app.register(cors, {
-    origin: webOrigin ? webOrigin.split(',').map((origin: string) => origin.trim()) : true,
+    origin: webOrigin ? webOrigin.split(',').map((origin: string) => origin.trim()) : (isProduction ? false : true),
     credentials: true,
+  });
+  app.register(rateLimit, {
+    global: false,
+    skipOnError: false,
+    errorResponseBuilder: () => ({
+      statusCode: 429,
+      error: 'Too Many Requests',
+      message: 'Muitas tentativas. Aguarde alguns instantes e tente novamente.',
+    }),
+    enableDraftSpec: true,
   });
   app.register(authPlugin);
   app.addHook('preHandler', globalSystemModeGuard);

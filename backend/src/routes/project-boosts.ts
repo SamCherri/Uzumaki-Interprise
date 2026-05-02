@@ -31,7 +31,7 @@ export async function projectBoostRoutes(app: FastifyInstance) {
     return { company, canBoost };
   });
 
-  app.post('/project-boosts/companies/:companyId/boost', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/project-boosts/companies/:companyId/boost', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
     const auth = request as AuthRequest;
     const { companyId } = request.params as { companyId: string };
     const body = z.object({ amountRpc: z.coerce.number().positive(), source: z.enum(OWNER_SOURCES), reason: z.string().min(3) }).parse(request.body);
@@ -52,7 +52,7 @@ export async function projectBoostRoutes(app: FastifyInstance) {
     return { injections };
   });
 
-  app.post('/admin/project-boosts/companies/:companyId/boost', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/admin/project-boosts/companies/:companyId/boost', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
     const auth = request as AuthRequest;
     const roles = auth.user.roles ?? [];
     if (!isAdmin(roles)) return reply.code(403).send({ message: 'Sem permissão.' });

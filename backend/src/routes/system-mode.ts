@@ -16,7 +16,7 @@ export async function systemModeRoutes(app: FastifyInstance) {
     return ensureSystemModeConfig();
   });
 
-  app.post('/admin/system-mode/test/enable', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/admin/system-mode/test/enable', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
     try {
       const roles = ((request.user as { roles?: string[] }).roles ?? []);
       if (!hasControlRole(roles)) return reply.status(403).send({ message: 'Sem permissão.' });
@@ -28,7 +28,7 @@ export async function systemModeRoutes(app: FastifyInstance) {
     } catch (e) { return badRequest(reply, e); }
   });
 
-  app.post('/admin/system-mode/normal/enable', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/admin/system-mode/normal/enable', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
     try {
       const roles = ((request.user as { roles?: string[] }).roles ?? []);
       if (!hasControlRole(roles)) return reply.status(403).send({ message: 'Sem permissão.' });

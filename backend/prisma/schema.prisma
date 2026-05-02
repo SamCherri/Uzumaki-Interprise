@@ -95,6 +95,8 @@ model User {
   bankAccountNumber String?
   passwordHash String
   isBlocked    Boolean          @default(false)
+  failedLoginAttempts Int       @default(0)
+  loginLockedUntil DateTime?
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   wallet       Wallet?

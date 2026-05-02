@@ -13,14 +13,15 @@
     "prisma:migrate:dev": "prisma migrate dev --name init",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:seed:demo": "SEED_DEMO_DATA=true tsx prisma/seed.ts",
-    "test": "tsx --test tests/*.test.ts",
-    "test:critical": "tsx --test tests/*.test.ts",
+    "test": "tsx --test tests/critical-economic-security.test.ts && tsx --test tests/security-production.test.ts && tsx --test tests/rpc-market-simulation.test.ts",
+    "test:critical": "tsx --test tests/critical-economic-security.test.ts && tsx --test tests/security-production.test.ts",
     "test:critical:ci": "npm run prisma:generate && prisma migrate deploy && npm run test:critical",
     "test:simulation": "tsx --test tests/rpc-market-simulation.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",
     "@fastify/jwt": "^9.1.0",
+    "@fastify/rate-limit": "^10.3.0",
     "@prisma/client": "^6.7.0",
     "bcryptjs": "^2.4.3",
     "fastify": "^5.2.1",
@@ -29,9 +30,9 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.13.10",
     "prisma": "^6.7.0",
     "tsx": "^4.19.3",
-    "typescript": "^5.8.2",
-    "@types/node": "^22.13.10"
+    "typescript": "^5.8.2"
   }
 }

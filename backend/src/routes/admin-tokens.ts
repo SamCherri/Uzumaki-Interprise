@@ -123,7 +123,7 @@ export async function adminTokensRoutes(app: FastifyInstance) {
     };
   });
 
-  app.post('/tokens', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/tokens', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
     if (!ensureAdmin(reply, roles)) return;
@@ -259,7 +259,7 @@ export async function adminTokensRoutes(app: FastifyInstance) {
     }
   });
 
-  app.patch('/tokens/:id/owner', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.patch('/tokens/:id/owner', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
     if (!ensureAdmin(reply, roles)) return;
@@ -310,7 +310,7 @@ export async function adminTokensRoutes(app: FastifyInstance) {
     }
   });
 
-  app.patch('/tokens/:id/suspend', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.patch('/tokens/:id/suspend', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
     if (!ensureAdmin(reply, roles)) return;
@@ -353,7 +353,7 @@ export async function adminTokensRoutes(app: FastifyInstance) {
     }
   });
 
-  app.patch('/tokens/:id/reactivate', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.patch('/tokens/:id/reactivate', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
     if (!ensureAdmin(reply, roles)) return;
@@ -388,7 +388,7 @@ export async function adminTokensRoutes(app: FastifyInstance) {
     }
   });
 
-  app.patch('/tokens/:id/close', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.patch('/tokens/:id/close', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
     if (!ensureAdmin(reply, roles)) return;
@@ -465,7 +465,7 @@ export async function adminTokensRoutes(app: FastifyInstance) {
     return { company, counts };
   });
 
-  app.delete('/companies/:id/force-delete', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.delete('/companies/:id/force-delete', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
     if (!isSuperAdmin(roles)) {
@@ -578,7 +578,7 @@ export async function adminTokensRoutes(app: FastifyInstance) {
     }
   });
 
-  app.delete('/tokens/:id', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.delete('/tokens/:id', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
     if (!ensureAdmin(reply, roles)) return;
