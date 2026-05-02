@@ -140,7 +140,11 @@ test('rate limit retorna 429 em endpoint sensível', async () => {
       }
     }
     assert.ok(limitedResponse, 'Esperava receber HTTP 429 após excesso de tentativas.');
-    assert.deepEqual(limitedResponse!.json(), { message: 'Muitas tentativas. Aguarde alguns instantes e tente novamente.' });
+    const limitedBody = limitedResponse!.json() as { statusCode?: number; error?: string; message?: string };
+    assert.equal(limitedResponse!.statusCode, 429);
+    assert.equal(limitedBody.message, 'Muitas tentativas. Aguarde alguns instantes e tente novamente.');
+    assert.equal(limitedBody.statusCode, 429);
+    assert.equal(limitedBody.error, 'Too Many Requests');
   } finally {
     await app.close().catch(() => undefined);
     process.env.NODE_ENV = originalNodeEnv;
