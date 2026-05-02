@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import bcrypt from 'bcryptjs';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
@@ -45,6 +46,16 @@ async function resolveUniqueUserByRef(
 }
 
 export async function adminRoutes(app: FastifyInstance) {
+  async function assertAdminPassword(tx: Prisma.TransactionClient, userId: string, adminPassword?: string) {
+    if (!adminPassword || !adminPassword.trim()) {
+      throw new Error('Confirme sua senha para continuar.');
+    }
+    const actor = await tx.user.findUnique({ where: { id: userId }, select: { passwordHash: true } });
+    if (!actor?.passwordHash) throw new Error('Senha administrativa inválida.');
+    const isValid = await bcrypt.compare(adminPassword, actor.passwordHash);
+    if (!isValid) throw new Error('Senha administrativa inválida.');
+  }
+
   app.get('/admin/overview', { preHandler: [app.authenticate] }, async (request: FastifyRequest, reply: FastifyReply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
@@ -265,6 +276,7 @@ export async function adminRoutes(app: FastifyInstance) {
         userRef: z.string().min(1).optional(),
         amount: amountSchema,
         reason: z.string().trim().min(3),
+        adminPassword: z.string().optional(),
       }).superRefine((value, ctx) => {
         if (!value.userId && !value.userEmail && !value.userRef) {
           ctx.addIssue({
@@ -280,6 +292,7 @@ export async function adminRoutes(app: FastifyInstance) {
       const userRef = parsed.userRef?.trim();
 
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await assertAdminPassword(tx, authRequest.user.sub, parsed.adminPassword);
         const treasury = await tx.treasuryAccount.findFirstOrThrow();
         const amount = new Decimal(parsed.amount);
 
@@ -413,6 +426,7 @@ export async function adminRoutes(app: FastifyInstance) {
         adminId: z.string().min(1).optional(),
         amount: amountSchema,
         reason: z.string().trim().min(3),
+        adminPassword: z.string().optional(),
       }).superRefine((value, ctx) => {
         if (!value.adminEmail && !value.adminId && !value.adminRef) {
           ctx.addIssue({
@@ -428,6 +442,7 @@ export async function adminRoutes(app: FastifyInstance) {
       const adminRef = parsed.adminRef?.trim();
 
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await assertAdminPassword(tx, authRequest.user.sub, parsed.adminPassword);
         const amount = new Decimal(parsed.amount);
         const targetAdmin = parsed.adminId
           ? await tx.user.findFirst({ where: { id: parsed.adminId }, include: { roles: { select: { role: { select: { key: true } } } } } })

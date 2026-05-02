@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import bcrypt from 'bcryptjs';
 
 if (process.env.NODE_ENV === 'production') throw new Error('Simulação não pode rodar em produção.');
 if (!process.env.TEST_DATABASE_URL) throw new Error('TEST_DATABASE_URL é obrigatório para simulação.');
@@ -12,6 +13,7 @@ const [{ buildApp }, { prisma }] = await Promise.all([
 ]);
 
 const app = buildApp();
+const ADMIN_PASSWORD = 'Admin@123';
 
 async function resetDb() {
   await prisma.$transaction([
@@ -30,7 +32,7 @@ async function mkRole(key: string) {
   return prisma.role.create({ data: { key, name: key } });
 }
 async function mkUser(email: string, roles: { id: string; key: string }[], balances?: { fiat?: number; rpc?: number }) {
-  const user = await prisma.user.create({ data: { email, name: email.split('@')[0], passwordHash: 'hash', wallet: { create: {} } } });
+  const user = await prisma.user.create({ data: { email, name: email.split('@')[0], passwordHash: await bcrypt.hash(ADMIN_PASSWORD, 10), wallet: { create: {} } } });
   await prisma.userRole.createMany({ data: roles.map((r) => ({ userId: user.id, roleId: r.id })) });
   if (balances?.fiat || balances?.rpc) {
     await prisma.wallet.update({
@@ -180,7 +182,7 @@ test('simulação segura de fluxos críticos RPC/R$', async () => {
   const tradeCountBeforeWithdrawProfit = await prisma.rpcExchangeTrade.count();
   const platformBeforeWithdraw = await prisma.platformAccount.findFirstOrThrow();
 
-  const withdrawProfit = await app.inject({ method: 'POST', url: '/api/admin/platform-account/withdraw-to-admin', headers: { authorization: `Bearer ${superTk}` }, payload: { adminId: adminTarget.id, amount: 2, reason: 'simulação retirada de lucro segura' } });
+  const withdrawProfit = await app.inject({ method: 'POST', url: '/api/admin/platform-account/withdraw-to-admin', headers: { authorization: `Bearer ${superTk}` }, payload: { adminId: adminTarget.id, amount: 2, reason: 'simulação retirada de lucro segura', adminPassword: ADMIN_PASSWORD } });
   assert.equal(withdrawProfit.statusCode, 201, withdrawProfit.body);
 
   const platformAfterWithdraw = await prisma.platformAccount.findFirstOrThrow();

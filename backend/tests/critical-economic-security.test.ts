@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import bcrypt from 'bcryptjs';
 
 if (process.env.NODE_ENV === 'production') throw new Error('Testes não podem rodar em produção.');
 if (!process.env.TEST_DATABASE_URL) throw new Error('TEST_DATABASE_URL é obrigatório para testes de integração.');
@@ -12,6 +13,7 @@ const [{ buildApp }, { prisma }] = await Promise.all([
 ]);
 
 const app = buildApp();
+const ADMIN_PASSWORD = 'Admin@123';
 
 async function resetDb() {
   await prisma.$transaction([
@@ -50,7 +52,7 @@ async function resetDb() {
 }
 
 async function mkUser(email: string, name = 'User') {
-  return prisma.user.create({ data: { email, name, passwordHash: 'hash', wallet: { create: {} } } });
+  return prisma.user.create({ data: { email, name, passwordHash: await bcrypt.hash(ADMIN_PASSWORD, 10), wallet: { create: {} } } });
 }
 
 async function mkRole(key: string) {
@@ -311,7 +313,15 @@ test('admin deposita R$ direto em jogador com débito atômico da tesouraria', a
   const adminToken = await token(admin.id, ['SUPER_ADMIN']);
   const userToken = await token(commonUser.id, ['USER']);
 
-  const ok = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${adminToken}` }, payload: { userId: player.id, amount: 120, reason: 'ajuste adm' } });
+  const missingPassword = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${adminToken}` }, payload: { userId: player.id, amount: 120, reason: 'ajuste adm sem senha' } });
+  assert.equal(missingPassword.statusCode, 400, missingPassword.body);
+  assert.match(missingPassword.body, /confirme sua senha para continuar/i);
+
+  const invalidPassword = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${adminToken}` }, payload: { userId: player.id, amount: 120, reason: 'ajuste adm senha inválida', adminPassword: 'senha-errada' } });
+  assert.equal(invalidPassword.statusCode, 400, invalidPassword.body);
+  assert.match(invalidPassword.body, /senha administrativa inválida/i);
+
+  const ok = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${adminToken}` }, payload: { userId: player.id, amount: 120, reason: 'ajuste adm', adminPassword: ADMIN_PASSWORD } });
   assert.equal(ok.statusCode, 201, ok.body);
 
   const treasury = await prisma.treasuryAccount.findFirstOrThrow();
@@ -328,12 +338,14 @@ test('admin deposita R$ direto em jogador com débito atômico da tesouraria', a
   assert.ok(adjustment);
   assert.ok(adminLog);
 
-  const insufficient = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${adminToken}` }, payload: { userId: player.id, amount: 999999, reason: 'sem saldo' } });
+  const insufficient = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${adminToken}` }, payload: { userId: player.id, amount: 999999, reason: 'sem saldo', adminPassword: ADMIN_PASSWORD } });
   assert.equal(insufficient.statusCode, 400, insufficient.body);
   assert.match(insufficient.body, /saldo.*insuficiente/i);
 
   const forbidden = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${userToken}` }, payload: { userId: player.id, amount: 10, reason: 'forbidden' } });
   assert.equal(forbidden.statusCode, 403, forbidden.body);
+  const walletAfterForbidden = await prisma.wallet.findUniqueOrThrow({ where: { userId: player.id } });
+  assert.equal(Number(walletAfterForbidden.fiatAvailableBalance), 120);
 });
 
 test('operações sensíveis bloqueiam referência ambígua e preservam id/email técnico', async () => {
@@ -380,10 +392,10 @@ test('operações sensíveis bloqueiam referência ambígua e preservam id/email
   const superToken = await token(superAdmin.id, ['SUPER_ADMIN']);
   const brokerToken = await token(brokerSender.id, ['VIRTUAL_BROKER']);
 
-  const uniqueByRef = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${superToken}` }, payload: { userRef: 'RP-UNICO-001', amount: 50, reason: 'depósito por ref única' } });
+  const uniqueByRef = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${superToken}` }, payload: { userRef: 'RP-UNICO-001', amount: 50, reason: 'depósito por ref única', adminPassword: ADMIN_PASSWORD } });
   assert.equal(uniqueByRef.statusCode, 201, uniqueByRef.body);
 
-  const ambiguousUserRef = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${superToken}` }, payload: { userRef: 'Duplicado RP', amount: 10, reason: 'deve bloquear' } });
+  const ambiguousUserRef = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${superToken}` }, payload: { userRef: 'Duplicado RP', amount: 10, reason: 'deve bloquear', adminPassword: ADMIN_PASSWORD } });
   assert.equal(ambiguousUserRef.statusCode, 400, ambiguousUserRef.body);
   assert.match(ambiguousUserRef.body, /referência ambígua/i);
 
@@ -395,10 +407,10 @@ test('operações sensíveis bloqueiam referência ambígua e preservam id/email
   assert.equal(ambiguousBrokerUserRef.statusCode, 400, ambiguousBrokerUserRef.body);
   assert.match(ambiguousBrokerUserRef.body, /referência ambígua/i);
 
-  const emailStillWorks = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${superToken}` }, payload: { userEmail: 'player-unique@test.local', amount: 10, reason: 'email técnico' } });
+  const emailStillWorks = await app.inject({ method: 'POST', url: '/api/admin/treasury/transfer-to-user', headers: { authorization: `Bearer ${superToken}` }, payload: { userEmail: 'player-unique@test.local', amount: 10, reason: 'email técnico', adminPassword: ADMIN_PASSWORD } });
   assert.equal(emailStillWorks.statusCode, 201, emailStillWorks.body);
 
-  const idStillWorks = await app.inject({ method: 'POST', url: '/api/admin/platform-account/withdraw-to-admin', headers: { authorization: `Bearer ${superToken}` }, payload: { adminId: adminA.id, amount: 20, reason: 'saque admin por id' } });
+  const idStillWorks = await app.inject({ method: 'POST', url: '/api/admin/platform-account/withdraw-to-admin', headers: { authorization: `Bearer ${superToken}` }, payload: { adminId: adminA.id, amount: 20, reason: 'saque admin por id', adminPassword: ADMIN_PASSWORD } });
   assert.equal(idStillWorks.statusCode, 201, idStillWorks.body);
 });
 
@@ -428,7 +440,20 @@ test('super admin retira lucro da Exchange para carteira administrativa', async 
   const userToken = await token(commonUser.id, ['USER']);
   const brokerToken = await token(broker.id, ['VIRTUAL_BROKER']);
 
-  const ok = await app.inject({ method: 'POST', url: '/api/admin/platform-account/withdraw-to-admin', headers: { authorization: `Bearer ${superToken}` }, payload: { adminId: adminTarget.id, amount: 300, reason: 'retirada lucro' } });
+  const missingPassword = await app.inject({ method: 'POST', url: '/api/admin/platform-account/withdraw-to-admin', headers: { authorization: `Bearer ${superToken}` }, payload: { adminId: adminTarget.id, amount: 300, reason: 'retirada sem senha' } });
+  assert.equal(missingPassword.statusCode, 400, missingPassword.body);
+  assert.match(missingPassword.body, /confirme sua senha para continuar/i);
+
+  const invalidPassword = await app.inject({ method: 'POST', url: '/api/admin/platform-account/withdraw-to-admin', headers: { authorization: `Bearer ${superToken}` }, payload: { adminId: adminTarget.id, amount: 300, reason: 'retirada senha inválida', adminPassword: 'senha-errada' } });
+  assert.equal(invalidPassword.statusCode, 400, invalidPassword.body);
+  assert.match(invalidPassword.body, /senha administrativa inválida/i);
+
+  const ok = await app.inject({
+    method: 'POST',
+    url: '/api/admin/platform-account/withdraw-to-admin',
+    headers: { authorization: `Bearer ${superToken}`, 'user-agent': 'rpc-exchange-test-agent', 'x-forwarded-for': '198.51.100.25' },
+    payload: { adminId: adminTarget.id, amount: 300, reason: 'retirada lucro', adminPassword: ADMIN_PASSWORD },
+  });
   assert.equal(ok.statusCode, 201, ok.body);
 
   const platform = await prisma.platformAccount.findFirstOrThrow();
@@ -443,8 +468,12 @@ test('super admin retira lucro da Exchange para carteira administrativa', async 
   assert.equal(Number(adminWallet.rpcAvailableBalance), 0);
   assert.ok(tx);
   assert.ok(log);
+  assert.ok(log?.action);
+  assert.ok(log?.entity);
+  assert.match(log?.userAgent ?? '', /rpc-exchange-test-agent/i);
+  assert.notEqual(log?.ip, undefined);
 
-  const tooMuch = await app.inject({ method: 'POST', url: '/api/admin/platform-account/withdraw-to-admin', headers: { authorization: `Bearer ${superToken}` }, payload: { adminId: adminTarget.id, amount: 99999, reason: 'sem saldo' } });
+  const tooMuch = await app.inject({ method: 'POST', url: '/api/admin/platform-account/withdraw-to-admin', headers: { authorization: `Bearer ${superToken}` }, payload: { adminId: adminTarget.id, amount: 99999, reason: 'sem saldo', adminPassword: ADMIN_PASSWORD } });
   assert.equal(tooMuch.statusCode, 400, tooMuch.body);
 
   for (const tk of [adminToken, userToken, brokerToken]) {
