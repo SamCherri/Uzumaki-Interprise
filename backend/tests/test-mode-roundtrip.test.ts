@@ -11,6 +11,7 @@ const [{ buildApp }, { prisma }] = await Promise.all([
   import('../src/lib/prisma.js'),
 ]);
 const app = buildApp();
+const SYSTEM_MODE_ID = 'SYSTEM_MODE_MAIN';
 
 async function resetDb() {
   await prisma.$transaction([
@@ -30,6 +31,13 @@ async function mkUser(email: string) { return prisma.user.create({ data: { email
 async function tk(userId: string, roles: string[]) { return app.jwt.sign({ sub: userId, roles }); }
 
 const dec = (v: unknown) => Number(v);
+async function enableTestMode() {
+  await prisma.systemModeConfig.upsert({
+    where: { id: SYSTEM_MODE_ID },
+    update: { mode: 'TEST' },
+    create: { id: SYSTEM_MODE_ID, mode: 'TEST' },
+  });
+}
 
 async function estimatedTestPatrimony(userId: string) {
   const [wallet, market] = await Promise.all([
@@ -47,7 +55,7 @@ test('modo teste: round-trip imediato não gera lucro + quote compatível + lead
   const role = await mkRole('USER');
   const user = await mkUser('testmode@test.local');
   await prisma.userRole.create({ data: { userId: user.id, roleId: role.id } });
-  await prisma.systemModeConfig.create({ data: { mode: 'TEST' } });
+  await enableTestMode();
   await prisma.testModeWallet.create({ data: { userId: user.id, fiatBalance: 10000, rpcBalance: 0 } });
   await prisma.testModeMarketState.create({ data: { id: 'TEST_MODE_MARKET_MAIN' } });
 
@@ -84,7 +92,7 @@ test('modo teste: 10 ciclos buy/sell não geram lucro', async () => {
   const role = await mkRole('USER');
   const user = await mkUser('cycles@test.local');
   await prisma.userRole.create({ data: { userId: user.id, roleId: role.id } });
-  await prisma.systemModeConfig.create({ data: { mode: 'TEST' } });
+  await enableTestMode();
   await prisma.testModeWallet.create({ data: { userId: user.id, fiatBalance: 10000, rpcBalance: 0 } });
   await prisma.testModeMarketState.create({ data: { id: 'TEST_MODE_MARKET_MAIN' } });
   const token = await tk(user.id, ['USER']);
