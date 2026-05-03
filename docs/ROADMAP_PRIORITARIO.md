@@ -6,13 +6,16 @@ A prioridade atual do projeto é fechar o ciclo econômico real da RPC Exchange 
 
 O objetivo é transformar o MVP em um Beta fechado com economia RP completa, segura, auditável e sustentável.
 
-Regra central:
+## Regra central refinada
 
-Empresa gera lucro no RP
-→ lucro entra no caixa institucional do projeto
-→ projeto usa esse saldo para recompra, distribuição, reserva ou expansão
-→ holders ganham por valorização real ou distribuição
+Empresa gera lucro dentro do RP
+→ o dono usa esse lucro para comprar/receber R$ fictício no site pelo fluxo normal da economia
+→ com R$ fictício, compra RPC no mercado RPC/R$
+→ com RPC real já existente na carteira, injeta no projeto ou compra/recompra o token do projeto
+→ o preço muda apenas por compra executada na oferta inicial ou por trade real no mercado secundário
 → tudo fica registrado, auditável e separado da carteira pessoal do dono.
+
+Esta regra substitui qualquer interpretação anterior de que o lucro RP vira RPC automaticamente no caixa do projeto.
 
 ## Regras econômicas permanentes
 
@@ -30,29 +33,33 @@ Empresa gera lucro no RP
 12. Injeção de RPC não deve subir gráfico automaticamente.
 13. Recompra deve executar contra ordens reais do livro.
 14. Moedas recompradas devem ir para reserva institucional do projeto, não para carteira pessoal do dono.
-15. Lucro da empresa deve entrar primeiro no caixa institucional do projeto.
-16. Saldo institucional do projeto deve ficar separado do saldo pessoal do fundador.
-17. Test Mode é laboratório isolado e não pode afetar saldo real, RPC real, mercado real ou tokens reais.
+15. Lucro da empresa dentro do RP não vira RPC automática e não cria crédito institucional livre.
+16. Se o dono quiser injetar no projeto, ele precisa usar RPC já existente na própria carteira, obtida pelo fluxo R$ → RPC.
+17. O caixa institucional do projeto só deve receber saldo rastreável: taxas já implementadas, transferência real de RPC, recompra/reserva futura ou ajuste administrativo excepcional auditado.
+18. Nenhum usuário comum ou dono de projeto pode criar crédito institucional confirmado do nada.
+19. Saldo institucional do projeto deve ficar separado do saldo pessoal do fundador.
+20. Test Mode é laboratório isolado e não pode afetar saldo real, RPC real, mercado real ou tokens reais.
 
 ## Prioridade 1 — Fechar ciclo econômico real da Exchange
 
-### PR 1 — Caixa econômico do projeto
+### PR 1 — Fluxo de capital R$ → RPC → token/projeto
 
 Objetivo:
-Criar a base contábil institucional dos projetos.
+Garantir que a entrada de capital para projetos passe pelo fluxo econômico normal, sem criar crédito institucional livre.
 
 Implementar futuramente:
-- caixa/receita institucional do projeto;
-- registro de lucro da empresa dentro do RP;
-- histórico de entradas e saídas;
-- motivo obrigatório;
-- autor;
-- IP e user-agent quando disponível;
+- documentação e UX clara do fluxo R$ fictício → RPC → compra de token;
+- confirmação de que RPC usada para injetar no projeto precisa existir na carteira do usuário/dono;
+- transferência rastreável de RPC da carteira pessoal para o caixa institucional do projeto, se o produto decidir permitir aporte institucional;
+- histórico de aportes com motivo obrigatório;
+- autor, IP e user-agent quando disponível;
 - separação entre saldo pessoal do dono e saldo institucional do projeto;
-- logs administrativos;
+- logs administrativos/econômicos;
 - auditoria básica.
 
 Não deve:
+- criar RPC automática a partir de lucro RP;
+- permitir crédito institucional livre por dono/fundador;
 - alterar preço da moeda;
 - criar trade;
 - criar recompra;
@@ -61,7 +68,7 @@ Não deve:
 - mexer no simulador.
 
 Critério de aceite:
-A empresa/projeto consegue registrar lucro RP convertido em RPC no caixa institucional sem creditar a carteira pessoal do dono.
+O sistema deixa claro e auditável que capital do projeto entra por saldo existente: R$ fictício → RPC → compra/injeção, sem creditar a carteira pessoal do dono e sem criar preço falso.
 
 ### PR 2 — Mercado primário correto
 
@@ -81,10 +88,56 @@ Compra da oferta inicial pode mover preço.
 Oferta inicial parada não move preço.
 Depois da oferta inicial, preço só muda por trade real no mercado secundário.
 
-### PR 3 — Programa oficial de recompra
+### PR 3 — Mercado secundário seguro
 
 Objetivo:
-Permitir que projetos usem lucro institucional para recomprar o próprio token.
+Garantir que o preço de mercado secundário seja formado apenas por negociação real entre participantes.
+
+Implementar futuramente:
+- revisar criação, cancelamento e execução de ordens;
+- reforçar que ordem criada não move preço;
+- reforçar que ordem executada move preço;
+- bloquear self-trade;
+- auditar preço alterado sem trade;
+- manter proteção contra saldo/token negativo.
+
+Regra:
+Oferta criada = não altera preço.
+Oferta executada = altera preço.
+
+### PR 4 — Caixa institucional rastreável do projeto
+
+Objetivo:
+Criar ou consolidar a base contábil institucional dos projetos sem virar mecanismo de criação livre de saldo.
+
+Implementar futuramente:
+- caixa/receita institucional do projeto;
+- histórico de entradas e saídas;
+- origem rastreável do saldo;
+- motivo obrigatório;
+- autor;
+- IP e user-agent quando disponível;
+- logs administrativos;
+- auditoria básica.
+
+Entradas permitidas:
+- taxas do projeto já distribuídas pelo sistema;
+- transferência real de RPC da carteira do dono/usuário para o projeto;
+- ajuste administrativo excepcional com motivo forte e auditoria;
+- futuramente, saldos vindos de recompra, reserva ou distribuição conforme regras próprias.
+
+Não deve:
+- transformar lucro RP externo em RPC automática;
+- permitir que fundador crie crédito institucional confirmado do nada;
+- alterar preço;
+- criar trade;
+- criar ordem;
+- alterar supply.
+
+### PR 5 — Programa oficial de recompra com RPC existente
+
+Objetivo:
+Permitir que projetos usem RPC real já existente para recomprar o próprio token.
 
 Implementar futuramente:
 - programa de recompra com valor em RPC;
@@ -101,7 +154,7 @@ Regra:
 Recompra não aumenta preço diretamente.
 Preço só sobe se houver trade real executado.
 
-### PR 4 — Reserva de tokens recomprados
+### PR 6 — Reserva de tokens recomprados
 
 Objetivo:
 Criar reserva institucional para tokens recomprados.
@@ -115,10 +168,10 @@ Implementar futuramente:
 Regra inicial:
 Tokens recomprados ficam bloqueados na reserva do projeto.
 
-### PR 5 — Distribuição de lucro para holders
+### PR 7 — Distribuição para holders, se mantida
 
 Objetivo:
-Permitir que holders ganhem RPC sem precisar vender tokens.
+Permitir que holders ganhem RPC sem precisar vender tokens, mas somente usando RPC rastreável e já existente.
 
 Implementar futuramente:
 - snapshot de holders;
@@ -128,13 +181,10 @@ Implementar futuramente:
 - logs;
 - proteção contra manipulação.
 
-Exemplo:
-Empresa lucrou 100.000 RPC:
-- 50% recompra;
-- 30% distribuição para holders;
-- 20% reserva.
+Regra:
+Distribuição não cria RPC nova. Ela usa saldo já existente no caixa institucional do projeto.
 
-### PR 6 — Política da RPC
+### PR 8 — Política da RPC
 
 Objetivo:
 Consolidar RPC como moeda base controlada.
@@ -152,7 +202,7 @@ Diretriz:
 RPC não é infinita.
 RPC deve ser emitida/liberada com controle, motivo e auditoria.
 
-### PR 7 — Painel de auditoria econômica
+### PR 9 — Painel de auditoria econômica
 
 Objetivo:
 Detectar inconsistências econômicas.
@@ -167,20 +217,21 @@ Alertas futuros:
 - distribuição inconsistente;
 - reserva negativa;
 - emissão sem log;
-- admin mexendo em saldo sem motivo.
+- admin mexendo em saldo sem motivo;
+- crédito institucional sem origem rastreável.
 
-### PR 8 — Simulador do ciclo completo
+### PR 10 — Simulador do ciclo completo
 
 Objetivo:
 Depois de fechar a economia real, evoluir o Test Mode para simular o ciclo completo.
 
 Simular:
+- fluxo R$ → RPC → token;
 - oferta inicial;
-- compra de RPC;
 - compra de token;
 - mercado secundário;
 - recompra;
-- distribuição de lucro;
+- distribuição de lucro, se mantida;
 - reserva;
 - queima;
 - venda em massa;
@@ -188,7 +239,7 @@ Simular:
 - entrada de baleia;
 - saída de baleia.
 
-### PR 9 — UX funcional
+### PR 11 — UX funcional
 
 Objetivo:
 Melhorar clareza e segurança de uso antes do visual premium.
@@ -200,9 +251,10 @@ Implementar futuramente:
 - aviso de risco;
 - estado vazio correto;
 - explicação de mercado primário/secundário;
+- explicação de fluxo R$ → RPC → token;
 - explicação de recompra/distribuição/reserva.
 
-### PR 10 — Visual premium
+### PR 12 — Visual premium
 
 Objetivo:
 Somente depois da economia estar fechada.
@@ -217,16 +269,18 @@ Implementar futuramente:
 
 ## Ordem oficial atual
 
-1. Caixa econômico do projeto.
+1. Fluxo de capital R$ → RPC → token/projeto.
 2. Mercado primário correto.
-3. Programa de recompra.
-4. Reserva de tokens recomprados.
-5. Distribuição para holders.
-6. Política da RPC.
-7. Auditoria econômica.
-8. Simulador do ciclo completo.
-9. UX funcional.
-10. Visual premium.
+3. Mercado secundário seguro.
+4. Caixa institucional rastreável do projeto.
+5. Programa de recompra com RPC existente.
+6. Reserva de tokens recomprados.
+7. Distribuição para holders, se mantida.
+8. Política da RPC.
+9. Auditoria econômica.
+10. Simulador do ciclo completo.
+11. UX funcional.
+12. Visual premium.
 
 ## Regra para Codex e agentes
 
@@ -244,4 +298,5 @@ Em caso de conflito:
 - regra de segurança econômica vence visual;
 - não criar preço falso;
 - não criar volume falso;
-- não criar liquidez falsa.
+- não criar liquidez falsa;
+- não criar crédito institucional livre sem origem rastreável.
