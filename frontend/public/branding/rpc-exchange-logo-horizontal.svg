@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" role="img" aria-labelledby="title desc">
+  <title id="title">RPC Exchange - Logo Horizontal</title>
+  <desc id="desc">Moeda dourada com setas circulares azul e dourada e texto RPC Exchange.</desc>
+  <defs>
+    <linearGradient id="bgBlue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00D4FF"/>
+      <stop offset="100%" stop-color="#0077FF"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFF3B0"/>
+      <stop offset="45%" stop-color="#FFD54D"/>
+      <stop offset="100%" stop-color="#E6A700"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(20,10)">
+    <circle cx="150" cy="150" r="82" fill="url(#gold)" stroke="#B87900" stroke-width="8"/>
+    <circle cx="150" cy="150" r="63" fill="#F5B400" opacity="0.42"/>
+    <text x="150" y="168" text-anchor="middle" font-size="62" font-family="Inter, Arial, sans-serif" font-weight="800" fill="#8A5A00">RPC</text>
+
+    <path d="M63 67c22-22 53-37 88-37h58l-22 26h-37c-29 0-55 11-74 29l-17 16-21-21 25-13z" fill="url(#bgBlue)"/>
+    <polygon points="210,31 243,43 220,67" fill="url(#bgBlue)"/>
+
+    <path d="M237 239c-22 22-53 37-88 37H91l22-26h37c29 0 55-11 74-29l17-16 21 21-25 13z" fill="url(#gold)"/>
+    <polygon points="90,289 57,277 80,253" fill="url(#gold)"/>
+  </g>
+
+  <g transform="translate(360,66)">
+    <text x="0" y="110" font-size="112" font-family="Inter, Arial, sans-serif" font-weight="800" letter-spacing="0.5" fill="url(#bgBlue)">RPC</text>
+    <text x="280" y="110" font-size="112" font-family="Inter, Arial, sans-serif" font-weight="700" letter-spacing="0.2" fill="#E8EEF8">Exchange</text>
+    <text x="2" y="176" font-size="54" font-family="Inter, Arial, sans-serif" font-weight="500" fill="#9AA7BC">Simulação econômica RP</text>
+  </g>
+</svg>

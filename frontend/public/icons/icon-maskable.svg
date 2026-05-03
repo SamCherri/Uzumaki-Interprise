@@ -1,5 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#0f172a"/>
-  <circle cx="256" cy="256" r="170" fill="#1d4ed8"/>
-  <text x="256" y="300" text-anchor="middle" font-size="140" font-family="Arial, sans-serif" font-weight="700" fill="#f8fafc">BRP</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="RPC Exchange Symbol">
+  <defs>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00D4FF"/>
+      <stop offset="100%" stop-color="#0077FF"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFF3B0"/>
+      <stop offset="45%" stop-color="#FFD54D"/>
+      <stop offset="100%" stop-color="#E6A700"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="110" fill="#0B1220"/>
+  <circle cx="256" cy="256" r="136" fill="url(#gold)" stroke="#B87900" stroke-width="16"/>
+  <circle cx="256" cy="256" r="108" fill="#F5B400" opacity="0.42"/>
+  <text x="256" y="282" text-anchor="middle" font-size="102" font-family="Inter, Arial, sans-serif" font-weight="800" fill="#8A5A00">RPC</text>
+  <path d="M108 149c36-39 85-61 141-61h96l-33 38h-63c-43 0-81 15-110 43l-27 25-31-31 27-14z" fill="url(#blue)"/>
+  <polygon points="343,88 395,106 360,145" fill="url(#blue)"/>
+  <path d="M404 362c-36 39-85 61-141 61h-96l33-38h63c43 0 81-15 110-43l27-25 31 31-27 14z" fill="url(#gold)"/>
+  <polygon points="169,424 117,406 152,367" fill="url(#gold)"/>
 </svg>
