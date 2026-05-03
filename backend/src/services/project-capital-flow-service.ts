@@ -18,6 +18,7 @@ export async function contributeRpcToProject(input: { companyId: string; actorUs
     if (company.founderUserId !== input.actorUserId) throw new HttpError(403, 'Sem permissão para aportar neste projeto.');
     if (company.status !== 'ACTIVE') throw new HttpError(400, 'Projeto precisa estar ACTIVE para receber aporte.');
 
+    await tx.$queryRaw`SELECT id FROM "Wallet" WHERE "userId" = ${input.actorUserId} FOR UPDATE`
     const walletBefore = await tx.wallet.findUnique({ where: { userId: input.actorUserId } });
     if (!walletBefore) throw new HttpError(404, 'Carteira não encontrada.');
     const previousWalletRpcBalance = walletBefore.rpcAvailableBalance;

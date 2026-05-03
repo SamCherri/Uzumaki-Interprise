@@ -11,7 +11,7 @@ export async function projectCapitalFlowRoutes(app: FastifyInstance) {
   app.get('/project-capital-flow/my-projects', { preHandler: [app.authenticate] }, async (request) => {
     const auth = request as AuthRequest;
     const wallet = await prisma.wallet.findUnique({ where: { userId: auth.user.sub } });
-    const companies = await prisma.company.findMany({ where: { founderUserId: auth.user.sub }, include: { revenueAccount: true, capitalFlowEntries: { orderBy: { createdAt: 'desc' }, take: 10 } } });
+    const companies = await prisma.company.findMany({ where: { founderUserId: auth.user.sub, status: 'ACTIVE' }, include: { revenueAccount: true, boostAccount: true, capitalFlowEntries: { orderBy: { createdAt: 'desc' }, take: 10 } } });
     return { walletRpcAvailableBalance: wallet?.rpcAvailableBalance ?? 0, companies };
   });
 
