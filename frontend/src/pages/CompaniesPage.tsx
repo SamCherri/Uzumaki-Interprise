@@ -132,6 +132,7 @@ function normalizeChartData(trades: Trade[], initialPrice: number, currentPrice:
 
 
 const FAVORITES_STORAGE_KEY = 'rpc-exchange-market-favorites';
+const PENDING_COMPANY_MARKET_KEY = 'rpc-exchange-open-company-market-id';
 
 function readFavoriteMarketIds() {
   if (typeof window === 'undefined') return [];
@@ -245,6 +246,18 @@ export function CompaniesPage() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    const pendingCompanyId = localStorage.getItem(PENDING_COMPANY_MARKET_KEY);
+    if (!pendingCompanyId || companies.length === 0) return;
+    localStorage.removeItem(PENDING_COMPANY_MARKET_KEY);
+    const companyExists = companies.some((company) => company.id === pendingCompanyId);
+    if (!companyExists) {
+      setError('Este ativo não possui mercado disponível no momento.');
+      return;
+    }
+    void selectCompany(pendingCompanyId);
+  }, [companies]);
 
 
   useEffect(() => {

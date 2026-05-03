@@ -32,6 +32,8 @@ export function WithdrawalsPage() {
   const [userNote, setUserNote] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
 
   async function load() {
     try {
@@ -54,6 +56,8 @@ export function WithdrawalsPage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       const created = await api<Withdrawal>('/withdrawals', {
         method: 'POST',
@@ -65,16 +69,22 @@ export function WithdrawalsPage() {
       await load();
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
   async function cancel(id: string) {
+    if (cancelingId) return;
+    setCancelingId(id);
     try {
       await api(`/withdrawals/${id}/cancel`, { method: 'POST' });
       setMessage('Saque cancelado e valor devolvido ao saldo disponível.');
       await load();
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setCancelingId(null);
     }
   }
 
@@ -97,7 +107,7 @@ export function WithdrawalsPage() {
         <input value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Valor em R$" required />
         <input value={userNote} onChange={(event) => setUserNote(event.target.value)} placeholder="Observação" />
         <p className="info-text">O valor solicitado ficará pendente até o ADM concluir a entrega dentro do RP.</p>
-        <button className="button-primary" type="submit">Solicitar saque</button>
+        <button className="button-primary" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Processando...' : 'Solicitar saque'}</button>
       </form>
 
       <h3 className="nested-card">Meus saques</h3>
@@ -111,8 +121,8 @@ export function WithdrawalsPage() {
             <p><strong>Data:</strong> {new Date(item.createdAt).toLocaleString('pt-BR')}</p>
             <p><strong>Observação:</strong> {item.userNote || 'Sem observação'}</p>
             {item.status === 'PENDING' && (
-              <button className="button-danger" type="button" onClick={() => cancel(item.id)}>
-                Cancelar
+              <button className="button-danger" type="button" onClick={() => cancel(item.id)} disabled={cancelingId !== null}>
+                {cancelingId === item.id ? 'Cancelando...' : 'Cancelar'}
               </button>
             )}
           </article>

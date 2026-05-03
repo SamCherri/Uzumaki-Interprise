@@ -13,6 +13,7 @@ export function ProjectOwnerPanel() {
   const [reason, setReason] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const load = async () => {
     const response = await api<{ companies: Company[] }>('/project-boosts/my-projects');
@@ -29,6 +30,8 @@ export function ProjectOwnerPanel() {
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!selectedId) return;
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
     try {
       const response = await api<{ message: string; priceBefore: string; priceAfter: string }>(`/project-boosts/companies/${selectedId}/boost`, { method: 'POST', body: JSON.stringify({ amountRpc, source, reason }) });
@@ -39,8 +42,10 @@ export function ProjectOwnerPanel() {
       await load();
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
-  return <section className="card"><h2>Meus Projetos</h2>{error && <p className="status-message error">{error}</p>}{message && <p className="status-message success">{message}</p>}{companies.length === 0 && <p className="info-text">Você ainda não possui projetos ativos.</p>}<div className="mobile-card-list">{companies.map((c) => <article key={c.id} className="summary-item compact-card"><strong>{c.ticker} - {c.name}</strong><p>Status: {translateCompanyStatus(c.status)}</p><p>Preço: {formatPrice(Number(c.currentPrice))} RPC</p><p>Market cap: {formatCurrency(Number(c.fictitiousMarketCap))}</p><p>Receita projeto: {formatCurrency(Number(c.revenueAccount?.balance ?? 0))}</p><p>Reserva boost: {formatCurrency(Number(c.boostAccount?.rpcBalance ?? 0))}</p><p>Total impulsionado: {formatCurrency(Number(c.boostAccount?.totalInjectedRpc ?? 0))}</p></article>)}</div>{selectedId && <form onSubmit={submit} className="form-grid"><select value={selectedId} onChange={(e) => setSelectedId(e.target.value)} required>{companies.map((c) => <option key={c.id} value={c.id}>{c.ticker} - {c.name}</option>)}</select><input value={amountRpc} onChange={(e) => setAmountRpc(e.target.value)} placeholder="Valor RPC" required /><select value={source} onChange={(e) => setSource(e.target.value as 'PERSONAL_WALLET' | 'PROJECT_REVENUE')}><option value="PERSONAL_WALLET">{translateBoostSource('PERSONAL_WALLET')}</option><option value="PROJECT_REVENUE">{translateBoostSource('PROJECT_REVENUE')}</option></select><input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo" required /><p className="info-text">Esta ação é definitiva. Você não receberá tokens e não poderá vender essa injeção.</p><button className="button-primary" type="submit">Confirmar impulsão</button></form>}</section>;
+  return <section className="card"><h2>Meus Projetos</h2>{error && <p className="status-message error">{error}</p>}{message && <p className="status-message success">{message}</p>}{companies.length === 0 && <p className="info-text">Você ainda não possui projetos ativos.</p>}<div className="mobile-card-list">{companies.map((c) => <article key={c.id} className="summary-item compact-card"><strong>{c.ticker} - {c.name}</strong><p>Status: {translateCompanyStatus(c.status)}</p><p>Preço: {formatPrice(Number(c.currentPrice))} RPC</p><p>Market cap: {formatCurrency(Number(c.fictitiousMarketCap))}</p><p>Receita projeto: {formatCurrency(Number(c.revenueAccount?.balance ?? 0))}</p><p>Reserva boost: {formatCurrency(Number(c.boostAccount?.rpcBalance ?? 0))}</p><p>Total impulsionado: {formatCurrency(Number(c.boostAccount?.totalInjectedRpc ?? 0))}</p></article>)}</div>{selectedId && <form onSubmit={submit} className="form-grid"><select value={selectedId} onChange={(e) => setSelectedId(e.target.value)} required>{companies.map((c) => <option key={c.id} value={c.id}>{c.ticker} - {c.name}</option>)}</select><input value={amountRpc} onChange={(e) => setAmountRpc(e.target.value)} placeholder="Valor RPC" required /><select value={source} onChange={(e) => setSource(e.target.value as 'PERSONAL_WALLET' | 'PROJECT_REVENUE')}><option value="PERSONAL_WALLET">{translateBoostSource('PERSONAL_WALLET')}</option><option value="PROJECT_REVENUE">{translateBoostSource('PROJECT_REVENUE')}</option></select><input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo" required /><p className="info-text">Esta ação é definitiva. Você não receberá tokens e não poderá vender essa injeção.</p><button className="button-primary" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Processando...' : 'Confirmar impulsão'}</button></form>}</section>;
 }
