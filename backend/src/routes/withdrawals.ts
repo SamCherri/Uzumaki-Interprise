@@ -3,6 +3,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { MAX_PENDING_WITHDRAWALS_PER_USER } from '../config/anti-abuse-limits.js';
 
 type AuthRequest = FastifyRequest & { user: { sub: string; roles?: string[] } };
 
@@ -72,6 +73,11 @@ export async function withdrawalsRoutes(app: FastifyInstance) {
         const wallet = await tx.wallet.findUnique({ where: { userId: authRequest.user.sub } });
         if (!wallet) {
           throw new Error('Carteira não encontrada.');
+        }
+
+        const pendingCount = await tx.withdrawalRequest.count({ where: { userId: authRequest.user.sub, status: { in: ['PENDING', 'PROCESSING'] } } });
+        if (pendingCount >= MAX_PENDING_WITHDRAWALS_PER_USER) {
+          throw new Error('Você já possui saques pendentes. Aguarde a conclusão antes de solicitar outro.');
         }
 
         const amount = new Decimal(body.amount);

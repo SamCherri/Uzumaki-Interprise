@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { RPC_MARKET_BUY_FEE_PERCENT, RPC_MARKET_SELL_FEE_PERCENT } from '../constants/fee-rules.js';
 import { ensurePlatformAccount } from '../services/fee-distribution-service.js';
+import { MAX_ORDER_CANCELS_PER_MINUTE, MAX_RPC_TRADES_PER_MINUTE, RPC_MARKET_MAX_OPEN_ORDERS_PER_USER } from '../config/anti-abuse-limits.js';
 
 const MIN_AMOUNT = new Decimal('0.01');
 const PRICE_SCALE = 8;
@@ -229,7 +230,7 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
     return { trades };
   });
 
-  app.post('/rpc-market/buy', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 40, timeWindow: '1 minute' } } }, async (request, reply) => {
+  app.post('/rpc-market/buy', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: MAX_RPC_TRADES_PER_MINUTE, timeWindow: '1 minute', errorResponseBuilder: () => ({ message: 'Muitas negociações em sequência. Aguarde um minuto e tente novamente.' }) } } }, async (request, reply) => {
     try {
       const body = amountSchema.parse(request.body ?? {});
       if (body.fiatAmount == null) return reply.status(400).send({ message: 'fiatAmount é obrigatório.' });
@@ -284,6 +285,10 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
     try {
       const body = limitOrderCreateSchema.parse(request.body ?? {});
       const userId = (request.user as { sub: string }).sub;
+      const openOrdersCount = await prisma.rpcLimitOrder.count({ where: { userId, status: 'OPEN' } });
+      if (openOrdersCount >= RPC_MARKET_MAX_OPEN_ORDERS_PER_USER) {
+        return reply.status(429).send({ message: 'Limite de ordens abertas atingido. Cancele ordens antigas antes de criar novas.' });
+      }
       const limitPrice = toDecimal(body.limitPrice).toDecimalPlaces(8);
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const wallet = await tx.wallet.findUnique({ where: { userId } });
@@ -309,10 +314,14 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/rpc-market/orders/:id/cancel', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
+  app.post('/rpc-market/orders/:id/cancel', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: MAX_ORDER_CANCELS_PER_MINUTE, timeWindow: '1 minute', errorResponseBuilder: () => ({ message: 'Muitas tentativas de cancelamento. Aguarde um minuto e tente novamente.' }) } } }, async (request, reply) => {
     try {
       const { id } = z.object({ id: z.string().min(1) }).parse(request.params ?? {});
       const userId = (request.user as { sub: string }).sub;
+      const openOrdersCount = await prisma.rpcLimitOrder.count({ where: { userId, status: 'OPEN' } });
+      if (openOrdersCount >= RPC_MARKET_MAX_OPEN_ORDERS_PER_USER) {
+        return reply.status(429).send({ message: 'Limite de ordens abertas atingido. Cancele ordens antigas antes de criar novas.' });
+      }
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const order = await tx.rpcLimitOrder.findUnique({ where: { id } });
         if (!order || order.userId !== userId) throw new Error('Ordem não encontrada.');
@@ -423,7 +432,7 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/rpc-market/sell', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 40, timeWindow: '1 minute' } } }, async (request, reply) => {
+  app.post('/rpc-market/sell', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: MAX_RPC_TRADES_PER_MINUTE, timeWindow: '1 minute', errorResponseBuilder: () => ({ message: 'Muitas negociações em sequência. Aguarde um minuto e tente novamente.' }) } } }, async (request, reply) => {
     try {
       const body = amountSchema.parse(request.body ?? {});
       if (body.rpcAmount == null) return reply.status(400).send({ message: 'rpcAmount é obrigatório.' });

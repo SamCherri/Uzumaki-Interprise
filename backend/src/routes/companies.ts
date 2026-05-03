@@ -3,6 +3,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { MAX_COMPANY_TRADES_PER_MINUTE, MAX_PROJECT_CREATIONS_PER_DAY } from '../config/anti-abuse-limits.js';
 import { COMPANY_RULES } from '../constants/company-rules.js';
 import { distributeFee, ensureCompanyRevenueAccount } from '../services/fee-distribution-service.js';
 
@@ -349,7 +350,7 @@ export async function companyRoutes(app: FastifyInstance) {
     return { company: updated };
   });
 
-  app.post('/companies/:id/buy-initial-offer', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/companies/:id/buy-initial-offer', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: MAX_COMPANY_TRADES_PER_MINUTE, timeWindow: '1 minute', errorResponseBuilder: () => ({ message: 'Muitas negociações em sequência. Aguarde um minuto e tente novamente.' }) } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const params = z.object({ id: z.string().min(1) }).parse(request.params);
 

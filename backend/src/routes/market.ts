@@ -4,6 +4,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { distributeFee } from '../services/fee-distribution-service.js';
+import { COMPANY_MARKET_MAX_OPEN_ORDERS_PER_USER, MAX_COMPANY_TRADES_PER_MINUTE, MAX_ORDER_CANCELS_PER_MINUTE } from '../config/anti-abuse-limits.js';
 
 type AuthRequest = FastifyRequest & { user: { sub: string; roles?: string[] } };
 
@@ -612,7 +613,7 @@ export async function marketRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/market/orders/:id/cancel', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
+  app.post('/market/orders/:id/cancel', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: MAX_ORDER_CANCELS_PER_MINUTE, timeWindow: '1 minute', errorResponseBuilder: () => ({ message: 'Muitas tentativas de cancelamento. Aguarde um minuto e tente novamente.' }) } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
 
     try {
@@ -637,7 +638,7 @@ export async function marketRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/market/companies/:companyId/buy-market', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/market/companies/:companyId/buy-market', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: MAX_COMPANY_TRADES_PER_MINUTE, timeWindow: '1 minute', errorResponseBuilder: () => ({ message: 'Muitas negociações em sequência. Aguarde um minuto e tente novamente.' }) } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
 
     try {
@@ -670,7 +671,7 @@ export async function marketRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post('/market/companies/:companyId/sell-market', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.post('/market/companies/:companyId/sell-market', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: MAX_COMPANY_TRADES_PER_MINUTE, timeWindow: '1 minute', errorResponseBuilder: () => ({ message: 'Muitas negociações em sequência. Aguarde um minuto e tente novamente.' }) } } }, async (request, reply) => {
     const authRequest = request as AuthRequest;
 
     try {
