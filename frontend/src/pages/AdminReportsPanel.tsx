@@ -1,236 +1,59 @@
-import { FormEvent, useEffect, useState } from 'react';
-
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3333';
+import { useState } from 'react';
 import { api } from '../services/api';
-import {
-  translateCompanyStatus,
-  translateOrderMode,
-  translateOrderStatus,
-  translateOrderType,
-  translateRole,
-  translateTransferType,
-  translateWithdrawalStatus,
-} from '../utils/labels';
 
-type ReportDateFilter = { from: string; to: string };
+type UserReport = { user: { id: string; email: string }; wallet: Record<string, unknown>; activity: Record<string, unknown> };
+type BrokerReport = { broker: { id: string; email: string } };
 
 export function AdminReportsPanel() {
-  const [overview, setOverview] = useState<any>(null);
-  const [revenues, setRevenues] = useState<any[]>([]);
+  const [userId, setUserId] = useState('');
+  const [brokerId, setBrokerId] = useState('');
+  const [data, setData] = useState<UserReport | BrokerReport | null>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const [userFilters, setUserFilters] = useState({ userId: '', from: '', to: '' });
-  const [brokerFilters, setBrokerFilters] = useState({ userId: '', from: '', to: '' });
-
-  const [userReport, setUserReport] = useState<any>(null);
-  const [brokerReport, setBrokerReport] = useState<any>(null);
-
-  const [userLoading, setUserLoading] = useState(false);
-  const [brokerLoading, setBrokerLoading] = useState(false);
-  const [userError, setUserError] = useState('');
-  const [brokerError, setBrokerError] = useState('');
-  const [exportLoading, setExportLoading] = useState<string | null>(null);
-
-  useEffect(() => { void load(); }, []);
-
-  async function load() {
-    const [ov, rev] = await Promise.all([
-      api('/admin/reports/overview'),
-      api<{ items: any[] }>('/admin/reports/company-revenues'),
-    ]);
-    setOverview(ov);
-    setRevenues(rev.items ?? []);
+  async function loadUser() {
+    if (!userId.trim()) return setError('Informe o ID do usuário.');
+    try { setLoading(true); setData(await api<UserReport>(`/admin/reports/users/${userId.trim()}`)); setError(''); }
+    catch (e) { setError((e as Error).message); }
+    finally { setLoading(false); }
   }
 
-  function buildQuery({ from, to }: ReportDateFilter) {
-    const query = new URLSearchParams();
-    if (from) query.set('from', from);
-    if (to) query.set('to', to);
-    const queryString = query.toString();
-    return queryString ? `?${queryString}` : '';
+  async function loadBroker() {
+    if (!brokerId.trim()) return setError('Informe o ID do corretor.');
+    try { setLoading(true); setData(await api<BrokerReport>(`/admin/reports/brokers/${brokerId.trim()}`)); setError(''); }
+    catch (e) { setError((e as Error).message); }
+    finally { setLoading(false); }
   }
 
-
-
-  async function downloadCsv(path: string, filename?: string) {
-    const token = localStorage.getItem('token');
-    if (!token) throw new Error('Sessão expirada. Faça login novamente.');
-
-    const response = await fetch(`${API_URL}/api${path}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (!response.ok) {
-      let message = 'Falha ao exportar CSV.';
-      try {
-        const body = await response.json();
-        if (body?.message) message = body.message;
-      } catch {}
-      throw new Error(message);
-    }
-
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = filename ?? `export-${Date.now()}.csv`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  async function handleExport(type: string, filters: Record<string, string> = {}, requiredUserId = false) {
-    const userId = (filters.userId ?? '').trim();
-    if (requiredUserId && !userId) {
-      const message = type === 'broker-report' ? 'Informe o ID do corretor para exportar CSV.' : 'Informe o ID do usuário para exportar CSV.';
-      if (type === 'broker-report') setBrokerError(message); else setUserError(message);
-      return;
-    }
-
-    const query = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value?.trim()) query.set(key, value.trim());
-    });
-
-    const path = `/admin/reports/export/${type}${query.toString() ? `?${query.toString()}` : ''}`;
-    setExportLoading(type);
+  async function download(path: string, filename: string) {
     try {
-      await downloadCsv(path, `rpc-exchange-${type}.csv`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao exportar CSV.';
-      if (type === 'broker-report') setBrokerError(message);
-      else if (type === 'user-report') setUserError(message);
-      else alert(message);
+      setLoading(true);
+      const base = import.meta.env.VITE_API_URL ?? 'http://localhost:3333/api';
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${base}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!res.ok) throw new Error('Falha ao baixar arquivo.');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      setError('');
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
-      setExportLoading(null);
+      setLoading(false);
     }
   }
 
-  async function handleUserReportSubmit(event: FormEvent) {
-    event.preventDefault();
-    if (!userFilters.userId.trim()) {
-      setUserError('Informe o ID do usuário.');
-      return;
-    }
-
-    setUserError('');
-    setUserLoading(true);
-    try {
-      const query = buildQuery({ from: userFilters.from, to: userFilters.to });
-      const response = await api(`/admin/reports/users/${encodeURIComponent(userFilters.userId.trim())}${query}`);
-      setUserReport(response);
-    } catch (error) {
-      setUserError(error instanceof Error ? error.message : 'Erro ao carregar relatório do usuário.');
-    } finally {
-      setUserLoading(false);
-    }
-  }
-
-  async function handleBrokerReportSubmit(event: FormEvent) {
-    event.preventDefault();
-    if (!brokerFilters.userId.trim()) {
-      setBrokerError('Informe o ID do corretor.');
-      return;
-    }
-
-    setBrokerError('');
-    setBrokerLoading(true);
-    try {
-      const query = buildQuery({ from: brokerFilters.from, to: brokerFilters.to });
-      const response = await api(`/admin/reports/brokers/${encodeURIComponent(brokerFilters.userId.trim())}${query}`);
-      setBrokerReport(response);
-    } catch (error) {
-      setBrokerError(error instanceof Error ? error.message : 'Erro ao carregar relatório do corretor.');
-    } finally {
-      setBrokerLoading(false);
-    }
-  }
-
-  return <div className="nested-card">
-    <h3>Relatórios</h3>
-    {overview && <div className="summary-grid">{Object.entries(overview).map(([k, v]) => <div key={k} className="summary-item"><span className="summary-label">{k}</span><strong className="summary-value">{String(v)}</strong></div>)}</div>}
-
-    <h4>Relatórios gerais (CSV)</h4>
-    <div className="filters-row">
-      <button type="button" disabled={exportLoading === 'transactions'} onClick={() => void handleExport('transactions')}>Exportar transações CSV</button>
-      <button type="button" disabled={exportLoading === 'transfers'} onClick={() => void handleExport('transfers')}>Exportar transferências CSV</button>
-      <button type="button" disabled={exportLoading === 'withdrawals'} onClick={() => void handleExport('withdrawals')}>Exportar saques CSV</button>
-      <button type="button" disabled={exportLoading === 'orders'} onClick={() => void handleExport('orders')}>Exportar ordens CSV</button>
-      <button type="button" disabled={exportLoading === 'trades'} onClick={() => void handleExport('trades')}>Exportar trades CSV</button>
-      <button type="button" disabled={exportLoading === 'company-revenues'} onClick={() => void handleExport('company-revenues')}>Exportar receitas por projeto CSV</button>
-    </div>
-
-    <h4>Receitas por projeto</h4>
-    <div className="mobile-card-list">{revenues.map((item) => <article className="summary-item compact-card" key={item.companyId}><strong>{item.ticker} - {item.token}</strong><p>Dono: {item.owner?.name ?? '-'}</p><p>Saldo: {String(item.balance)}</p><p>Taxas: {String(item.totalReceivedFees)}</p><p>Status: {translateCompanyStatus(item.status)}</p></article>)}</div>
-
-    <h4>Relatório por usuário</h4>
-    <form className="filters-row" onSubmit={handleUserReportSubmit}>
-      <input placeholder="ID do usuário" value={userFilters.userId} onChange={(event) => setUserFilters((prev) => ({ ...prev, userId: event.target.value }))} />
-      <input type="date" value={userFilters.from} onChange={(event) => setUserFilters((prev) => ({ ...prev, from: event.target.value }))} />
-      <input type="date" value={userFilters.to} onChange={(event) => setUserFilters((prev) => ({ ...prev, to: event.target.value }))} />
-      <button type="submit" disabled={userLoading}>{userLoading ? 'Buscando...' : 'Buscar usuário'}</button>
-      <button type="button" disabled={exportLoading === 'user-report'} onClick={() => void handleExport('user-report', userFilters, true)}>Exportar relatório do usuário CSV</button>
-    </form>
-    {userError && <p>{userError}</p>}
-    {userReport && <>
-      <div className="summary-grid">
-        <div className="summary-item"><span className="summary-label">Nome</span><strong className="summary-value">{userReport.user?.name ?? '-'}</strong></div>
-        <div className="summary-item"><span className="summary-label">E-mail</span><strong className="summary-value">{userReport.user?.email ?? '-'}</strong></div>
-        <div className="summary-item"><span className="summary-label">Cargos</span><strong className="summary-value">{(userReport.user?.roles ?? []).map((role: string) => translateRole(role)).join(', ') || '-'}</strong></div>
-        <div className="summary-item"><span className="summary-label">Status</span><strong className="summary-value">{userReport.user?.isBlocked ? 'Bloqueado' : 'Ativo'}</strong></div>
-        <div className="summary-item"><span className="summary-label">Saldo disponível</span><strong className="summary-value">{String(userReport.wallet?.availableBalance ?? 0)}</strong></div>
-        <div className="summary-item"><span className="summary-label">Saldo bloqueado</span><strong className="summary-value">{String(userReport.wallet?.lockedBalance ?? 0)}</strong></div>
-        <div className="summary-item"><span className="summary-label">Pendente saque</span><strong className="summary-value">{String(userReport.wallet?.pendingWithdrawalBalance ?? 0)}</strong></div>
-        <div className="summary-item"><span className="summary-label">Total recebido</span><strong className="summary-value">{String(userReport.summary?.transferredIn ?? 0)}</strong></div>
-        <div className="summary-item"><span className="summary-label">Total enviado</span><strong className="summary-value">{String(userReport.summary?.transferredOut ?? 0)}</strong></div>
-        <div className="summary-item"><span className="summary-label">Saques pendentes</span><strong className="summary-value">{String(userReport.summary?.withdrawalsPending ?? 0)}</strong></div>
-        <div className="summary-item"><span className="summary-label">Saques concluídos</span><strong className="summary-value">{String(userReport.summary?.withdrawalsCompleted ?? 0)}</strong></div>
-        <div className="summary-item"><span className="summary-label">Ordens abertas</span><strong className="summary-value">{String(userReport.summary?.openOrders ?? 0)}</strong></div>
-        <div className="summary-item"><span className="summary-label">Ordens executadas</span><strong className="summary-value">{String(userReport.summary?.filledOrders ?? 0)}</strong></div>
-        <div className="summary-item"><span className="summary-label">Holdings</span><strong className="summary-value">{String(userReport.summary?.holdingsCount ?? 0)}</strong></div>
-      </div>
-
-      <h5>Últimas transações</h5>
-      <div className="mobile-card-list">{(userReport.recentTransactions ?? []).map((item: any) => <article className="summary-item compact-card" key={item.id}><p><strong>{item.type}</strong></p><p>Valor: {String(item.amount)}</p><p>{new Date(item.createdAt).toLocaleString('pt-BR')}</p></article>)}</div>
-
-      <h5>Últimas transferências</h5>
-      <div className="mobile-card-list">{(userReport.recentTransfers ?? []).map((item: any) => <article className="summary-item compact-card" key={item.id}><p><strong>{translateTransferType(item.type)}</strong></p><p>Valor: {String(item.amount)}</p><p>De: {item.sender?.name ?? '-'}</p><p>Para: {item.receiver?.name ?? '-'}</p></article>)}</div>
-
-      <h5>Últimos saques</h5>
-      <div className="mobile-card-list">{(userReport.recentWithdrawals ?? []).map((item: any) => <article className="summary-item compact-card" key={item.id}><p><strong>{translateWithdrawalStatus(item.status)}</strong></p><p>Valor: {String(item.amount)}</p><p>Código: {item.code}</p></article>)}</div>
-
-      <h5>Últimas ordens</h5>
-      <div className="mobile-card-list">{(userReport.recentOrders ?? []).map((item: any) => <article className="summary-item compact-card" key={item.id}><p><strong>{translateOrderType(item.type)} · {translateOrderMode(item.mode)}</strong></p><p>Status: {translateOrderStatus(item.status)}</p><p>Empresa: {item.company?.ticker} - {item.company?.name}</p></article>)}</div>
-
-      <h5>Holdings</h5>
-      <div className="mobile-card-list">{(userReport.holdings ?? []).map((item: any) => <article className="summary-item compact-card" key={item.id}><p><strong>{item.company?.ticker} - {item.company?.name}</strong></p><p>Ações: {String(item.shares)}</p><p>Preço médio: {String(item.averageBuyPrice)}</p><p>Status: {translateCompanyStatus(item.company?.status)}</p></article>)}</div>
-    </>}
-
-    <h4>Relatório por corretor</h4>
-    <form className="filters-row" onSubmit={handleBrokerReportSubmit}>
-      <input placeholder="ID do corretor" value={brokerFilters.userId} onChange={(event) => setBrokerFilters((prev) => ({ ...prev, userId: event.target.value }))} />
-      <input type="date" value={brokerFilters.from} onChange={(event) => setBrokerFilters((prev) => ({ ...prev, from: event.target.value }))} />
-      <input type="date" value={brokerFilters.to} onChange={(event) => setBrokerFilters((prev) => ({ ...prev, to: event.target.value }))} />
-      <button type="submit" disabled={brokerLoading}>{brokerLoading ? 'Buscando...' : 'Buscar corretor'}</button>
-      <button type="button" disabled={exportLoading === 'broker-report'} onClick={() => void handleExport('broker-report', brokerFilters, true)}>Exportar relatório do corretor CSV</button>
-    </form>
-    {brokerError && <p>{brokerError}</p>}
-    {brokerReport && <>
-      <div className="summary-grid">
-        <div className="summary-item"><span className="summary-label">Nome</span><strong className="summary-value">{brokerReport.broker?.name ?? '-'}</strong></div>
-        <div className="summary-item"><span className="summary-label">E-mail</span><strong className="summary-value">{brokerReport.broker?.email ?? '-'}</strong></div>
-        <div className="summary-item"><span className="summary-label">Saldo corretor</span><strong className="summary-value">{String(brokerReport.brokerAccount?.availableBalance ?? 0)}</strong></div>
-        <div className="summary-item"><span className="summary-label">Total recebido</span><strong className="summary-value">{String(brokerReport.brokerAccount?.receivedTotal ?? 0)}</strong></div>
-        <div className="summary-item"><span className="summary-label">Total transferido</span><strong className="summary-value">{String(brokerReport.brokerAccount?.transferredTotal ?? 0)}</strong></div>
-        <div className="summary-item"><span className="summary-label">Recebido da tesouraria</span><strong className="summary-value">{String(brokerReport.summary?.receivedFromTreasury ?? 0)}</strong></div>
-        <div className="summary-item"><span className="summary-label">Enviado a usuários</span><strong className="summary-value">{String(brokerReport.summary?.sentToUsers ?? 0)}</strong></div>
-        <div className="summary-item"><span className="summary-label">Quantidade de envios</span><strong className="summary-value">{String(brokerReport.summary?.transfersToUsersCount ?? 0)}</strong></div>
-        <div className="summary-item"><span className="summary-label">Usuários atendidos</span><strong className="summary-value">{String(brokerReport.summary?.usersServedCount ?? 0)}</strong></div>
-        <div className="summary-item"><span className="summary-label">Última transferência</span><strong className="summary-value">{brokerReport.summary?.lastTransferAt ? new Date(brokerReport.summary.lastTransferAt).toLocaleString('pt-BR') : '-'}</strong></div>
-      </div>
-
-      <h5>Últimas transferências</h5>
-      <div className="mobile-card-list">{(brokerReport.recentTransfers ?? []).map((item: any) => <article className="summary-item compact-card" key={item.id}><p><strong>{translateTransferType(item.type)}</strong></p><p>Valor: {String(item.amount)}</p><p>De: {item.sender?.name ?? '-'}</p><p>Para: {item.receiver?.name ?? '-'}</p><p>{new Date(item.createdAt).toLocaleString('pt-BR')}</p></article>)}</div>
-    </>}
-  </div>;
+  return <section className="card nested-card"><h3>Relatórios Admin</h3>
+    <label>ID do usuário<input value={userId} onChange={(e) => setUserId(e.target.value)} /></label>
+    <div className="actions-row"><button className="button-primary" onClick={loadUser} disabled={loading}>Gerar relatório de usuário</button><button className="button-secondary" onClick={() => userId.trim() ? download(`/admin/reports/users/${userId.trim()}.csv`, 'user-report.csv') : setError('Informe o ID do usuário.')} disabled={loading}>Baixar CSV do usuário</button></div>
+    <label>ID do corretor<input value={brokerId} onChange={(e) => setBrokerId(e.target.value)} /></label>
+    <div className="actions-row"><button className="button-primary" onClick={loadBroker} disabled={loading}>Gerar relatório de corretor</button><button className="button-secondary" onClick={() => brokerId.trim() ? download(`/admin/reports/brokers/${brokerId.trim()}.csv`, 'broker-report.csv') : setError('Informe o ID do corretor.')} disabled={loading}>Baixar CSV do corretor</button></div>
+    <button className="button-secondary" onClick={() => download('/admin/reports/admin-logs.csv', 'admin-logs.csv')} disabled={loading}>Baixar logs admin CSV</button>
+    {error && <p className="error-text">{error}</p>}
+    {data && <pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(data, null, 2)}</pre>}
+  </section>;
 }

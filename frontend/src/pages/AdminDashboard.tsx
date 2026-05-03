@@ -5,6 +5,7 @@ import { AdminUsersPanel } from './AdminUsersPanel';
 import { AdminTokensPanel } from './AdminTokensPanel';
 import { AdminAuditPanel } from './AdminAuditPanel';
 import { AdminEconomicAlertsPanel } from './AdminEconomicAlertsPanel';
+import { AdminReportsPanel } from './AdminReportsPanel';
 import { SideDrawer, SideDrawerItem } from '../components/SideDrawer';
 import { ConfirmActionModal } from '../components/ConfirmActionModal';
 
@@ -19,7 +20,7 @@ type CompanyRevenueAccount = {
   totalReceivedFees: string | number;
   totalWithdrawn: string | number;
 };
-type ActiveTab = 'overview' | 'users' | 'brokers' | 'tokens' | 'withdrawals' | 'treasury' | 'liquidity' | 'revenues' | 'audit' | 'economic-alerts' | 'test-mode';
+type ActiveTab = 'overview' | 'users' | 'brokers' | 'tokens' | 'withdrawals' | 'treasury' | 'liquidity' | 'revenues' | 'audit' | 'reports' | 'economic-alerts' | 'test-mode';
 
 type AdminConfirmAction =
   | 'issuance'
@@ -135,6 +136,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
     liquidity: 'Liquidez RPC/R$',
     revenues: 'Receitas',
     audit: 'Auditoria',
+    reports: 'Relatórios',
     'economic-alerts': 'Alertas econômicos',
     'test-mode': 'Modo Teste',
   };
@@ -156,6 +158,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
     { key: 'treasury', label: 'Tesouraria administrativa', active: tab === 'treasury', onClick: () => setTab('treasury') },
     { key: 'revenues', label: 'Receitas', active: tab === 'revenues', onClick: () => setTab('revenues') },
     { key: 'audit', label: 'Auditoria', active: tab === 'audit', onClick: () => setTab('audit') },
+    { key: 'reports', label: 'Relatórios', active: tab === 'reports', onClick: () => setTab('reports') },
     { key: 'economic-alerts', label: 'Alertas econômicos', active: tab === 'economic-alerts', onClick: () => setTab('economic-alerts') },
     { key: 'test-mode', label: 'Modo Teste', active: tab === 'test-mode', onClick: () => setTab('test-mode') },
   ];
@@ -296,6 +299,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
         {canManageRpcLiquidity && <button className={tab === 'liquidity' ? 'pill active' : 'pill'} onClick={() => setTab('liquidity')}>Liquidez RPC/R$</button>}
         <button className={tab === 'revenues' ? 'pill active' : 'pill'} onClick={() => setTab('revenues')}>Receitas</button>
         <button className={tab === 'audit' ? 'pill active' : 'pill'} onClick={() => setTab('audit')}>Auditoria</button>
+        <button className={tab === 'reports' ? 'pill active' : 'pill'} onClick={() => setTab('reports')}>Relatórios</button>
         <button className={tab === 'economic-alerts' ? 'pill active' : 'pill'} onClick={() => setTab('economic-alerts')}>Alertas econômicos</button>
         <button className={tab === 'test-mode' ? 'pill active' : 'pill'} onClick={() => setTab('test-mode')}>Modo Teste</button>
       </nav>
@@ -460,6 +464,7 @@ export function AdminDashboard({ currentUserRoles, onPermissionsUpdated }: Admin
       )}
 
       {tab === 'audit' && <AdminAuditPanel />}
+      {tab === 'reports' && <AdminReportsPanel />}
       {tab === 'economic-alerts' && <AdminEconomicAlertsPanel />}
 
       {tab === 'test-mode' && (
