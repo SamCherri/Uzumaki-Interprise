@@ -57,7 +57,7 @@ test.after(async () => { await app.close(); await prisma.$disconnect(); });
 
 test('bloqueia ticker reservado e parecidos', async () => {
   await resetDb(); const user = await mkUser('u1@test.local'); const tk = await token(user.id);
-  for (const ticker of ['RPC','ADMIN','RPCEXCHANGE','BANCO','EXCHANGE']) {
+  for (const ticker of ['RPC', 'ADMIN', 'BANCO', 'EXCHANGE', 'ADM', 'BROKER']) {
     const res = await app.inject({ method: 'POST', url: '/api/companies/request', headers: { authorization: `Bearer ${tk}` }, payload: { ...validPayload, ticker, name: `Empresa ${ticker}` } });
     assert.equal(res.statusCode, 400); assert.match(res.body, /Ticker reservado/);
   }
@@ -89,6 +89,8 @@ test('permite projeto normal e reforça para usuário comum', async () => {
 
 test('conta RP única no cadastro', async () => {
   await resetDb();
+  await prisma.role.create({ data: { key: 'USER', name: 'Usuário' } });
+
   const first = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { name: 'User One', characterName: 'Cidadao Um', bankAccountNumber: 'RP-UNICO-1', email: 'cad1@test.local', password: '12345678' } });
   assert.equal(first.statusCode, 201, first.body);
   const second = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { name: 'User Two', characterName: 'Cidadao Dois', bankAccountNumber: 'RP-UNICO-1', email: 'cad2@test.local', password: '12345678' } });
