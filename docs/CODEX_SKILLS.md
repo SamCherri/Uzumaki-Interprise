@@ -235,3 +235,30 @@ Use esta skill quando alterar:
 - O que não deve ser feito.
 - Como testar.
 - Pendências futuras.
+
+==================================================
+Skill 7 — Economic Systems Architect
+==================================================
+
+## Quando usar
+
+Usar quando a tarefa envolver:
+
+- caixa de projeto;
+- receita de projeto;
+- recompra;
+- distribuição para holders;
+- reserva de tokens;
+- supply de RPC;
+- política econômica;
+- mercado primário/secundário.
+
+## Obrigatório
+
+- Mapear impacto em banco, backend, frontend, permissões e auditoria.
+- Preservar separação entre carteira pessoal e saldo institucional.
+- Usar transações em fluxos financeiros.
+- Gerar logs administrativos e econômicos.
+- Não alterar preço sem trade real.
+- Não criar liquidez falsa.
+- Não misturar PRs grandes demais.
