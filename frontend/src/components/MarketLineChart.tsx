@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { formatCurrency, formatPrice } from '../utils/formatters';
 
 export type MarketChartPoint = {
@@ -20,6 +20,7 @@ type PlotPoint = MarketChartPoint & { x: number; y: number };
 
 export function MarketLineChart({ points, currentPrice = 0, timeframe = '24H', height = 260, emptyMessage = 'Sem dados suficientes para o gráfico.' }: MarketLineChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const gradientId = useId().replace(/:/g, '');
 
   const chart = useMemo(() => {
     const sorted = [...points].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).filter((point) => Number.isFinite(point.price) && point.price > 0);
@@ -89,17 +90,18 @@ export function MarketLineChart({ points, currentPrice = 0, timeframe = '24H', h
         onMouseMove={(event) => setIndexFromPointer(event.clientX, event.currentTarget.getBoundingClientRect())}
         onTouchMove={(event) => setIndexFromPointer(event.touches[0].clientX, event.currentTarget.getBoundingClientRect())}
         onTouchStart={(event) => setIndexFromPointer(event.touches[0].clientX, event.currentTarget.getBoundingClientRect())}
+        onTouchCancel={() => setHoveredIndex(null)}
       >
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="market-line-chart-svg">
           <defs>
-            <linearGradient id="marketLineAreaGradient" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="rgba(59,130,246,0.45)" />
               <stop offset="100%" stopColor="rgba(250,204,21,0.06)" />
             </linearGradient>
           </defs>
           {[20, 36, 52, 68, 84].map((lineY) => <line key={lineY} className="chart-grid-line" x1="6" x2="94" y1={lineY} y2={lineY} />)}
           <line className="current-price-line" x1="6" x2="94" y1={chart.currentY} y2={chart.currentY} />
-          <polygon points={chart.areaPoints} className="market-line-chart-area" />
+          <polygon points={chart.areaPoints} className="market-line-chart-area" style={{ fill: `url(#${gradientId})` }} />
           <polyline points={chart.linePoints} className="market-line-chart-line" vectorEffect="non-scaling-stroke" />
           {activePoint && <>
             <line className="market-line-chart-cursor" x1={activePoint.x} x2={activePoint.x} y1="14" y2="86" />
@@ -116,7 +118,7 @@ export function MarketLineChart({ points, currentPrice = 0, timeframe = '24H', h
           </div>
         )}
 
-        <div className="market-line-chart-price-label" style={{ top: `${Math.max(8, Math.min(86, chart.currentY))}%` }}>R$ {formatPrice(currentPrice || activePoint?.price || 0)}</div>
+        <div className="market-line-chart-price-label" style={{ top: `${Math.max(8, Math.min(86, chart.currentY))}%` }}>R$ {formatPrice((currentPrice > 0 ? currentPrice : activePoint?.price) ?? 0)}</div>
       </div>
 
       {chart.hasVolume && (
