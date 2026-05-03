@@ -68,8 +68,8 @@ Auditoria consolidada do estado atual da **RPC Exchange**, mantendo o projeto ex
 ## 5) Atualização 2026-04-29 — Impulsão definitiva
 
 - Implementado no código/documentado historicamente: reserva de boost por projeto, histórico de injeções, fonte por carteira pessoal/receita/ajuste admin e logs de auditoria.
-- Situação atual de governança: essa mecânica passa a ser tratada como **legado/risco econômico** frente ao roadmap econômico novo.
-- Diretriz estratégica atual: **não é prioridade evoluir boost para subir preço diretamente**; a prioridade é fechar o ciclo econômico real (caixa institucional, recompra real, reserva e distribuição auditável).
+- Situação atual de governança: boost/injeção direta continua como **histórico/legado** e risco econômico frente ao roadmap econômico novo.
+- Diretriz estratégica atual: **não é prioridade evoluir boost para subir preço diretamente**; a prioridade é fluxo R$ → RPC → token/projeto, recompra real, reserva e distribuição auditável (se mantida).
 
 ## 6) Atualização 2026-04-29 — Segurança econômica no matching multi-fill
 
@@ -217,15 +217,17 @@ Regras:
 ## Nova prioridade econômica
 
 A prioridade oficial atual é fechar o ciclo econômico real da Exchange, nesta ordem:
-1. Caixa institucional do projeto.
+1. Fluxo de capital R$ → RPC → token/projeto.
 2. Mercado primário correto.
-3. Recompra real via ordens de mercado.
-4. Reserva institucional de tokens recomprados.
-5. Distribuição para holders.
-6. Política da RPC.
-7. Auditoria econômica.
-8. Simulador do ciclo completo.
-9. UX funcional.
-10. Visual premium.
+3. Mercado secundário seguro.
+4. Caixa institucional rastreável do projeto.
+5. Programa de recompra com RPC existente.
+6. Reserva de tokens recomprados.
+7. Distribuição para holders, se mantida.
+8. Política da RPC.
+9. Auditoria econômica.
+10. Simulador do ciclo completo.
+11. UX funcional.
+12. Visual premium.
 
 Fonte oficial: `docs/ROADMAP_PRIORITARIO.md`.
