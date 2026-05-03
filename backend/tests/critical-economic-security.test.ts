@@ -45,6 +45,7 @@ async function resetDb() {
     prisma.testModeTrade.deleteMany(),
     prisma.testModeWallet.deleteMany(),
     prisma.testModeMarketState.deleteMany(),
+    prisma.systemModeConfig.deleteMany(),
     prisma.user.deleteMany(),
     prisma.platformAccount.deleteMany(),
     prisma.treasuryAccount.deleteMany(),
@@ -938,8 +939,12 @@ test('modo teste: preço, leaderboard, guardas e report types', async () => {
   const sorted = [...rows].sort((a, b) => Number(b.estimatedTotalFiat) - Number(a.estimatedTotalFiat));
   assert.deepEqual(rows.map((r) => r.userId), sorted.map((r) => r.userId));
 
-  for (const type of ['BUG','VISUAL_ERROR','BALANCE_ERROR','CHEAT_SUSPECTED','SUGGESTION','OTHER']) {
-    const report = await app.inject({ method: 'POST', url: '/api/test-mode/reports', headers: { authorization: `Bearer ${userToken}` }, payload: { type, location: 'Tela', description: 'Teste' } });
+  const reportTypes = ['BUG','VISUAL_ERROR','BALANCE_ERROR','CHEAT_SUSPECTED','SUGGESTION','OTHER'] as const;
+  for (const [idx, type] of reportTypes.entries()) {
+    const reportUser = await mkUser(`tmode-report-${idx}@test.local`, `TMode Report ${idx}`);
+    await prisma.userRole.create({ data: { userId: reportUser.id, roleId: rUser.id } });
+    const reportToken = await token(reportUser.id, ['USER']);
+    const report = await app.inject({ method: 'POST', url: '/api/test-mode/reports', headers: { authorization: `Bearer ${reportToken}` }, payload: { type, location: 'Tela', description: 'Teste' } });
     assert.equal(report.statusCode, 201, report.body);
   }
 
@@ -959,6 +964,11 @@ test('bot tick do modo teste só opera em TEST e não altera economia real', asy
   await prisma.platformAccount.create({ data: {} });
 
   const userToken = await token(user.id, ['USER']);
+  await prisma.systemModeConfig.upsert({
+    where: { id: 'SYSTEM_MODE_MAIN' },
+    update: { mode: 'NORMAL' },
+    create: { id: 'SYSTEM_MODE_MAIN', mode: 'NORMAL' },
+  });
 
   const normalMode = await app.inject({
     method: 'POST',
