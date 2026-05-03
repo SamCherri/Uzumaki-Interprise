@@ -3,6 +3,7 @@ import { Button } from '../components/ui/Button';
 import { Toast } from '../components/ui/Toast';
 import { api } from '../services/api';
 import { formatCurrency, formatPercent, formatPrice, formatSignedPrice } from '../utils/formatters';
+import { MarketLineChart, type MarketChartPoint } from '../components/MarketLineChart';
 
 type MarketState = { currentPrice: string; fiatReserve: string; rpcReserve: string; totalFiatVolume: string; totalRpcVolume: string; totalBuys: number; totalSells: number; updatedAt: string; };
 type Trade = { id: string; side: 'BUY_RPC' | 'SELL_RPC'; fiatAmount: string; rpcAmount: string; unitPrice: string; priceBefore: string; priceAfter: string; createdAt: string; };
@@ -14,7 +15,6 @@ type Timeframe = '1H' | '24H' | '7D' | '30D' | 'ALL';
 type RpcMarketTab = 'preco' | 'livro' | 'ordens' | 'trades' | 'dados';
 type TradeFlow = 'buy' | 'sell' | null;
 type RpcTradeMode = 'market' | 'limit';
-type ChartPoint = { id: string; x: number; y: number; price: number; fiatAmount: number; rpcAmount: number; side: 'BUY_RPC' | 'SELL_RPC'; createdAt: string; };
 
 const timeframes: { key: Timeframe; label: string; hours: number | null }[] = [
   { key: '1H', label: '1H', hours: 1 },
@@ -143,63 +143,40 @@ export function RpcMarketPage({ initialTradeFlow, onTradeFlowHandled }: { initia
     return trades.filter((trade) => new Date(trade.createdAt).getTime() >= minDate);
   }, [activeTimeframe, trades]);
 
-  const chart = useMemo(() => {
+  const chartMetrics = useMemo(() => {
     const ordered = [...filteredTrades].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    const currentPrice = Number(market?.currentPrice ?? 0) || 0;
     const normalized = ordered
-      .map((trade) => ({ ...trade, price: Number(trade.priceAfter || trade.unitPrice || 0), fiat: Number(trade.fiatAmount || 0), rpc: Number(trade.rpcAmount || 0), timestamp: new Date(trade.createdAt).getTime() }))
+      .map((trade) => ({ ...trade, price: Number(trade.priceAfter || trade.unitPrice || 0), fiat: Number(trade.fiatAmount || 0), rpc: Number(trade.rpcAmount || 0) }))
       .filter((trade) => Number.isFinite(trade.price) && trade.price > 0);
 
     const prices = normalized.map((item) => item.price);
+    const currentPrice = Number(market?.currentPrice ?? 0) || 0;
     const basePrice = currentPrice > 0 ? currentPrice : prices[0] ?? 1;
     const first = prices[0] ?? basePrice;
     const last = prices[prices.length - 1] ?? basePrice;
-    const pricesWithReference = [...prices, basePrice];
-    const rawMin = Math.min(...pricesWithReference);
-    const rawMax = Math.max(...pricesWithReference);
-    const spread = Math.max(rawMax - rawMin, Math.max(rawMin, basePrice) * 0.004, 0.01);
-    const minBound = Math.max(0.0001, rawMin - spread * 0.4);
-    const maxBound = rawMax + spread * 0.4;
-
-    const timestampStart = normalized[0]?.timestamp ?? Date.now();
-    const timestampEnd = normalized[normalized.length - 1]?.timestamp ?? timestampStart + 1;
-    const range = Math.max(1, timestampEnd - timestampStart);
-    const yFor = (price: number) => 88 - ((price - minBound) / Math.max(maxBound - minBound, 0.0001)) * 78;
-
-    const points: ChartPoint[] = normalized.map((trade, index) => ({
-      id: trade.id,
-      x: Number.isFinite(trade.timestamp) ? 6 + ((trade.timestamp - timestampStart) / range) * 88 : 6 + (index / Math.max(1, normalized.length - 1)) * 88,
-      y: yFor(trade.price),
-      price: trade.price,
-      fiatAmount: trade.fiat,
-      rpcAmount: trade.rpc,
-      side: trade.side,
-      createdAt: trade.createdAt,
-    }));
-
-    const linePoints = points.map((point) => `${point.x},${point.y}`).join(' ');
-    const areaPoints = points.length ? `6,88 ${linePoints} 94,88` : '';
-    const fiatVolume = normalized.reduce((acc, trade) => acc + trade.fiat, 0);
-    const rpcVolume = normalized.reduce((acc, trade) => acc + trade.rpc, 0);
 
     return {
-      points,
-      linePoints,
-      areaPoints,
-      min: rawMin,
-      max: rawMax,
       first,
       last,
       variationAbs: last - first,
       variationPercent: first > 0 ? ((last - first) / first) * 100 : 0,
-      tradeCount: points.length,
-      fiatVolume,
-      rpcVolume,
-      currentY: yFor(basePrice),
-      emptyReason: points.length === 0 ? 'Ainda não há negociações neste período.' : points.length === 1 ? 'Histórico insuficiente neste período.' : undefined,
-      activityBars: points.slice(-40),
+      tradeCount: normalized.length,
+      fiatVolume: normalized.reduce((acc, trade) => acc + trade.fiat, 0),
+      rpcVolume: normalized.reduce((acc, trade) => acc + trade.rpc, 0),
+      max: prices.length ? Math.max(...prices) : basePrice,
+      min: prices.length ? Math.min(...prices) : basePrice,
+      emptyReason: normalized.length === 0 ? 'Ainda não há negociações neste período.' : normalized.length === 1 ? 'Histórico insuficiente neste período.' : undefined,
     };
   }, [filteredTrades, market?.currentPrice]);
+
+  const chartPoints = useMemo<MarketChartPoint[]>(() => filteredTrades
+    .map((trade) => ({
+      timestamp: trade.createdAt,
+      price: Number(trade.priceAfter || trade.unitPrice || 0),
+      volume: Number(trade.fiatAmount || 0),
+      tradeCount: 1,
+    }))
+    .filter((trade) => Number.isFinite(trade.price) && trade.price > 0), [filteredTrades]);
 
   async function onBuy(event: FormEvent) {
     event.preventDefault();
@@ -284,8 +261,8 @@ export function RpcMarketPage({ initialTradeFlow, onTradeFlowHandled }: { initia
     }
   }
 
-  const variationAbs = chart.variationAbs;
-  const variationPercent = chart.variationPercent;
+  const variationAbs = chartMetrics.variationAbs;
+  const variationPercent = chartMetrics.variationPercent;
 
   return (
     <section className="card market-page market-shell market-page-v2">
@@ -303,9 +280,9 @@ export function RpcMarketPage({ initialTradeFlow, onTradeFlowHandled }: { initia
             </p>
           </div>
           <div className="market-stats-row market-mini-stats">
-            <div className="market-mini-stat-card"><span className="market-mini-stat-label">Máx</span><strong>R$ {formatPrice(chart.max)}</strong></div>
-            <div className="market-mini-stat-card"><span className="market-mini-stat-label">Mín</span><strong>R$ {formatPrice(chart.min)}</strong></div>
-            <div className="market-mini-stat-card"><span className="market-mini-stat-label">Volume</span><strong>R$ {formatCurrency(chart.fiatVolume)}</strong></div>
+            <div className="market-mini-stat-card"><span className="market-mini-stat-label">Máx</span><strong>R$ {formatPrice(chartMetrics.max)}</strong></div>
+            <div className="market-mini-stat-card"><span className="market-mini-stat-label">Mín</span><strong>R$ {formatPrice(chartMetrics.min)}</strong></div>
+            <div className="market-mini-stat-card"><span className="market-mini-stat-label">Volume</span><strong>R$ {formatCurrency(chartMetrics.fiatVolume)}</strong></div>
             <div className="market-mini-stat-card"><span className="market-mini-stat-label">Saldo RPC</span><strong>{formatCurrency(Number(wallet?.rpcAvailableBalance ?? 0))}</strong></div>
           </div>
         </header>
@@ -325,17 +302,11 @@ export function RpcMarketPage({ initialTradeFlow, onTradeFlowHandled }: { initia
           <h4>Preço RPC/R$</h4>
           <div className="chart-timeframes">{timeframes.map((tf) => <button key={tf.key} className={activeTimeframe === tf.key ? 'quick-pill active' : 'quick-pill'} onClick={() => setActiveTimeframe(tf.key)}>{tf.label}</button>)}</div>
           <div className="chart-wrap chart-wrap-highlight modern-chart-shell market-chart-card rpc-chart-shell">
-            {isLoading && <div className="chart-empty-elegant"><strong>Carregando histórico</strong><span>Buscando dados do mercado RPC/R$.</span></div>}
-            {!isLoading && <svg viewBox="0 0 100 100" preserveAspectRatio="none" className={`line-chart ${variationPercent >= 0 ? 'positive-chart' : 'negative-chart'}`}>
-              {[20, 36, 52, 68, 84].map((lineY) => <line key={lineY} className="chart-grid-line" x1="6" x2="94" y1={lineY} y2={lineY} />)}
-              <line className="current-price-line" x1="6" x2="94" y1={chart.currentY} y2={chart.currentY} />
-              {chart.tradeCount >= 2 && <polygon className="chart-area-fill" points={chart.areaPoints} />}
-              {chart.tradeCount >= 2 && <polyline className="chart-main-line" points={chart.linePoints} fill="none" vectorEffect="non-scaling-stroke" />}
-              {chart.tradeCount <= 1 && <line className="chart-main-line" x1="6" x2="94" y1={chart.tradeCount === 1 ? chart.points[0].y : chart.currentY} y2={chart.tradeCount === 1 ? chart.points[0].y : chart.currentY} vectorEffect="non-scaling-stroke" />}
-            </svg>}
+            {isLoading && <div className="chart-empty-elegant"><strong>Carregando gráfico...</strong><span>Buscando dados do mercado RPC/R$.</span></div>}
+            {!isLoading && <MarketLineChart points={chartPoints} currentPrice={Number(market?.currentPrice ?? 0)} timeframe={activeTimeframe} emptyMessage="Sem dados suficientes para o gráfico." />}
           </div>
-          <div className="chart-meta market-price-card"><div><span>Atual</span><strong>R$ {formatPrice(Number(market?.currentPrice ?? 0))}</strong></div><div><span>Máximo</span><strong>R$ {formatPrice(chart.max)}</strong></div><div><span>Mínimo</span><strong>R$ {formatPrice(chart.min)}</strong></div><div><span>Volume R$</span><strong>{formatCurrency(chart.fiatVolume)}</strong></div><div><span>Volume RPC</span><strong>{formatCurrency(chart.rpcVolume)}</strong></div><div><span>Trades no período</span><strong>{chart.tradeCount}</strong></div></div>
-          {!isLoading && chart.emptyReason && <p className="empty-state">{chart.emptyReason}</p>}
+          <div className="chart-meta market-price-card"><div><span>Atual</span><strong>R$ {formatPrice(Number(market?.currentPrice ?? 0))}</strong></div><div><span>Máximo</span><strong>R$ {formatPrice(chartMetrics.max)}</strong></div><div><span>Mínimo</span><strong>R$ {formatPrice(chartMetrics.min)}</strong></div><div><span>Volume R$</span><strong>{formatCurrency(chartMetrics.fiatVolume)}</strong></div><div><span>Volume RPC</span><strong>{formatCurrency(chartMetrics.rpcVolume)}</strong></div><div><span>Trades no período</span><strong>{chartMetrics.tradeCount}</strong></div></div>
+          {!isLoading && chartMetrics.emptyReason && <p className="empty-state">{chartMetrics.emptyReason}</p>}
         </section>}
 
         {activeTab === 'livro' && <section className="card nested-card market-tab-panel market-full-width"><h4>Livro de ordens RPC/R$</h4><p className="info-text">RPC/R$ ainda usa liquidez automática para execução. O livro mostra ordens limite pendentes.</p><div className="order-book-grid"><div className="summary-item"><span className="summary-label">Reserva RPC</span><strong>{formatCurrency(Number(market?.rpcReserve ?? 0))} RPC</strong></div><div className="summary-item"><span className="summary-label">Reserva R$</span><strong>R$ {formatCurrency(Number(market?.fiatReserve ?? 0))}</strong></div><div className="summary-item"><span className="summary-label">Preço atual</span><strong>R$ {formatPrice(Number(market?.currentPrice ?? 0))}</strong></div></div><h5>Compras</h5>{orderBook.buyOrders.length===0?<p className="empty-state">Sem ordens abertas neste lado.</p>:orderBook.buyOrders.map((o)=><article key={o.id} className="summary-item compact-card market-order-card"><p>Preço limite: R$ {formatPrice(Number(o.limitPrice))}</p><p>Valor R$: {formatCurrency(Number(o.lockedFiatAmount||o.fiatAmount||0))}</p><p>Criada: {new Date(o.createdAt).toLocaleString('pt-BR')}</p></article>)}<h5>Vendas</h5>{orderBook.sellOrders.length===0?<p className="empty-state">Sem ordens abertas neste lado.</p>:orderBook.sellOrders.map((o)=><article key={o.id} className="summary-item compact-card market-order-card"><p>Preço limite: R$ {formatPrice(Number(o.limitPrice))}</p><p>Valor RPC: {formatCurrency(Number(o.lockedRpcAmount||o.rpcAmount||0))}</p><p>Criada: {new Date(o.createdAt).toLocaleString('pt-BR')}</p></article>)}</section>}
