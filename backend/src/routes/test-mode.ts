@@ -8,6 +8,8 @@ import { assertTestMode, isAdminRole } from '../plugins/system-mode-guard.js';
 
 const MARKET_ID = 'TEST_MODE_MARKET_MAIN';
 const MIN_AMOUNT = new Decimal('0.01');
+const TEST_MODE_BUY_FEE_PERCENT = new Decimal('1');
+const TEST_MODE_SELL_FEE_PERCENT = new Decimal('1');
 const CONTROL_ROLES = new Set(['SUPER_ADMIN', 'COIN_CHIEF_ADMIN']);
 const BOT_TICK_COOLDOWN_SECONDS = 20;
 
@@ -19,30 +21,35 @@ async function ensureMarket() { return prisma.testModeMarketState.upsert({ where
 async function ensureWallet(userId: string) { return prisma.testModeWallet.upsert({ where: { userId }, update: {}, create: { userId } }); }
 
 function buildBuyQuote(state: { currentPrice: Decimal; fiatReserve: Decimal; rpcReserve: Decimal }, fiatAmount: Decimal) {
+  const feeAmount = fiatAmount.mul(TEST_MODE_BUY_FEE_PERCENT).div(100).toDecimalPlaces(2);
+  const netFiatAmount = fiatAmount.sub(feeAmount).toDecimalPlaces(2);
   const k = state.fiatReserve.mul(state.rpcReserve);
-  const newFiatReserve = state.fiatReserve.add(fiatAmount);
+  const newFiatReserve = state.fiatReserve.add(netFiatAmount);
   const newRpcReserve = k.div(newFiatReserve).toDecimalPlaces(2);
   const rpcAmount = state.rpcReserve.sub(newRpcReserve).toDecimalPlaces(2);
   const priceAfter = newFiatReserve.div(newRpcReserve).toDecimalPlaces(8);
   const unitPrice = fiatAmount.div(rpcAmount).toDecimalPlaces(8);
-  return { rpcAmount, priceBefore: state.currentPrice, priceAfter, unitPrice, newFiatReserve, newRpcReserve };
+  return { rpcAmount, grossFiatAmount: fiatAmount, netFiatAmount, feeAmount, feePercent: TEST_MODE_BUY_FEE_PERCENT, priceBefore: state.currentPrice, priceAfter, unitPrice, newFiatReserve, newRpcReserve };
 }
 function buildSellQuote(state: { currentPrice: Decimal; fiatReserve: Decimal; rpcReserve: Decimal }, rpcAmount: Decimal) {
   const k = state.fiatReserve.mul(state.rpcReserve);
   const newRpcReserve = state.rpcReserve.add(rpcAmount);
-  const newFiatReserve = k.div(newRpcReserve).toDecimalPlaces(2);
-  const fiatAmount = state.fiatReserve.sub(newFiatReserve).toDecimalPlaces(2);
-  const priceAfter = newFiatReserve.div(newRpcReserve).toDecimalPlaces(8);
+  const newFiatReserve = k.div(newRpcReserve);
+  const grossFiatAmount = state.fiatReserve.sub(newFiatReserve).toDecimalPlaces(2);
+  const feeAmount = grossFiatAmount.mul(TEST_MODE_SELL_FEE_PERCENT).div(100).toDecimalPlaces(2);
+  const fiatAmount = grossFiatAmount.sub(feeAmount).toDecimalPlaces(2);
+  const finalFiatReserve = state.fiatReserve.sub(grossFiatAmount).toDecimalPlaces(2);
+  const priceAfter = finalFiatReserve.div(newRpcReserve).toDecimalPlaces(8);
   const unitPrice = fiatAmount.div(rpcAmount).toDecimalPlaces(8);
-  return { fiatAmount, priceBefore: state.currentPrice, priceAfter, unitPrice, newFiatReserve, newRpcReserve };
+  return { fiatAmount, grossFiatAmount, netFiatAmount: fiatAmount, feeAmount, feePercent: TEST_MODE_SELL_FEE_PERCENT, priceBefore: state.currentPrice, priceAfter, unitPrice, newFiatReserve: finalFiatReserve, newRpcReserve };
 }
 
 export async function testModeRoutes(app: FastifyInstance) {
   app.get('/test-mode/me', { preHandler: [app.authenticate] }, async (request, reply) => { if (!(await assertTestMode(reply))) return; return ensureWallet((request.user as { sub: string }).sub); });
   app.get('/test-mode/market', { preHandler: [app.authenticate] }, async (_req, reply) => { if (!(await assertTestMode(reply))) return; return ensureMarket(); });
   app.get('/test-mode/trades', { preHandler: [app.authenticate] }, async (request, reply) => { try { if (!(await assertTestMode(reply))) return; const q = z.object({ limit: z.coerce.number().int().min(1).max(200).optional() }).parse(request.query ?? {}); return { trades: await prisma.testModeTrade.findMany({ take: q.limit ?? 50, orderBy: { createdAt: 'desc' } }) }; } catch (e) { return badRequest(reply, e); } });
-  app.get('/test-mode/quote-buy', { preHandler: [app.authenticate] }, async (request, reply) => { try { if (!(await assertTestMode(reply))) return; const { fiatAmount } = z.object({ fiatAmount: z.coerce.number().min(0.01) }).parse(request.query ?? {}); const market = await ensureMarket(); const quote = buildBuyQuote(market, toDecimal(fiatAmount).toDecimalPlaces(2)); return { fiatAmount, estimatedRpcAmount: quote.rpcAmount, effectiveUnitPrice: quote.unitPrice, estimatedPriceAfter: quote.priceAfter }; } catch (e) { return badRequest(reply, e); } });
-  app.get('/test-mode/quote-sell', { preHandler: [app.authenticate] }, async (request, reply) => { try { if (!(await assertTestMode(reply))) return; const { rpcAmount } = z.object({ rpcAmount: z.coerce.number().min(0.01) }).parse(request.query ?? {}); const market = await ensureMarket(); const quote = buildSellQuote(market, toDecimal(rpcAmount).toDecimalPlaces(2)); return { rpcAmount, estimatedFiatAmount: quote.fiatAmount, effectiveUnitPrice: quote.unitPrice, estimatedPriceAfter: quote.priceAfter }; } catch (e) { return badRequest(reply, e); } });
+  app.get('/test-mode/quote-buy', { preHandler: [app.authenticate] }, async (request, reply) => { try { if (!(await assertTestMode(reply))) return; const { fiatAmount } = z.object({ fiatAmount: z.coerce.number().min(0.01) }).parse(request.query ?? {}); const market = await ensureMarket(); const quote = buildBuyQuote(market, toDecimal(fiatAmount).toDecimalPlaces(2)); return { grossFiatAmount: quote.grossFiatAmount, netFiatAmount: quote.netFiatAmount, feeAmount: quote.feeAmount, feePercent: quote.feePercent, estimatedRpcAmount: quote.rpcAmount, effectiveUnitPrice: quote.unitPrice, estimatedPriceAfter: quote.priceAfter }; } catch (e) { return badRequest(reply, e); } });
+  app.get('/test-mode/quote-sell', { preHandler: [app.authenticate] }, async (request, reply) => { try { if (!(await assertTestMode(reply))) return; const { rpcAmount } = z.object({ rpcAmount: z.coerce.number().min(0.01) }).parse(request.query ?? {}); const market = await ensureMarket(); const quote = buildSellQuote(market, toDecimal(rpcAmount).toDecimalPlaces(2)); return { rpcAmount, grossFiatAmount: quote.grossFiatAmount, netFiatAmount: quote.netFiatAmount, feeAmount: quote.feeAmount, feePercent: quote.feePercent, estimatedFiatAmount: quote.fiatAmount, effectiveUnitPrice: quote.unitPrice, estimatedPriceAfter: quote.priceAfter }; } catch (e) { return badRequest(reply, e); } });
 
   app.post('/test-mode/buy', { preHandler: [app.authenticate], config: { rateLimit: process.env.NODE_ENV === 'test' ? false : { max: 60, timeWindow: '1 minute' } } }, async (request, reply) => {
     try {
