@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma.js';
+import { validatePublicNameAllowed, validateRpAccountUnique } from './content-moderation-service.js';
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 const LOGIN_LOCKOUT_MINUTES = 15;
 
@@ -9,6 +10,10 @@ export async function registerUser(name: string, characterName: string, bankAcco
   if (exists) {
     throw new Error('E-mail já cadastrado.');
   }
+
+  await validatePublicNameAllowed(name, 'user');
+  await validatePublicNameAllowed(characterName, 'character');
+  await validateRpAccountUnique(bankAccountNumber);
 
   const passwordHash = await bcrypt.hash(password, 10);
 

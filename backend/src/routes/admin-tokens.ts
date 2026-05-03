@@ -4,6 +4,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { cancelOrderWithRelease } from './market.js';
+import { validateDescriptionAllowed, validatePublicNameAllowed, validateTickerAllowed } from '../services/content-moderation-service.js';
 
 type AuthRequest = FastifyRequest & { user: { sub: string; roles?: string[] } };
 const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN'] as const;
@@ -143,6 +144,10 @@ export async function adminTokensRoutes(app: FastifyInstance) {
         buyFeePercent: z.coerce.number().min(0),
         sellFeePercent: z.coerce.number().min(0),
       }).parse(request.body);
+
+      validateTickerAllowed(body.ticker);
+      validatePublicNameAllowed(body.name, 'company');
+      validateDescriptionAllowed(body.description);
 
       const ticker = body.ticker.trim().toUpperCase();
       if (Math.abs((body.ownerSharePercent + body.publicOfferPercent) - 100) > 0.001) {
