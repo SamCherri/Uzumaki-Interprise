@@ -80,6 +80,235 @@ export async function adminRoutes(app: FastifyInstance) {
     };
   });
 
+  app.get('/admin/economic-alerts', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authRequest = request as AuthRequest;
+    const roles = authRequest.user.roles ?? [];
+    if (!requireRole(reply, roles, ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN', 'AUDITOR'], 'Sem permissão para consultar alertas econômicos.')) {
+      return;
+    }
+
+    type AlertSeverity = 'CRITICAL' | 'WARNING';
+    type EconomicAlert = {
+      code: string;
+      severity: AlertSeverity;
+      title: string;
+      description: string;
+      entity: string;
+      entityId: string;
+      userId?: string;
+      details: Record<string, unknown>;
+    };
+    const alerts: EconomicAlert[] = [];
+    const unitPriceTolerance = 0.000001;
+
+    const wallets = await prisma.wallet.findMany();
+    for (const wallet of wallets) {
+      const monitoredFields: Array<keyof typeof wallet> = [
+        'availableBalance',
+        'lockedBalance',
+        'pendingWithdrawalBalance',
+        'fiatAvailableBalance',
+        'fiatLockedBalance',
+        'fiatPendingWithdrawalBalance',
+        'rpcAvailableBalance',
+        'rpcLockedBalance',
+      ];
+      const negativeFields = monitoredFields
+        .filter((field) => Number(wallet[field]) < 0)
+        .map((field) => ({ field, value: String(wallet[field]) }));
+
+      if (negativeFields.length > 0) {
+        alerts.push({
+          code: 'NEGATIVE_WALLET_BALANCE',
+          severity: 'CRITICAL',
+          title: 'Saldo negativo encontrado',
+          description: 'A carteira possui um ou mais campos de saldo com valor negativo.',
+          entity: 'Wallet',
+          entityId: wallet.id,
+          userId: wallet.userId,
+          details: { negativeFields },
+        });
+      }
+    }
+
+    const openRpcOrders = await prisma.rpcLimitOrder.findMany({ where: { status: 'OPEN' } });
+    const rpcOpenBuyByUser = new Set(openRpcOrders.filter((order) => order.side === 'BUY_RPC').map((order) => order.userId));
+    const rpcOpenSellByUser = new Set(openRpcOrders.filter((order) => order.side === 'SELL_RPC').map((order) => order.userId));
+    const marketOpenOrders = await prisma.marketOrder.findMany({ where: { status: { in: ['OPEN', 'PARTIALLY_FILLED'] } } });
+    const openMarketByUser = new Set(marketOpenOrders.map((order) => order.userId));
+
+    for (const wallet of wallets) {
+      const orphanReasons: string[] = [];
+      if (Number(wallet.fiatLockedBalance) > 0 && !rpcOpenBuyByUser.has(wallet.userId)) {
+        orphanReasons.push('fiatLockedBalance > 0 sem RpcLimitOrder OPEN BUY_RPC');
+      }
+      if (Number(wallet.rpcLockedBalance) > 0 && !rpcOpenSellByUser.has(wallet.userId)) {
+        orphanReasons.push('rpcLockedBalance > 0 sem RpcLimitOrder OPEN SELL_RPC');
+      }
+      if (Number(wallet.lockedBalance) > 0 && !openMarketByUser.has(wallet.userId)) {
+        orphanReasons.push('lockedBalance > 0 sem MarketOrder OPEN/PARTIALLY_FILLED');
+      }
+
+      if (orphanReasons.length > 0) {
+        alerts.push({
+          code: 'ORPHAN_LOCKED_BALANCE',
+          severity: 'CRITICAL',
+          title: 'Saldo travado sem ordem aberta',
+          description: 'Foi detectado saldo bloqueado sem ordem aberta compatível.',
+          entity: 'Wallet',
+          entityId: wallet.id,
+          userId: wallet.userId,
+          details: { reasons: orphanReasons },
+        });
+      }
+    }
+
+    for (const order of openRpcOrders) {
+      if (order.side === 'BUY_RPC' && Number(order.lockedFiatAmount) <= 0) {
+        alerts.push({
+          code: 'OPEN_ORDER_WITHOUT_LOCK',
+          severity: 'CRITICAL',
+          title: 'Ordem aberta sem saldo travado',
+          description: 'Ordem OPEN BUY_RPC encontrada sem travamento de R$.',
+          entity: 'RpcLimitOrder',
+          entityId: order.id,
+          userId: order.userId,
+          details: { side: order.side, status: order.status, lockedFiatAmount: String(order.lockedFiatAmount) },
+        });
+      }
+      if (order.side === 'SELL_RPC' && Number(order.lockedRpcAmount) <= 0) {
+        alerts.push({
+          code: 'OPEN_ORDER_WITHOUT_LOCK',
+          severity: 'CRITICAL',
+          title: 'Ordem aberta sem saldo travado',
+          description: 'Ordem OPEN SELL_RPC encontrada sem travamento de RPC.',
+          entity: 'RpcLimitOrder',
+          entityId: order.id,
+          userId: order.userId,
+          details: { side: order.side, status: order.status, lockedRpcAmount: String(order.lockedRpcAmount) },
+        });
+      }
+    }
+
+    for (const order of marketOpenOrders) {
+      if (order.remainingQuantity <= 0) continue;
+      const missingLock = (order.type === 'BUY' && Number(order.lockedCash) <= 0)
+        || (order.type === 'SELL' && Number(order.lockedShares) <= 0);
+      if (!missingLock) continue;
+
+      alerts.push({
+        code: 'OPEN_ORDER_WITHOUT_LOCK',
+        severity: 'CRITICAL',
+        title: 'Ordem aberta sem bloqueio compatível',
+        description: 'Ordem de mercado aberta/parcial sem bloqueio compatível para a quantidade restante.',
+        entity: 'MarketOrder',
+        entityId: order.id,
+        userId: order.userId,
+        details: {
+          type: order.type,
+          status: order.status,
+          remainingQuantity: order.remainingQuantity,
+          lockedCash: String(order.lockedCash),
+          lockedShares: order.lockedShares,
+        },
+      });
+    }
+
+    const rpcTrades = await prisma.rpcExchangeTrade.findMany();
+    for (const trade of rpcTrades) {
+      const rpcAmount = Number(trade.rpcAmount);
+      if (rpcAmount <= 0) continue;
+      const fiatAmount = Number(trade.fiatAmount);
+      const unitPrice = Number(trade.unitPrice);
+      const expectedUnitPrice = fiatAmount / rpcAmount;
+      const diff = Math.abs(unitPrice - expectedUnitPrice);
+      if (diff <= unitPriceTolerance) continue;
+
+      alerts.push({
+        code: 'INCONSISTENT_RPC_TRADE_UNIT_PRICE',
+        severity: 'CRITICAL',
+        title: 'Trade RPC/R$ com unitPrice inconsistente',
+        description: 'unitPrice divergente do cálculo fiatAmount/rpcAmount.',
+        entity: 'RpcExchangeTrade',
+        entityId: trade.id,
+        userId: trade.userId,
+        details: { fiatAmount, rpcAmount, unitPrice, expectedUnitPrice, diff },
+      });
+    }
+
+    const companyTrades = await prisma.trade.findMany();
+    for (const trade of companyTrades) {
+      if (trade.quantity <= 0) continue;
+      const expectedUnitPrice = Number(trade.grossAmount) / trade.quantity;
+      const unitPrice = Number(trade.unitPrice);
+      const diff = Math.abs(unitPrice - expectedUnitPrice);
+      if (diff <= unitPriceTolerance) continue;
+      alerts.push({
+        code: 'INCONSISTENT_COMPANY_TRADE_UNIT_PRICE',
+        severity: 'WARNING',
+        title: 'Trade de empresa com unitPrice inconsistente',
+        description: 'unitPrice divergente do cálculo grossAmount/quantity.',
+        entity: 'Trade',
+        entityId: trade.id,
+        details: { grossAmount: Number(trade.grossAmount), quantity: trade.quantity, unitPrice, expectedUnitPrice, diff },
+      });
+    }
+
+    const pendingWithdrawals = await prisma.withdrawalRequest.findMany({
+      where: { status: { in: ['PENDING', 'PROCESSING'] } },
+      select: { userId: true, amount: true },
+    });
+    const pendingByUser = new Map<string, number>();
+    for (const withdrawal of pendingWithdrawals) {
+      const current = pendingByUser.get(withdrawal.userId) ?? 0;
+      pendingByUser.set(withdrawal.userId, current + Number(withdrawal.amount));
+    }
+    for (const [userId, pendingTotal] of pendingByUser.entries()) {
+      const wallet = wallets.find((item) => item.userId === userId);
+      const pendingBalance = Number(wallet?.fiatPendingWithdrawalBalance ?? 0);
+      if (pendingTotal <= pendingBalance) continue;
+      alerts.push({
+        code: 'WITHDRAWAL_WITHOUT_PENDING_BALANCE',
+        severity: 'CRITICAL',
+        title: 'Saque pendente sem saldo pendente suficiente',
+        description: 'A soma dos saques pendentes/processando excede o saldo pendente da carteira.',
+        entity: 'WithdrawalRequest',
+        entityId: userId,
+        userId,
+        details: {
+          pendingWithdrawalsTotal: pendingTotal,
+          fiatPendingWithdrawalBalance: pendingBalance,
+          diff: pendingTotal - pendingBalance,
+        },
+      });
+    }
+
+    const platformAccounts = await prisma.platformAccount.findMany();
+    for (const account of platformAccounts) {
+      const negatives: Array<{ field: string; value: number }> = [
+        { field: 'balance', value: Number(account.balance) },
+        { field: 'totalReceivedFees', value: Number(account.totalReceivedFees) },
+        { field: 'totalWithdrawn', value: Number(account.totalWithdrawn) },
+      ].filter(({ value }) => value < 0);
+      if (negatives.length === 0) continue;
+      alerts.push({
+        code: 'NEGATIVE_PLATFORM_ACCOUNT',
+        severity: 'CRITICAL',
+        title: 'Conta da plataforma negativa',
+        description: 'A PlatformAccount possui campo econômico negativo.',
+        entity: 'PlatformAccount',
+        entityId: account.id,
+        details: {
+          negativeFields: negatives,
+        },
+      });
+    }
+
+    const critical = alerts.filter((alert) => alert.severity === 'CRITICAL').length;
+    const warning = alerts.filter((alert) => alert.severity === 'WARNING').length;
+    return { summary: { total: alerts.length, critical, warning }, alerts };
+  });
+
   app.get('/admin/treasury/balance', { preHandler: [app.authenticate] }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];
