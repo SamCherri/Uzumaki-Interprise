@@ -201,5 +201,6 @@ Objetivo da fase de PWA:
 ### Carteiras econômicas separadas
 - Carteira pessoal
 - Receita do projeto
-- Reserva definitiva de boost
+- Reserva institucional do projeto
+- Reserva de tokens recomprados
 - Conta da Exchange
