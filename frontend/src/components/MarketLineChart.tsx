@@ -24,7 +24,7 @@ export function MarketLineChart({ points, currentPrice = 0, timeframe = '24H', h
 
   const chart = useMemo(() => {
     const sorted = [...points].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).filter((point) => Number.isFinite(point.price) && point.price > 0);
-    if (sorted.length === 0) return { data: [] as PlotPoint[], linePoints: '', areaPoints: '', min: 0, max: 0, currentY: 52, hasVolume: false, maxVolume: 0 };
+    if (sorted.length === 0) return { data: [] as PlotPoint[], linePoints: '', areaPoints: '', min: 0, max: 0, currentY: 52, minY: 86, maxY: 20, hasVolume: false, maxVolume: 0 };
 
     const prices = sorted.map((point) => point.price);
     const refPrice = currentPrice > 0 ? currentPrice : prices[prices.length - 1];
@@ -55,6 +55,8 @@ export function MarketLineChart({ points, currentPrice = 0, timeframe = '24H', h
       min: rawMin,
       max: rawMax,
       currentY: yFor(refPrice),
+      minY: yFor(rawMin),
+      maxY: yFor(rawMax),
       hasVolume: volumes.length > 0,
       maxVolume: Math.max(...volumes, 1),
     };
@@ -99,7 +101,7 @@ export function MarketLineChart({ points, currentPrice = 0, timeframe = '24H', h
               <stop offset="100%" stopColor="rgba(250,204,21,0.06)" />
             </linearGradient>
           </defs>
-          {[20, 36, 52, 68, 84].map((lineY) => <line key={lineY} className="chart-grid-line" x1="6" x2="94" y1={lineY} y2={lineY} />)}
+          {[18, 32, 46, 60, 74, 86].map((lineY) => <line key={lineY} className="chart-grid-line market-line-chart-grid" x1="6" x2="94" y1={lineY} y2={lineY} />)}
           <line className="current-price-line" x1="6" x2="94" y1={chart.currentY} y2={chart.currentY} />
           <polygon points={chart.areaPoints} className="market-line-chart-area" style={{ fill: `url(#${gradientId})` }} />
           <polyline points={chart.linePoints} className="market-line-chart-line" vectorEffect="non-scaling-stroke" />
@@ -119,6 +121,13 @@ export function MarketLineChart({ points, currentPrice = 0, timeframe = '24H', h
         )}
 
         <div className="market-line-chart-price-label" style={{ top: `${Math.max(8, Math.min(86, chart.currentY))}%` }}>R$ {formatPrice((currentPrice > 0 ? currentPrice : activePoint?.price) ?? 0)}</div>
+
+        <div className="market-line-chart-scale">
+          <span style={{ top: `${Math.max(8, Math.min(86, chart.maxY))}%` }}>R$ {formatPrice(chart.max)}</span>
+          <span style={{ top: `${Math.max(8, Math.min(86, chart.currentY))}%` }}>R$ {formatPrice((currentPrice > 0 ? currentPrice : activePoint?.price) ?? 0)}</span>
+          <span style={{ top: `${Math.max(8, Math.min(86, chart.minY))}%` }}>R$ {formatPrice(chart.min)}</span>
+        </div>
+
       </div>
 
       {chart.hasVolume && (

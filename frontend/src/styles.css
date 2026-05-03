@@ -810,16 +810,19 @@ input[type="checkbox"] {
 .market-line-chart { position: relative; display: grid; gap: 10px; animation: marketChartFade .25s ease; }
 .market-line-chart-stage { position: relative; }
 .market-line-chart-svg { width: 100%; height: 220px; display: block; }
-.market-line-chart-area { fill: url(#marketLineAreaGradient); }
-.market-line-chart-line { fill: none; stroke: #60a5fa; stroke-width: 1.25; transition: all .2s ease; }
+.market-line-chart-area { opacity: .26; }
+.market-line-chart-line { fill: none; stroke: #7dd3fc; stroke-width: 1.6; filter: drop-shadow(0 0 2px rgba(125,211,252,.22)); transition: all .2s ease; }
 .market-line-chart-cursor { stroke: rgba(148,163,184,.75); stroke-width: .45; stroke-dasharray: 2 2; }
 .market-line-chart-dot { fill: #f8fafc; stroke: #60a5fa; stroke-width: .5; }
 .market-line-chart-tooltip { position: absolute; top: 8px; z-index: 4; min-width: 130px; border: 1px solid rgba(148,163,184,.35); border-radius: 10px; background: rgba(15,23,42,.92); padding: 8px; display: grid; gap: 2px; font-size: .75rem; pointer-events: none; }
 .market-line-chart-tooltip strong { color: #f8fafc; }
 .market-line-chart-tooltip span { color: #cbd5e1; }
-.market-line-chart-price-label { position: absolute; right: 2px; transform: translateY(-50%); border: 1px solid rgba(250,204,21,.45); background: rgba(250,204,21,.2); color: #fef3c7; padding: 3px 7px; border-radius: 999px; font-weight: 700; font-size: .75rem; }
+.market-line-chart-price-label { position: absolute; right: 2px; transform: translateY(-50%); border: 1px solid rgba(250,204,21,.45); background: rgba(250,204,21,.2); color: #fef3c7; padding: 3px 7px; border-radius: 999px; font-weight: 700; font-size: .75rem; z-index: 3; }
 .market-line-chart-volume { min-height: 56px; display: flex; align-items: end; gap: 3px; opacity: .9; }
-.market-line-chart-volume span { flex: 1; background: linear-gradient(180deg, rgba(96,165,250,.5), rgba(59,130,246,.18)); border-radius: 4px 4px 0 0; }
+.market-line-chart-volume span { flex: 1; background: linear-gradient(180deg, rgba(125,211,252,.35), rgba(56,189,248,.12)); border-radius: 4px 4px 0 0; }
 .market-line-chart-empty { margin: 0; border: 1px dashed #475569; border-radius: 12px; padding: 14px; color: #cbd5e1; background: rgba(30, 41, 59, 0.5); }
 
+ .market-line-chart-grid { stroke: rgba(148,163,184,.22); stroke-width: .34; }
+.market-line-chart-scale { position: absolute; right: 0; top: 0; bottom: 0; width: 74px; pointer-events: none; }
+.market-line-chart-scale span { position: absolute; right: 4px; transform: translateY(-50%); color: rgba(203,213,225,.8); font-size: .68rem; background: rgba(2,6,23,.58); padding: 1px 5px; border-radius: 6px; border: 1px solid rgba(148,163,184,.2); }
 @keyframes marketChartFade { from { opacity: .6; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
