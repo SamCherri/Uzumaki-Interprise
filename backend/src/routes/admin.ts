@@ -4,6 +4,8 @@ import bcrypt from 'bcryptjs';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { getMarketHealthReport } from '../services/market-health-service.js';
+import { toCsv } from '../services/csv-export-service.js';
 
 type AuthRequest = FastifyRequest & { user: { sub: string; roles?: string[] } };
 
@@ -338,6 +340,47 @@ export async function adminRoutes(app: FastifyInstance) {
     const critical = alerts.filter((alert) => alert.severity === 'CRITICAL').length;
     const warning = alerts.filter((alert) => alert.severity === 'WARNING').length;
     return { summary: { total: alerts.length, critical, warning }, alerts };
+  });
+
+  app.get('/admin/market-health', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authRequest = request as AuthRequest;
+    const roles = authRequest.user.roles ?? [];
+    if (!requireRole(reply, roles, ['SUPER_ADMIN', 'AUDITOR', 'COIN_CHIEF_ADMIN'], 'Sem permissão.')) return;
+    return getMarketHealthReport();
+  });
+
+  app.get('/admin/market-health.csv', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authRequest = request as AuthRequest;
+    const roles = authRequest.user.roles ?? [];
+    if (!requireRole(reply, roles, ['SUPER_ADMIN', 'AUDITOR', 'COIN_CHIEF_ADMIN'], 'Sem permissão.')) return;
+    const report = await getMarketHealthReport();
+    const rows = Object.entries(report.sections).flatMap(([section, payload]) => payload.issues.map((issue) => ({
+      section,
+      severity: issue.severity,
+      code: issue.code,
+      title: issue.title,
+      entity: issue.entity ?? '',
+      entityId: issue.entityId ?? '',
+      userId: issue.userId ?? '',
+      expected: issue.expected ?? '',
+      actual: issue.actual ?? '',
+      description: issue.description,
+    })));
+    const csv = toCsv(rows, [
+      { key: 'section', header: 'section' },
+      { key: 'severity', header: 'severity' },
+      { key: 'code', header: 'code' },
+      { key: 'title', header: 'title' },
+      { key: 'entity', header: 'entity' },
+      { key: 'entityId', header: 'entityId' },
+      { key: 'userId', header: 'userId' },
+      { key: 'expected', header: 'expected' },
+      { key: 'actual', header: 'actual' },
+      { key: 'description', header: 'description' },
+    ]);
+    reply.header('Content-Type', 'text/csv; charset=utf-8');
+    reply.header('Content-Disposition', 'attachment; filename=\"market-health.csv\"');
+    return reply.send(csv);
   });
 
   app.get('/admin/treasury/balance', { preHandler: [app.authenticate] }, async (request, reply) => {
