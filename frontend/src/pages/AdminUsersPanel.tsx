@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { ConfirmActionModal } from '../components/ConfirmActionModal';
 import { api } from '../services/api';
 import { translateRole } from '../utils/labels';
+import { getOfficialRoleBadge } from '../utils/roleBadges';
 
 type UserRow = {
   id: string;
@@ -179,6 +180,7 @@ export function AdminUsersPanel({ onPermissionsUpdated, mode = 'users' }: AdminU
           {users.map((user) => (
           <article key={user.id} className="summary-item compact-card">
             <strong>Usuário: {user.name}</strong>
+            {getOfficialRoleBadge(user.roles) && <span className="official-badge">{getOfficialRoleBadge(user.roles)}</span>}
             <p>Personagem: {user.characterName ?? 'Sem personagem'}</p>
             <p>Conta RP: {user.bankAccountNumber ?? 'Sem conta RP'}</p>
             <p className="info-text">Email técnico: {user.email}</p>
@@ -222,6 +224,7 @@ export function AdminUsersPanel({ onPermissionsUpdated, mode = 'users' }: AdminU
         {brokers.map((broker) => (
           <article key={broker.id} className="summary-item compact-card">
             <strong>Usuário: {broker.name}</strong>
+            {getOfficialRoleBadge(broker.roles) && <span className="official-badge">{getOfficialRoleBadge(broker.roles)}</span>}
             <p>Personagem: {broker.characterName ?? 'Sem personagem'}</p>
             <p>Conta RP: {broker.bankAccountNumber ?? 'Sem conta RP'}</p>
             <p className="info-text">Email técnico: {broker.email}</p>
