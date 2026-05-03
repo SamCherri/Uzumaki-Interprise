@@ -72,6 +72,20 @@ export async function companyRoutes(app: FastifyInstance) {
     try {
       const body = companyRequestSchema.parse(request.body);
       assertCompanyRequestRules(body);
+      const roles = authRequest.user.roles ?? [];
+      const isAdminUser = isAdmin(roles);
+      if (!isAdminUser) {
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const createdCount = await prisma.company.count({
+          where: {
+            founderUserId: authRequest.user.sub,
+            createdAt: { gte: since },
+          },
+        });
+        if (createdCount >= MAX_PROJECT_CREATIONS_PER_DAY) {
+          return reply.status(429).send({ message: 'Limite diário de criação de projetos atingido.' });
+        }
+      }
 
       const ticker = body.ticker.trim().toUpperCase();
       const existing = await prisma.company.findUnique({ where: { ticker } });

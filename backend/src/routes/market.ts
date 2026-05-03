@@ -481,6 +481,17 @@ export async function marketRoutes(app: FastifyInstance) {
 
     try {
       const body = createOrderSchema.parse(request.body);
+      const openOrdersCount = await prisma.marketOrder.count({
+        where: {
+          userId: authRequest.user.sub,
+          status: { in: ['OPEN', 'PARTIALLY_FILLED'] },
+        },
+      });
+      if (openOrdersCount >= COMPANY_MARKET_MAX_OPEN_ORDERS_PER_USER) {
+        return reply.status(429).send({
+          message: 'Limite de ordens abertas atingido. Cancele ordens antigas antes de criar novas.',
+        });
+      }
 
       const order = await prisma.$transaction(async (tx: Tx) => {
         const company = await getCompanyOrThrow(tx, body.companyId);

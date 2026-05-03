@@ -318,10 +318,6 @@ export async function rpcMarketRoutes(app: FastifyInstance) {
     try {
       const { id } = z.object({ id: z.string().min(1) }).parse(request.params ?? {});
       const userId = (request.user as { sub: string }).sub;
-      const openOrdersCount = await prisma.rpcLimitOrder.count({ where: { userId, status: 'OPEN' } });
-      if (openOrdersCount >= RPC_MARKET_MAX_OPEN_ORDERS_PER_USER) {
-        return reply.status(429).send({ message: 'Limite de ordens abertas atingido. Cancele ordens antigas antes de criar novas.' });
-      }
       const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const order = await tx.rpcLimitOrder.findUnique({ where: { id } });
         if (!order || order.userId !== userId) throw new Error('Ordem não encontrada.');
