@@ -109,45 +109,132 @@ Preço no secundário só muda por trade real, nunca por injeção administrativ
 Objetivo:
 Consolidar caixa institucional separado e rastreável para cada projeto.
 
+Implementar futuramente:
+- entradas permitidas: taxas do projeto, transferência real de RPC e ajuste administrativo excepcional auditado;
+- entradas proibidas: lucro RP externo virando RPC automática e crédito livre do fundador;
+- histórico de entradas e saídas;
+- motivo obrigatório em toda movimentação sensível;
+- origem rastreável do saldo institucional;
+- logs administrativos/econômicos.
+
+Não deve:
+- alterar preço;
+- criar trade;
+- criar ordem;
+- mexer em supply.
+
 ### PR 5 — Programa de recompra com RPC existente
 
 Objetivo:
 Permitir que projetos usem RPC institucional rastreável para recomprar o próprio token.
+
+Implementar futuramente:
+- usar apenas RPC existente e rastreável;
+- execução contra ordens reais de venda;
+- bloqueio de self-trade;
+- expiração;
+- renovação;
+- saldo não usado voltando para caixa/reserva do projeto;
+- logs de execução e governança.
+
+Regra:
+Preço só sobe se houver trade real executado.
 
 ### PR 6 — Reserva de tokens recomprados
 
 Objetivo:
 Criar reserva institucional para tokens recomprados.
 
+Implementar futuramente:
+- tokens recomprados saem dos vendedores;
+- entram na reserva institucional do projeto;
+- não vão para carteira pessoal do dono;
+- podem futuramente ser queimados, mantidos bloqueados, usados em evento ou nova oferta controlada.
+
 ### PR 7 — Distribuição para holders, se mantida
 
 Objetivo:
 Permitir distribuição auditável de RPC para holders, se a política for mantida.
+
+Implementar futuramente:
+- uso exclusivo de RPC existente no caixa institucional;
+- snapshot de holders;
+- cálculo proporcional;
+- extrato para usuário;
+- logs administrativos/econômicos;
+- proteção contra manipulação.
 
 ### PR 8 — Política da RPC
 
 Objetivo:
 Consolidar RPC como moeda base controlada.
 
+Implementar futuramente:
+- RPC não é infinita;
+- supply planejado;
+- circulação;
+- tesouraria;
+- emissão;
+- logs obrigatórios;
+- painel e alertas de emissão.
+
 ### PR 9 — Auditoria econômica
 
 Objetivo:
 Detectar inconsistências econômicas e reforçar governança.
+
+Alertas futuros:
+- saldo negativo;
+- ordem aberta sem saldo travado;
+- preço alterado sem trade;
+- crédito institucional sem origem rastreável;
+- programa de recompra vencido;
+- saldo preso sem destino;
+- self-trade;
+- emissão sem log;
+- admin mexendo em saldo sem motivo.
 
 ### PR 10 — Simulador do ciclo completo
 
 Objetivo:
 Depois de fechar a economia real, evoluir o Test Mode para simular o ciclo completo.
 
+Simular futuramente:
+- R$ → RPC → token/projeto;
+- oferta inicial;
+- mercado secundário;
+- recompra;
+- reserva;
+- distribuição, se mantida;
+- venda em massa;
+- baixa liquidez;
+- entrada/saída de baleia.
+
 ### PR 11 — UX funcional
 
 Objetivo:
 Melhorar clareza e segurança de uso antes do visual premium.
 
+Implementar futuramente:
+- mensagens claras;
+- anti-clique duplo;
+- preview de impacto;
+- aviso de risco;
+- explicação de R$ → RPC → token;
+- explicação de mercado primário/secundário;
+- explicação de recompra/reserva/distribuição.
+
 ### PR 12 — Visual premium
 
 Objetivo:
 Somente depois da economia estar fechada.
+
+Implementar futuramente:
+- gráfico premium;
+- livro de ordens premium;
+- dashboard refinado;
+- melhorias mobile;
+- animações.
 
 ## Ordem oficial atual
 
@@ -180,4 +267,5 @@ Em caso de conflito:
 - regra de segurança econômica vence visual;
 - não criar preço falso;
 - não criar volume falso;
-- não criar liquidez falsa.
+- não criar liquidez falsa;
+- não criar crédito institucional livre sem origem rastreável.
