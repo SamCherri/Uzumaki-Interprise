@@ -236,6 +236,37 @@ export async function adminRoutes(app: FastifyInstance) {
       });
     }
 
+    // Detecção simples baseada em atividade recente no AdminLog.
+    // Se não houver IP/userAgent suficientes no banco, nenhum alerta é gerado para evitar falso positivo.
+    const suspiciousWindowStart = new Date(Date.now() - (24 * 60 * 60 * 1000));
+    const logsWithIp = await prisma.adminLog.findMany({
+      where: { createdAt: { gte: suspiciousWindowStart }, ip: { not: null } },
+      select: { ip: true, userId: true },
+      take: 2000,
+    });
+    const usersByIp = new Map<string, Set<string>>();
+    for (const log of logsWithIp) {
+      const ip = log.ip;
+      if (!ip) continue;
+      const ipKey = String(ip);
+      if (!usersByIp.has(ipKey)) usersByIp.set(ipKey, new Set());
+      if (!log.userId) continue;
+      usersByIp.get(ipKey)!.add(log.userId);
+    }
+    for (const [ip, users] of usersByIp.entries()) {
+      if (users.size >= 4) {
+        alerts.push({
+          code: 'SUSPICIOUS_MULTI_ACCOUNT_ACTIVITY',
+          severity: 'WARNING',
+          title: 'Atividade suspeita de múltiplas contas',
+          description: 'Múltiplos usuários distintos operaram com o mesmo IP em janela recente.',
+          entity: 'AdminLog',
+          entityId: ip,
+          details: { ip, uniqueUsers: users.size, windowHours: 24 },
+        });
+      }
+    }
+
     const companyTrades = await prisma.trade.findMany();
     for (const trade of companyTrades) {
       if (trade.quantity <= 0) continue;

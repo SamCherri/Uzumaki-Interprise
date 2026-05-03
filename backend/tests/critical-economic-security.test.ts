@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import bcrypt from 'bcryptjs';
+import { RPC_MARKET_MAX_OPEN_ORDERS_PER_USER } from '../src/config/anti-abuse-limits.js';
 
 if (process.env.NODE_ENV === 'production') throw new Error('Testes não podem rodar em produção.');
 if (!process.env.TEST_DATABASE_URL) throw new Error('TEST_DATABASE_URL é obrigatório para testes de integração.');
@@ -45,6 +46,7 @@ async function resetDb() {
     prisma.testModeTrade.deleteMany(),
     prisma.testModeWallet.deleteMany(),
     prisma.testModeMarketState.deleteMany(),
+    prisma.systemModeConfig.deleteMany(),
     prisma.user.deleteMany(),
     prisma.platformAccount.deleteMany(),
     prisma.treasuryAccount.deleteMany(),
@@ -938,8 +940,12 @@ test('modo teste: preço, leaderboard, guardas e report types', async () => {
   const sorted = [...rows].sort((a, b) => Number(b.estimatedTotalFiat) - Number(a.estimatedTotalFiat));
   assert.deepEqual(rows.map((r) => r.userId), sorted.map((r) => r.userId));
 
-  for (const type of ['BUG','VISUAL_ERROR','BALANCE_ERROR','CHEAT_SUSPECTED','SUGGESTION','OTHER']) {
-    const report = await app.inject({ method: 'POST', url: '/api/test-mode/reports', headers: { authorization: `Bearer ${userToken}` }, payload: { type, location: 'Tela', description: 'Teste' } });
+  const reportTypes = ['BUG','VISUAL_ERROR','BALANCE_ERROR','CHEAT_SUSPECTED','SUGGESTION','OTHER'] as const;
+  for (const [idx, type] of reportTypes.entries()) {
+    const reportUser = await mkUser(`tmode-report-${idx}@test.local`, `TMode Report ${idx}`);
+    await prisma.userRole.create({ data: { userId: reportUser.id, roleId: rUser.id } });
+    const reportToken = await token(reportUser.id, ['USER']);
+    const report = await app.inject({ method: 'POST', url: '/api/test-mode/reports', headers: { authorization: `Bearer ${reportToken}` }, payload: { type, location: 'Tela', description: 'Teste' } });
     assert.equal(report.statusCode, 201, report.body);
   }
 
@@ -959,6 +965,11 @@ test('bot tick do modo teste só opera em TEST e não altera economia real', asy
   await prisma.platformAccount.create({ data: {} });
 
   const userToken = await token(user.id, ['USER']);
+  await prisma.systemModeConfig.upsert({
+    where: { id: 'SYSTEM_MODE_MAIN' },
+    update: { mode: 'NORMAL' },
+    create: { id: 'SYSTEM_MODE_MAIN', mode: 'NORMAL' },
+  });
 
   const normalMode = await app.inject({
     method: 'POST',
@@ -1134,9 +1145,22 @@ test('ordens limite RPC/R$ bloqueadores P1: arredondamento mínimo e seleção p
   assert.equal(tooSmallSell.statusCode, 400, tooSmallSell.body);
   assert.match(tooSmallSell.body, /valor mínimo para ordem é 0,01/i);
 
-  for (let i = 0; i < 220; i += 1) {
-    const o = await app.inject({ method: 'POST', url: '/api/rpc-market/orders', headers: { authorization: `Bearer ${buyerTk}` }, payload: { side: 'BUY_RPC', fiatAmount: 1, limitPrice: 0.5 } });
-    assert.equal(o.statusCode, 201, o.body);
+  const makerCount = 11;
+  const buyers = [{ id: buyer.id, token: buyerTk }];
+  for (let i = 0; i < makerCount - 1; i += 1) {
+    const maker = await mkUser(`p1-maker-buy-${i}@test.local`);
+    await prisma.userRole.create({ data: { userId: maker.id, roleId: rUser.id } });
+    await prisma.wallet.update({ where: { userId: maker.id }, data: { fiatAvailableBalance: 1000 } });
+    buyers.push({ id: maker.id, token: await token(maker.id, ['USER']) });
+  }
+
+  for (const maker of buyers) {
+    const openCount = await prisma.rpcLimitOrder.count({ where: { userId: maker.id, status: 'OPEN' } });
+    assert.ok(openCount < RPC_MARKET_MAX_OPEN_ORDERS_PER_USER);
+    for (let i = 0; i < RPC_MARKET_MAX_OPEN_ORDERS_PER_USER; i += 1) {
+      const o = await app.inject({ method: 'POST', url: '/api/rpc-market/orders', headers: { authorization: `Bearer ${maker.token}` }, payload: { side: 'BUY_RPC', fiatAmount: 1, limitPrice: 0.5 } });
+      assert.equal(o.statusCode, 201, o.body);
+    }
   }
 
   const eligibleSell = await app.inject({ method: 'POST', url: '/api/rpc-market/orders', headers: { authorization: `Bearer ${sellerTk}` }, payload: { side: 'SELL_RPC', rpcAmount: 20, limitPrice: 0.8 } });
