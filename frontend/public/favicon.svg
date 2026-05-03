@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="RPC símbolo">
+  <rect width="512" height="512" rx="110" fill="#020617"/>
+  <circle cx="256" cy="256" r="162" fill="#b45309"/>
+  <circle cx="256" cy="256" r="136" fill="#facc15"/>
+  <circle cx="256" cy="256" r="112" fill="#b45309"/>
+  <text x="256" y="284" text-anchor="middle" font-size="120" font-family="Inter,Arial,sans-serif" font-weight="700" fill="#fde68a">RPC</text>
+  <path d="M72 382 L194 287" stroke="#0ea5e9" stroke-width="36" stroke-linecap="round"/>
+  <polygon points="194,287 230,293 214,322" fill="#38bdf8"/>
+  <path d="M170 96 L392 161" stroke="#0ea5e9" stroke-width="36" stroke-linecap="round"/>
+  <polygon points="392,161 365,132 353,175" fill="#38bdf8"/>
+  <path d="M324 430 L420 187" stroke="#eab308" stroke-width="36" stroke-linecap="round"/>
+  <polygon points="420,187 385,175 396,216" fill="#facc15"/>
+</svg>

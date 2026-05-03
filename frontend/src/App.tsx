@@ -262,7 +262,7 @@ export function App() {
       <main className="container auth-shell">
         <section className="card public-entry-card">
           <header className="public-entry-header">
-            <h1>RPC Exchange</h1>
+            <img src="/brand/rpc-exchange-logo.svg" alt="RPC Exchange" className="app-logo" />
             <p className="subtitle">Ferramenta de interpretação de exchange para RP.</p>
             <p className="warning">Esta é uma ferramenta de simulação/interpretação de uma exchange. Nenhum valor possui conversão para dinheiro real.</p>
             <p className="info-text">Sem cripto real, sem blockchain, sem Pix, sem cartão e sem gateway de pagamento.</p>
@@ -323,7 +323,7 @@ export function App() {
           <button className="hamburger-button mobile-only" type="button" aria-label="Abrir menu" onClick={() => setIsGlobalDrawerOpen(true)}>☰</button>
           <div className="mobile-topbar-title">
             <span className="mobile-topbar-badge">Simulação RP</span>
-            <h1>RPC Exchange</h1>
+            <img src="/brand/rpc-exchange-logo.svg" alt="RPC Exchange" className="app-logo" />
             <p className="subtitle">Simulação econômica RP</p>
           </div>
           <button className="button-danger small-button desktop-only" onClick={handleLogout}>

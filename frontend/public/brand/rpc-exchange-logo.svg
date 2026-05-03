@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" role="img" aria-label="RPC Exchange">
+  <rect width="1200" height="300" fill="#020617"/>
+  <g transform="translate(24,20)">
+    <circle cx="130" cy="130" r="92" fill="#b45309"/>
+    <circle cx="130" cy="130" r="78" fill="#facc15"/>
+    <circle cx="130" cy="130" r="64" fill="#b45309"/>
+    <text x="130" y="146" text-anchor="middle" font-size="58" font-family="Inter,Arial,sans-serif" font-weight="700" fill="#fde68a">RPC</text>
+    <path d="M20 220 L100 170" stroke="#0ea5e9" stroke-width="22" stroke-linecap="round"/>
+    <polygon points="100,170 125,173 112,192" fill="#38bdf8"/>
+    <path d="M74 50 L220 92" stroke="#0ea5e9" stroke-width="22" stroke-linecap="round"/>
+    <polygon points="220,92 205,76 198,100" fill="#38bdf8"/>
+    <path d="M182 228 L242 98" stroke="#eab308" stroke-width="22" stroke-linecap="round"/>
+    <polygon points="242,98 222,91 228,113" fill="#facc15"/>
+  </g>
+  <text x="330" y="145" font-size="96" font-family="Inter,Arial,sans-serif" font-weight="800">
+    <tspan fill="#22d3ee">RPC</tspan>
+    <tspan fill="#e2e8f0"> Exchange</tspan>
+  </text>
+  <text x="332" y="210" font-size="48" font-family="Inter,Arial,sans-serif" fill="#94a3b8">Simulação econômica RP</text>
+</svg>

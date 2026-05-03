@@ -1,29 +1,17 @@
 {
   "name": "RPC Exchange",
-  "short_name": "RPCX",
-  "description": "Plataforma de simulação econômica com tokens criados por usuários e mercados em RPC.",
+  "short_name": "RPC",
+  "description": "RPC Exchange - Simulação econômica RP",
   "start_url": "/",
-  "scope": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#1f2a44",
-  "orientation": "portrait",
+  "background_color": "#020617",
+  "theme_color": "#020617",
   "icons": [
     {
-      "src": "/icons/icon-192.svg",
-      "sizes": "192x192",
-      "type": "image/svg+xml"
-    },
-    {
-      "src": "/icons/icon-512.svg",
-      "sizes": "512x512",
-      "type": "image/svg+xml"
-    },
-    {
-      "src": "/icons/icon-maskable.svg",
+      "src": "/icons/rpc-exchange-icon.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ]
 }
