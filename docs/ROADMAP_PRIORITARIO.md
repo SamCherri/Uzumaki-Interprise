@@ -270,4 +270,4 @@ Em caso de conflito:
 - não criar liquidez falsa;
 - não criar crédito institucional livre sem origem rastreável.
 
-- [x] PR 1 — Fluxo de capital R$ → RPC → token/projeto (implementação base com aporte rastreável no backend e UI do dono).
+- [~] PR 1 — Fluxo de capital R$ → RPC → token/projeto (implementação parcial: fluxo base + testes iniciais; ajustes adicionais podem evoluir em follow-up).
