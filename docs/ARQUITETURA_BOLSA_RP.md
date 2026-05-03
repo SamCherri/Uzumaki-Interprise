@@ -84,6 +84,31 @@ Regra estrutural:
 
 ---
 
+
+## Fluxo econômico completo desejado
+
+Jogador ganha dinheiro no RP
+→ compra/recebe RPC
+→ compra tokens em oferta inicial ou mercado secundário
+→ projeto acumula receita/lucro
+→ projeto pode recomprar, distribuir ou reservar
+→ holders ganham por valorização real ou distribuição
+→ logs e auditoria acompanham tudo.
+
+Componentes obrigatórios desse fluxo:
+- Tesouraria RPC;
+- corretores/jogadores;
+- oferta inicial;
+- mercado secundário;
+- caixa institucional do projeto;
+- receita por taxas;
+- lucro RP registrado no projeto;
+- recompra;
+- distribuição para holders;
+- reserva de tokens recomprados;
+- auditoria;
+- Test Mode isolado.
+
 ## 5) Fluxo de taxas implementado (fase atual)
 
 1. Existe uma carteira única da plataforma (`PlatformAccount`) para receitas de taxas.
@@ -176,5 +201,6 @@ Objetivo da fase de PWA:
 ### Carteiras econômicas separadas
 - Carteira pessoal
 - Receita do projeto
-- Reserva definitiva de boost
+- Reserva institucional do projeto
+- Reserva de tokens recomprados
 - Conta da Exchange

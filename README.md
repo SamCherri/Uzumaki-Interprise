@@ -8,6 +8,15 @@ Projeto de **interpretação/simulação** com mercados e tokens virtuais em uma
 
 ## Direção atual do produto
 
+## Fonte de prioridade atual
+
+A priorização oficial está em [docs/ROADMAP_PRIORITARIO.md](docs/ROADMAP_PRIORITARIO.md). Antes de alterar economia, mercado, RPC, projeto, token, admin, simulador ou UX estrutural, leia esse arquivo.
+
+## Fase estratégica atual
+
+A fase estratégica atual é **fechar o ciclo econômico real da RPC Exchange** (caixa institucional, mercado primário correto, recompra real, reserva e distribuição auditável) antes de evoluir para visual premium, gráfico avançado, simulador avançado ou temporadas.
+
+
 - O app agora usa linguagem visual de **exchange de tokens** (RPC Exchange).
 - A moeda base visual da plataforma é **RPC**.
 - Os ativos são exibidos como pares de mercado dinâmicos, por exemplo **TOKEN/RPC**, **ABC/RPC** ou **XYZ/RPC**.
@@ -87,7 +96,7 @@ npm run build               # build backend + frontend
 npm run start:backend       # sobe backend em produção
 ```
 
-## Fase atual (MVP - bloco 5: saque manual de RPC)
+## Fase implementada atual (estado técnico)
 
 Implementado nesta fase:
 
@@ -143,7 +152,7 @@ Implementado nesta fase:
 21. Novo campo em carteira:
    - `pendingWithdrawalBalance`.
 
-## Endpoints principais da Fase 4A
+## Endpoints principais do estado atual
 
 Mercados/Projetos:
 - `POST /api/companies/request`
@@ -300,7 +309,7 @@ npm run prisma:seed
 - Notificações.
 
 
-## Impulsionar moeda (boost definitivo)
-- Dono do projeto (ou admin autorizado) pode injetar RPC para elevar preço sem receber tokens vendáveis.
-- Fontes: carteira pessoal, receita do projeto e ajuste administrativo.
-- Ação definitiva, auditada e sem alterar a regra de taxa 50/50.
+## Nota sobre mecânicas legadas
+- Referências antigas sobre “boost” ou “injeção” como mecanismo de subir preço diretamente devem ser tratadas como **legado/risco econômico**.
+- A diretriz prioritária atual é: preço de mercado secundário só muda por trade real e recompra deve executar contra ordens reais.
+- Veja a decisão oficial em `docs/ROADMAP_PRIORITARIO.md`.

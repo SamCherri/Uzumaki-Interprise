@@ -74,3 +74,20 @@ Não finalizar PR com:
 - recurso pela metade sem declarar pendência;
 - dados falsos;
 - descrição desatualizada.
+
+
+## Leitura obrigatória para tarefas estruturais
+
+Antes de tarefas de produto, economia, mercado, RPC, projeto/token, simulador, admin ou UX estrutural, o agente deve ler:
+
+1. AGENTS.md
+2. docs/CODEX_SKILLS.md
+3. docs/ROADMAP_PRIORITARIO.md
+4. docs/ARQUITETURA_BOLSA_RP.md
+5. docs/AUDITORIA_ATUAL.md
+
+Regras adicionais:
+- Se houver conflito entre documentação antiga e ROADMAP_PRIORITARIO.md, seguir ROADMAP_PRIORITARIO.md.
+- Não implementar boost que suba preço diretamente sem autorização explícita.
+- Não criar preço falso, volume falso ou liquidez falsa.
+- Priorizar ciclo econômico real antes de visual premium.

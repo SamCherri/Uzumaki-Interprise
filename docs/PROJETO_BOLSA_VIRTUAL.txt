@@ -1,3 +1,6 @@
+NOTA IMPORTANTE (documento histórico):
+Este documento é histórico/base conceitual inicial. A fonte atual de priorização é docs/ROADMAP_PRIORITARIO.md.
+
 # PROJETO: RPC EXCHANGE (SIMULAÇÃO ECONÔMICA)
 
 ## 1. Visão geral

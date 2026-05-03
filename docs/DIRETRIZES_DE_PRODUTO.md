@@ -126,9 +126,6 @@ Toda PR visual deve respeitar:
 
 
 
-### Impulsionar moeda
-A impulsão gasta RPC e aumenta o preço sem entregar tokens. É definitiva e somente dono/admin pode executar.
-
 
 ## Regra permanente — visibilidade de projetos desligados
 - Projetos desligados ficam ocultos das telas comuns, inclusive para dono e investidores. Eles continuam preservados no banco e visíveis apenas para administração, auditoria e relatórios.
@@ -154,3 +151,16 @@ Critérios:
 - Não criar abas falsas.
 - Não alterar regras econômicas.
 - Rodar typecheck/build.
+
+## 10. Regras econômicas institucionais (prioridade atual)
+
+- Injeção de RPC não deve subir preço diretamente.
+- No mercado secundário, preço oficial só muda por trade real.
+- Recompra deve executar contra ordens reais do livro.
+- Lucro do projeto deve entrar primeiro no caixa institucional do projeto.
+- Tokens recomprados devem ir para reserva institucional do projeto (não para carteira pessoal do dono).
+
+## 11. Regra legada (atenção)
+
+- Qualquer regra antiga de “impulsão que aumenta preço” deve ser tratada como legada/risco econômico e não como direção prioritária atual.
+- A fonte de prioridade oficial é `docs/ROADMAP_PRIORITARIO.md`.
