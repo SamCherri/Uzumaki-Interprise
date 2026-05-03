@@ -43,6 +43,10 @@ test('admin reports permissão e payload', async () => {
   const brokerOk = await app.inject({ method: 'GET', url: `/api/admin/reports/brokers/${broker.id}`, headers: { authorization: `Bearer ${token(auditor.id, ['AUDITOR'])}` } });
   assert.equal(brokerOk.statusCode, 200);
   assert.ok(brokerOk.body.includes('broker'));
+
+  const brokerCsvOk = await app.inject({ method: 'GET', url: `/api/admin/reports/brokers/${broker.id}.csv`, headers: { authorization: `Bearer ${token(auditor.id, ['AUDITOR'])}` } });
+  assert.equal(brokerCsvOk.statusCode, 200);
+  assert.match(String(brokerCsvOk.headers['content-type']), /text\/csv/);
 });
 
 test('csv admin logs permissão e content-type + escape', async () => {

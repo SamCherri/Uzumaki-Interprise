@@ -420,7 +420,12 @@ export async function adminAuditRoutes(app: FastifyInstance) {
     const brokerResponse = await app.inject({ method: 'GET', url: `/admin/reports/brokers/${params.brokerId}`, headers: { authorization: request.headers.authorization ?? '' } });
     if (brokerResponse.statusCode !== 200) return reply.code(brokerResponse.statusCode).send(brokerResponse.json());
     const report = brokerResponse.json() as any;
-    const rows: Array<Record<string, unknown>> = [{ section: 'broker', key: 'id', value: report.broker.id }, { section: 'broker', key: 'email', value: report.broker.email }, { section: 'brokerAccount', key: 'available', value: report.broker.brokerAccount?.available ?? '' }, { section: 'summary', key: 'coinTransfers', value: report.broker.activity.coinTransfers.length }];
+    const rows: Array<Record<string, unknown>> = [
+      { section: 'broker', key: 'id', value: report.broker?.id ?? '' },
+      { section: 'broker', key: 'email', value: report.broker?.email ?? '' },
+      { section: 'brokerAccount', key: 'available', value: report.brokerAccount?.available ?? '' },
+      { section: 'summary', key: 'coinTransfers', value: report.activity?.coinTransfers?.length ?? 0 },
+    ];
     const csv = toCsvFromColumns(rows, [{ key: 'section', header: 'section' }, { key: 'key', header: 'key' }, { key: 'value', header: 'value' }]);
     reply.header('Content-Type', 'text/csv; charset=utf-8');
     reply.header('Content-Disposition', 'attachment; filename="broker-report.csv"');
