@@ -87,23 +87,33 @@ Regra estrutural:
 
 ## Fluxo econômico completo desejado
 
-Jogador ganha dinheiro no RP
-→ compra/recebe RPC
-→ compra tokens em oferta inicial ou mercado secundário
-→ projeto acumula receita/lucro
-→ projeto pode recomprar, distribuir ou reservar
-→ holders ganham por valorização real ou distribuição
+Empresa gera lucro dentro do RP
+→ dono compra/recebe R$ fictício no site pelo fluxo normal da economia
+→ dono compra RPC no mercado RPC/R$
+→ dono usa RPC real já existente para comprar/injetar no token/projeto
+→ usuários negociam tokens em oferta inicial ou mercado secundário
+→ projeto pode futuramente recomprar, distribuir ou reservar usando saldo rastreável
+→ holders ganham por valorização real ou distribuição auditável
 → logs e auditoria acompanham tudo.
 
+Regras de segurança deste fluxo:
+- lucro RP externo não vira RPC automática;
+- dono/fundador não cria crédito institucional livre;
+- injeção de RPC não sobe gráfico sozinha;
+- preço só muda por compra executada na oferta inicial ou trade real no mercado secundário;
+- não permitir crédito institucional livre sem origem rastreável.
+
 Componentes obrigatórios desse fluxo:
+- R$ fictício/site como etapa de entrada;
+- mercado RPC/R$;
 - Tesouraria RPC;
 - corretores/jogadores;
 - oferta inicial;
 - mercado secundário;
-- caixa institucional do projeto;
+- transferência real de RPC para aporte/injeção;
+- caixa institucional rastreável do projeto;
 - receita por taxas;
-- lucro RP registrado no projeto;
-- recompra;
+- recompra com RPC existente;
 - distribuição para holders;
 - reserva de tokens recomprados;
 - auditoria;
