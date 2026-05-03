@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ConfirmActionModal } from '../components/ConfirmActionModal';
+import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
 import { api } from '../services/api';
 import { translateWithdrawalStatus } from '../utils/labels';
 
@@ -86,23 +88,23 @@ export function AdminWithdrawalsPanel() {
             <p><strong>Conta RP:</strong> {item.user.bankAccountNumber ?? 'Sem conta RP'}</p>
             <p><strong>Email técnico:</strong> {item.user.email}</p>
             <p><strong>Valor:</strong> {item.amount} RPC</p>
-            <p><strong>Status:</strong> {translateWithdrawalStatus(item.status)}</p>
+            <p><strong>Status:</strong> <Badge variant={item.status === 'COMPLETED' ? 'success' : item.status === 'REJECTED' || item.status === 'CANCELED' ? 'danger' : item.status === 'PROCESSING' ? 'warning' : 'info'}>{translateWithdrawalStatus(item.status)}</Badge></p>
             <p><strong>Observação do usuário:</strong> {item.userNote || 'Sem observação'}</p>
             <p><strong>Data:</strong> {new Date(item.createdAt).toLocaleString('pt-BR')}</p>
 
             {['COMPLETED', 'REJECTED', 'CANCELED'].includes(item.status) ? null : (
               <div className="action-grid">
                 {item.status === 'PENDING' && (
-                  <button className="button-primary" type="button" onClick={() => openActionModal(item.id, 'mark-processing')} disabled={isSubmitting}>
+                  <Button variant="secondary" onClick={() => openActionModal(item.id, 'mark-processing')} disabled={isSubmitting}>
                     Marcar em processamento
-                  </button>
+                  </Button>
                 )}
-                <button className="button-success" type="button" onClick={() => openActionModal(item.id, 'complete')} disabled={isSubmitting}>
+                <Button variant="success" onClick={() => openActionModal(item.id, 'complete')} disabled={isSubmitting}>
                   Concluir saque
-                </button>
-                <button className="button-danger" type="button" onClick={() => openActionModal(item.id, 'reject')} disabled={isSubmitting}>
+                </Button>
+                <Button variant="danger" onClick={() => openActionModal(item.id, 'reject')} disabled={isSubmitting}>
                   Rejeitar
-                </button>
+                </Button>
               </div>
             )}
           </article>

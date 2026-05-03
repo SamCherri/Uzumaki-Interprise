@@ -770,3 +770,39 @@ input[type="checkbox"] {
 }
 
 .official-badge { display:inline-block; width:auto; margin-top:6px; padding:4px 10px; border-radius:999px; border:1px solid #facc15; background:rgba(250,204,21,0.16); color:#fde68a; font-size:.78rem; font-weight:700; }
+
+.ui-button { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; border:none; border-radius:12px; font-weight:700; transition:transform .15s ease, filter .2s ease, box-shadow .2s ease; }
+.ui-button:hover { filter: brightness(1.05); }
+.ui-button:active { transform: translateY(1px); }
+.ui-button:disabled { opacity:.7; cursor:not-allowed; }
+.ui-button-sm { min-height:36px; padding:8px 10px; font-size:.88rem; }
+.ui-button-md { min-height:44px; }
+.ui-button-lg { min-height:50px; font-size:1.03rem; }
+.ui-button-primary { background:linear-gradient(90deg,#2563eb,#7c3aed); color:#fff; }
+.ui-button-secondary { background:rgba(30,41,59,.95); border:1px solid #475569; color:#e2e8f0; }
+.ui-button-danger { background:linear-gradient(90deg,#dc2626,#f97316); color:#fff; }
+.ui-button-success { background:linear-gradient(90deg,#15803d,#22c55e); color:#fff; }
+.ui-button-warning { background:linear-gradient(90deg,#b45309,#f59e0b); color:#fff; }
+.ui-button-ghost { background:transparent; border:1px solid #475569; color:#cbd5e1; }
+.ui-button-loading { position:relative; }
+
+.ui-badge { display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px; font-size:.78rem; font-weight:700; border:1px solid transparent; }
+.ui-badge-success { color:#bbf7d0; background:rgba(21,128,61,.24); border-color:rgba(34,197,94,.35); }
+.ui-badge-warning { color:#fde68a; background:rgba(180,83,9,.24); border-color:rgba(245,158,11,.35); }
+.ui-badge-danger { color:#fecaca; background:rgba(220,38,38,.22); border-color:rgba(239,68,68,.35); }
+.ui-badge-info { color:#bfdbfe; background:rgba(37,99,235,.22); border-color:rgba(59,130,246,.35); }
+.ui-badge-neutral { color:#cbd5e1; background:rgba(71,85,105,.24); border-color:rgba(148,163,184,.28); }
+.ui-badge-premium { color:#fef3c7; background:rgba(180,83,9,.2); border-color:rgba(245,158,11,.35); }
+
+.ui-modal-backdrop { position:fixed; inset:0; background:rgba(2,6,23,.78); display:flex; align-items:center; justify-content:center; padding:14px; z-index:1010; }
+.ui-modal { width:100%; max-width:560px; background:#0f172a; border:1px solid #334155; border-radius:16px; padding:14px; display:grid; gap:12px; }
+
+.ui-toast { border-radius:12px; padding:12px; border:1px solid #334155; background:rgba(30,41,59,.7); }
+.ui-toast-success { border-color:#22c55e; background:rgba(34,197,94,.12); color:#bbf7d0; }
+.ui-toast-error { border-color:#ef4444; background:rgba(239,68,68,.12); color:#fecaca; }
+.ui-toast-warning { border-color:#f59e0b; background:rgba(245,158,11,.12); color:#fde68a; }
+.ui-toast-info { border-color:#3b82f6; background:rgba(59,130,246,.12); color:#bfdbfe; }
+
+.ui-metric-card { border:1px solid #334155; border-radius:12px; padding:12px; background:rgba(15,23,42,.62); }
+.ui-metric-card-premium { box-shadow:inset 0 0 0 1px rgba(245,158,11,.28); }
+.ui-metric-card-warning { box-shadow:inset 0 0 0 1px rgba(245,158,11,.35); }

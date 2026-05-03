@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Button } from '../components/ui/Button';
+import { MetricCard } from '../components/ui/MetricCard';
 import { api } from '../services/api';
 import { formatCurrency, formatPrice } from '../utils/formatters';
 
@@ -47,14 +49,8 @@ export function UserDashboard({
       {data && (
         <>
           <div className="summary-grid nested-card">
-            <div className="summary-item">
-              <span className="summary-label">Saldo R$ disponível</span>
-              <strong className="summary-value">{formatCurrency(Number(data.wallet.fiatAvailableBalance))} R$</strong>
-            </div>
-            <div className="summary-item">
-              <span className="summary-label">Pendente de saque R$</span>
-              <strong className="summary-value">{formatCurrency(Number(data.wallet.fiatPendingWithdrawalBalance))} R$</strong>
-            </div>
+            <MetricCard title="Saldo R$ disponível" value={`${formatCurrency(Number(data.wallet.fiatAvailableBalance))} R$`} />
+            <MetricCard title="Pendente de saque R$" value={`${formatCurrency(Number(data.wallet.fiatPendingWithdrawalBalance))} R$`} variant="warning" />
             <div className="summary-item">
               <span className="summary-label">Saldo RPC disponível</span>
               <strong className="summary-value">{formatCurrency(Number(data.wallet.rpcAvailableBalance))} RPC</strong>
@@ -78,8 +74,8 @@ export function UserDashboard({
           <p className="info-text">Use R$ para comprar RPC ou solicitar saque.</p>
           <p className="info-text">Para sacar, venda seus RPC por R$ e solicite o saque.</p>
           <div className="home-grid nested-card">
-            <button className="button-primary" type="button" onClick={() => onOpenRpcMarket?.('buy')}>Comprar RPC com R$</button>
-            <button className="button-primary" type="button" onClick={() => onOpenRpcMarket?.('sell')}>Vender RPC por R$</button>
+            <Button variant="primary" onClick={() => onOpenRpcMarket?.('buy')}>Comprar RPC com R$</Button>
+            <Button variant="secondary" onClick={() => onOpenRpcMarket?.('sell')}>Vender RPC por R$</Button>
           </div>
           <p className="info-text">Use RPC para negociar tokens/projetos.</p>
 
@@ -93,14 +89,16 @@ export function UserDashboard({
                 <p className="info-text">Preço médio: {formatPrice(Number(holding.averageBuyPrice))} RPC</p>
                 <p className="info-text">Preço atual: {formatPrice(Number(holding.currentPrice))} RPC</p>
                 <p className="info-text">Valor estimado: {formatCurrency(Number(holding.estimatedValue))} RPC</p>
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   className="quick-pill"
                   type="button"
                   onClick={() => onOpenCompanyMarket?.(holding.companyId)}
                   disabled={!holding.companyId}
                 >
                   {holding.companyId ? 'Ver mercado' : 'Mercado indisponível'}
-                </button>
+                </Button>
               </article>
             ))}
           </div>
