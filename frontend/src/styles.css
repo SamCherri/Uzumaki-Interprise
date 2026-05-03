@@ -830,3 +830,26 @@ input[type="checkbox"] {
 .market-line-chart-volume span { flex: 1; background: rgba(125, 211, 252, .28); border-radius: 2px 2px 0 0; }
 .market-line-chart-empty { margin: 0; border: 1px dashed #475569; border-radius: 12px; padding: 14px; color: #cbd5e1; background: rgba(30, 41, 59, 0.5); }
 @keyframes marketChartFade { from { opacity: .6; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+.order-book { display: grid; gap: 10px; }
+.order-book-section { border: 1px solid rgba(148, 163, 184, .2); border-radius: 12px; background: rgba(2, 6, 23, .55); overflow: hidden; }
+.order-book-section h5 { margin: 0; padding: 8px 10px; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: #cbd5e1; border-bottom: 1px solid rgba(148, 163, 184, .18); }
+.order-book-table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+.order-book-table th { text-align: left; font-size: .68rem; color: #94a3b8; padding: 6px 10px; }
+.order-book-row { position: relative; }
+.order-book-cell { position: relative; z-index: 2; padding: 6px 10px; border-top: 1px solid rgba(51, 65, 85, .4); white-space: nowrap; }
+.order-book-price { font-weight: 700; }
+.order-book-buy .order-book-price { color: #22d3ee; }
+.order-book-sell .order-book-price { color: #fb7185; }
+.order-book-depth { position: absolute; right: 0; top: 0; bottom: 0; z-index: 1; opacity: .18; pointer-events: none; }
+.order-book-buy .order-book-depth { background: linear-gradient(90deg, rgba(34,211,238,0) 0%, rgba(34,211,238,.8) 100%); }
+.order-book-sell .order-book-depth { background: linear-gradient(90deg, rgba(251,113,133,0) 0%, rgba(249,115,22,.8) 100%); }
+.order-book-spread { border: 1px solid rgba(250, 204, 21, .22); border-radius: 12px; padding: 8px 10px; background: rgba(51, 65, 85, .25); text-align: center; }
+.order-book-spread strong { color: #fef08a; font-size: .79rem; }
+.order-book-current-price { margin: 4px 0 0; color: #fcd34d; font-weight: 700; font-size: .8rem; }
+.order-book-empty { margin: 0; padding: 10px; color: #94a3b8; font-size: .8rem; text-align: center; }
+
+@media (min-width: 768px) {
+  .order-book-table { font-size: .82rem; }
+  .order-book-table th { font-size: .7rem; }
+}
