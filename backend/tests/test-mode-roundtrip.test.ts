@@ -12,6 +12,7 @@ const [{ buildApp }, { prisma }] = await Promise.all([
 ]);
 const app = buildApp();
 const SYSTEM_MODE_ID = 'SYSTEM_MODE_MAIN';
+const RPC_MARKET_STATE_ID = 'RPC_MARKET_MAIN';
 
 async function resetDb() {
   await prisma.$transaction([
@@ -36,6 +37,18 @@ async function enableTestMode() {
     where: { id: SYSTEM_MODE_ID },
     update: { mode: 'TEST' },
     create: { id: SYSTEM_MODE_ID, mode: 'TEST' },
+  });
+}
+async function ensureRpcMarketState() {
+  await prisma.rpcMarketState.upsert({
+    where: { id: RPC_MARKET_STATE_ID },
+    update: {},
+    create: {
+      id: RPC_MARKET_STATE_ID,
+      currentPrice: 1,
+      fiatReserve: 1000000,
+      rpcReserve: 1000000,
+    },
   });
 }
 
@@ -116,10 +129,14 @@ test('rpc/r$: round-trip imediato e 5 ciclos não geram lucro', async () => {
   const user = await mkUser('rpc@test.local');
   await prisma.userRole.create({ data: { userId: user.id, roleId: role.id } });
   await prisma.wallet.update({ where: { userId: user.id }, data: { fiatAvailableBalance: 10000, rpcAvailableBalance: 0 } });
+  await ensureRpcMarketState();
   const token = await tk(user.id, ['USER']);
 
   const getP = async () => {
-    const [w, m] = await Promise.all([prisma.wallet.findUniqueOrThrow({ where: { userId: user.id } }), prisma.rpcMarketState.findFirstOrThrow()]);
+    const [w, m] = await Promise.all([
+      prisma.wallet.findUniqueOrThrow({ where: { userId: user.id } }),
+      prisma.rpcMarketState.findUniqueOrThrow({ where: { id: RPC_MARKET_STATE_ID } }),
+    ]);
     return dec(w.fiatAvailableBalance) + dec(w.rpcAvailableBalance) * dec(m.currentPrice);
   };
 
