@@ -853,3 +853,30 @@ input[type="checkbox"] {
   .order-book-table { font-size: .82rem; }
   .order-book-table th { font-size: .7rem; }
 }
+
+.brand-logo {
+  display: block;
+  width: 100%;
+  max-width: 280px;
+  height: auto;
+  object-fit: contain;
+}
+
+.brand-logo-public {
+  margin: 0 auto;
+  max-width: min(100%, 320px);
+}
+
+.brand-symbol {
+  max-width: 56px;
+}
+
+.mobile-topbar-brand {
+  margin: 2px auto 0;
+}
+
+@media (min-width: 720px) {
+  .mobile-topbar-brand {
+    max-width: 64px;
+  }
+}
