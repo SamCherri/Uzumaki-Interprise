@@ -14,7 +14,7 @@ async function resetDb() {
   await prisma.$transaction([
     prisma.trade.deleteMany(), prisma.marketOrder.deleteMany(), prisma.rpcLimitOrder.deleteMany(), prisma.rpcExchangeTrade.deleteMany(), prisma.withdrawalRequest.deleteMany(),
     prisma.testModeReport.deleteMany(), prisma.companyOperation.deleteMany(), prisma.companyHolding.deleteMany(), prisma.companyInitialOffer.deleteMany(), prisma.companyRevenueAccount.deleteMany(), prisma.companyBoostInjection.deleteMany(), prisma.companyBoostAccount.deleteMany(), prisma.company.deleteMany(),
-    prisma.transaction.deleteMany(), prisma.wallet.deleteMany(), prisma.userRole.deleteMany(), prisma.rolePermission.deleteMany(), prisma.permission.deleteMany(), prisma.role.deleteMany(), prisma.user.deleteMany(), prisma.platformAccount.deleteMany(), prisma.treasuryAccount.deleteMany(), prisma.testModeTrade.deleteMany(), prisma.testModeWallet.deleteMany(), prisma.testModeMarketState.deleteMany(),
+    prisma.transaction.deleteMany(), prisma.wallet.deleteMany(), prisma.userRole.deleteMany(), prisma.rolePermission.deleteMany(), prisma.permission.deleteMany(), prisma.role.deleteMany(), prisma.user.deleteMany(), prisma.platformAccount.deleteMany(), prisma.treasuryAccount.deleteMany(), prisma.testModeTrade.deleteMany(), prisma.testModeWallet.deleteMany(), prisma.testModeMarketState.deleteMany(), prisma.systemModeConfig.deleteMany(),
   ]);
 }
 
@@ -73,6 +73,11 @@ test('5) bloqueia novo report no limite por hora', async () => {
   await resetDb();
   const user = await mkUser('report-limit@test.local');
   const tk = await token(user.id);
+  await prisma.systemModeConfig.upsert({
+    where: { id: 'SYSTEM_MODE_MAIN' },
+    update: { mode: 'TEST' },
+    create: { id: 'SYSTEM_MODE_MAIN', mode: 'TEST' },
+  });
   await prisma.testModeReport.createMany({ data: Array.from({ length: MAX_REPORTS_PER_HOUR }, () => ({ userId: user.id, type: 'BUG', location: 'mercado', description: 'descricao', userSnapshot: '{}' })) });
   const res = await app.inject({ method: 'POST', url: '/api/test-mode/reports', headers: { authorization: `Bearer ${tk}` }, payload: { type: 'BUG', location: 'mercado', description: 'novo report' } });
   assert.equal(res.statusCode, 429);
