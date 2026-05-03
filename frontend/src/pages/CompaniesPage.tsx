@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../services/api';
 import { formatCurrency, formatPercent, formatPrice } from '../utils/formatters';
 import { translateCompanyStatus, translateOrderMode, translateOrderStatus, translateOrderType } from '../utils/labels';
+import { MarketLineChart, type MarketChartPoint } from '../components/MarketLineChart';
 
 type Company = {
   id: string;
@@ -51,7 +52,7 @@ type InitialOfferBuyResponse = {
 };
 
 type ChartData = {
-  points: Array<{ x: number; y: number; price: number }>;
+  points: MarketChartPoint[];
   minPrice: number;
   maxPrice: number;
   initialPrice: number;
@@ -61,17 +62,6 @@ type ChartData = {
   lastPrice: number;
   note: string;
 };
-
-function buildPriceTicks(min: number, max: number, count = 5) {
-  if (!Number.isFinite(min) || !Number.isFinite(max)) return [];
-  if (min === max) {
-    const padding = Math.max(min * 0.01, 0.01);
-    min -= padding;
-    max += padding;
-  }
-  const step = (max - min) / (count - 1);
-  return Array.from({ length: count }, (_, index) => max - step * index);
-}
 
 function getBookVolumeWeight(order: MarketOrder, maxVolume: number) {
   if (maxVolume <= 0) return 0;
@@ -88,46 +78,35 @@ function getPriceChangePercent(company: Company) {
 
 function normalizeChartData(trades: Trade[], initialPrice: number, currentPrice: number): ChartData {
   const ordered = [...trades].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  const prices = ordered.map((trade) => Number(trade.unitPrice)).filter((price) => Number.isFinite(price) && price > 0);
-
   const safeInitialPrice = Number.isFinite(initialPrice) && initialPrice > 0 ? initialPrice : 1;
   const safeCurrentPrice = Number.isFinite(currentPrice) && currentPrice > 0 ? currentPrice : safeInitialPrice;
-  const series: number[] = [safeInitialPrice, ...prices];
-  const lastSeriesPrice = series[series.length - 1];
+  const tradePoints: MarketChartPoint[] = ordered
+    .map((trade) => ({
+      timestamp: trade.createdAt,
+      price: Number(trade.unitPrice),
+      volume: Number(trade.quantity),
+    }))
+    .filter((point) => Number.isFinite(point.price) && point.price > 0);
 
-  if (lastSeriesPrice !== safeCurrentPrice) {
-    series.push(safeCurrentPrice);
+  const points: MarketChartPoint[] = [
+    { timestamp: ordered[0]?.createdAt ?? new Date().toISOString(), price: safeInitialPrice },
+    ...tradePoints,
+  ];
+
+  if (points.length === 0 || points[points.length - 1].price !== safeCurrentPrice) {
+    points.push({ timestamp: new Date().toISOString(), price: safeCurrentPrice });
   }
 
-  if (series.length === 1) {
-    series.push(series[0]);
-  }
+  if (points.length === 1) points.push({ ...points[0] });
 
-  const note =
-    trades.length === 0
-      ? 'Aguardando primeiras negociações'
-      : 'Preço formado com base nas negociações reais do período.';
-
-  const minPrice = Math.min(...series);
-  const maxPrice = Math.max(...series);
-  const range = maxPrice - minPrice;
-  const hasRange = range !== 0;
-  const minimalPadding = Math.max(safeCurrentPrice * 0.01, 0.01);
-  const padding = hasRange ? Math.max(range * 0.2, minimalPadding) : minimalPadding;
-  const chartMin = minPrice - padding;
-  const chartMax = maxPrice + padding;
-  const chartRange = chartMax - chartMin;
-
+  const prices = points.map((point) => point.price);
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
   const variationAbsolute = safeCurrentPrice - safeInitialPrice;
   const variationPercent = safeInitialPrice === 0 ? 0 : (variationAbsolute / safeInitialPrice) * 100;
+  const note = trades.length === 0 ? 'Aguardando primeiras negociações' : 'Preço formado com base nas negociações reais do período.';
 
-  const points = series.map((price, index) => ({
-    x: series.length === 1 ? 0 : (index / (series.length - 1)) * 84,
-    y: !hasRange || chartRange === 0 ? 50 : 100 - ((price - chartMin) / chartRange) * 100,
-    price,
-  }));
-
-  return { points, minPrice, maxPrice, initialPrice: safeInitialPrice, currentPrice: safeCurrentPrice, variationAbsolute, variationPercent, lastPrice: series[series.length - 1], note };
+  return { points, minPrice, maxPrice, initialPrice: safeInitialPrice, currentPrice: safeCurrentPrice, variationAbsolute, variationPercent, lastPrice: points[points.length - 1].price, note };
 }
 
 
@@ -378,7 +357,6 @@ export function CompaniesPage() {
     () => normalizeChartData(filteredTrades, Number(selected?.initialPrice ?? 1), Number(selected?.currentPrice ?? selected?.initialPrice ?? 1)),
     [filteredTrades, selected?.currentPrice, selected?.initialPrice]
   );
-  const priceTicks = useMemo(() => buildPriceTicks(chartData.minPrice, chartData.maxPrice, 3), [chartData.minPrice, chartData.maxPrice]);
   const totalBuyStrength = useMemo(() => book.buyOrders.reduce((sum, order) => sum + order.remainingQuantity, 0), [book.buyOrders]);
   const totalSellStrength = useMemo(() => book.sellOrders.reduce((sum, order) => sum + order.remainingQuantity, 0), [book.sellOrders]);
   const totalStrength = totalBuyStrength + totalSellStrength;
@@ -494,23 +472,7 @@ export function CompaniesPage() {
                 ))}
               </div>
               <div className="chart-wrap chart-wrap-highlight modern-chart-shell market-chart-card">
-                <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="line-chart">
-                  <defs>
-                    <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-                      <path className="chart-grid-line" d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(148,163,184,.18)" strokeWidth="0.28" />
-                    </pattern>
-                  </defs>
-                  <rect x="0" y="0" width="100" height="100" fill="url(#grid)" />
-                  <polyline points={chartData.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" stroke="#4f46e5" strokeWidth="2.6" vectorEffect="non-scaling-stroke" />
-                  <line className="current-price-line" x1="0" x2="84" y1={chartData.points[chartData.points.length - 1].y} y2={chartData.points[chartData.points.length - 1].y} />
-                  <circle cx={chartData.points[chartData.points.length - 1].x} cy={chartData.points[chartData.points.length - 1].y} r="1.4" fill="#f8fafc" />
-                  {priceTicks.map((tick) => {
-                    const y = 100 - (((tick - (chartData.minPrice - Math.max((chartData.maxPrice - chartData.minPrice) * 0.2, 0.01))) / ((chartData.maxPrice + Math.max((chartData.maxPrice - chartData.minPrice) * 0.2, 0.01)) - (chartData.minPrice - Math.max((chartData.maxPrice - chartData.minPrice) * 0.2, 0.01)))) * 100);
-                    return <text key={tick} x="86" y={Math.max(3, Math.min(97, y))} className="price-scale-label">{formatPrice(tick)}</text>;
-                  })}
-                  <rect x="85.5" y={chartData.points[chartData.points.length - 1].y - 3.6} width="14" height="7.2" rx="1.6" className="current-price-badge" />
-                  <text x="92.5" y={chartData.points[chartData.points.length - 1].y + 1.3} textAnchor="middle" className="current-price-badge-text">{formatPrice(chartData.currentPrice)}</text>
-                </svg>
+                <MarketLineChart points={chartData.points} currentPrice={chartData.currentPrice} timeframe={activeTimeframe === '1D' ? '24H' : activeTimeframe === '4h' ? '7D' : '24H'} emptyMessage="Sem dados suficientes para o gráfico." />
               </div>
               <div className="chart-meta market-price-card"><div><span>Atual</span><strong>{formatPrice(chartData.lastPrice)}</strong></div><div><span>Máximo</span><strong>{formatPrice(chartData.maxPrice)}</strong></div><div><span>Mínimo</span><strong>{formatPrice(chartData.minPrice)}</strong></div></div>
               <div className="volume-mini-chart">
