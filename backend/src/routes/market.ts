@@ -242,6 +242,7 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
 
     const maker = await tx.marketOrder.findUnique({ where: { id: restingOrder.id } });
     if (!maker || maker.remainingQuantity <= 0) continue;
+    if (maker.userId === taker.userId) continue;
 
     const unitPrice = maker.limitPrice;
     if (!unitPrice) continue;

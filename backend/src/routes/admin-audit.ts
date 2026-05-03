@@ -333,7 +333,7 @@ export async function adminAuditRoutes(app: FastifyInstance) {
     const roles = ((request as AuthRequest).user.roles ?? []).map((role) => role.toUpperCase());
     if (!canViewAdminReports(roles)) return reply.status(403).send({ message: 'Sem permissão.' });
     const params = z.object({ userId: z.string().min(1) }).parse(request.params);
-    const reportRequest = await app.inject({ method: 'GET', url: `/admin/reports/users/${params.userId}`, headers: { authorization: request.headers.authorization ?? '' } });
+    const reportRequest = await app.inject({ method: 'GET', url: `/api/admin/reports/users/${params.userId}`, headers: { authorization: request.headers.authorization ?? '' } });
     if (reportRequest.statusCode !== 200) return reply.code(reportRequest.statusCode).send(reportRequest.json());
     const report = reportRequest.json() as any;
     const rows: Array<Record<string, unknown>> = [
@@ -417,7 +417,7 @@ export async function adminAuditRoutes(app: FastifyInstance) {
     const roles = ((request as AuthRequest).user.roles ?? []).map((role) => role.toUpperCase());
     if (!canViewAdminReports(roles)) return reply.status(403).send({ message: 'Sem permissão.' });
     const params = z.object({ brokerId: z.string().min(1) }).parse(request.params);
-    const brokerResponse = await app.inject({ method: 'GET', url: `/admin/reports/brokers/${params.brokerId}`, headers: { authorization: request.headers.authorization ?? '' } });
+    const brokerResponse = await app.inject({ method: 'GET', url: `/api/admin/reports/brokers/${params.brokerId}`, headers: { authorization: request.headers.authorization ?? '' } });
     if (brokerResponse.statusCode !== 200) return reply.code(brokerResponse.statusCode).send(brokerResponse.json());
     const report = brokerResponse.json() as any;
     const rows: Array<Record<string, unknown>> = [
