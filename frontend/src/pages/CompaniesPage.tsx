@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../services/api';
+import { Button } from '../components/ui/Button';
 import { formatCurrency, formatPercent, formatPrice } from '../utils/formatters';
 import { translateCompanyStatus, translateOrderMode, translateOrderStatus, translateOrderType } from '../utils/labels';
 import { MarketLineChart, type MarketChartPoint } from '../components/MarketLineChart';
@@ -157,6 +158,10 @@ export function CompaniesPage() {
   const [message, setMessage] = useState('');
   const [activeTimeframe, setActiveTimeframe] = useState<Timeframe>('Time');
   const [favoriteMarketIds, setFavoriteMarketIds] = useState<string[]>(() => readFavoriteMarketIds());
+  const [isBuyingInitial, setIsBuyingInitial] = useState(false);
+  const [isSubmittingLimitOrder, setIsSubmittingLimitOrder] = useState(false);
+  const [isSubmittingMarketOrder, setIsSubmittingMarketOrder] = useState(false);
+  const [cancelingOrderId, setCancelingOrderId] = useState<string | null>(null);
   
   async function loadCompanies() {
     const response = await api<{ companies: Omit<Company, 'description'>[] }>('/companies');
@@ -281,6 +286,8 @@ export function CompaniesPage() {
       await refreshMarketScreen(selected.id);
     } catch (err) {
       setError(`Não foi possível comprar tokens: ${(err as Error).message}`);
+    } finally {
+      setIsBuyingInitial(false);
     }
   }
 
@@ -300,6 +307,8 @@ export function CompaniesPage() {
       await refreshMarketScreen(selected.id);
     } catch (err) {
       setError(`Não foi possível criar ordem: ${(err as Error).message}`);
+    } finally {
+      setIsSubmittingLimitOrder(false);
     }
   }
 
@@ -320,6 +329,8 @@ export function CompaniesPage() {
       await refreshMarketScreen(selected.id);
     } catch (err) {
       setError(`Não foi possível enviar ordem agora: ${(err as Error).message}`);
+    } finally {
+      setIsSubmittingMarketOrder(false);
     }
   }
 
@@ -331,6 +342,8 @@ export function CompaniesPage() {
       await refreshMarketScreen(selected.id);
     } catch (err) {
       setError(`Falha ao cancelar ordem: ${(err as Error).message}`);
+    } finally {
+      setCancelingOrderId(null);
     }
   }
 
@@ -509,7 +522,7 @@ export function CompaniesPage() {
             <section className="card nested-card market-tab-panel">
               <h4>🧾 Minhas ordens</h4>
               {myOrders.length === 0 && <p className="empty-state">Você ainda não possui ordens neste mercado.</p>}
-              <div className="mobile-card-list">{myOrders.map((order) => (<article key={order.id} className="summary-item compact-card market-order-card"><p><strong>{translateOrderType(order.type)}</strong> · {translateOrderMode(order.mode)}</p><p>Quantidade: {order.quantity} · Restante: {order.remainingQuantity}</p><p>Status: {translateOrderStatus(order.status)}</p><p>Preço: {order.limitPrice ? formatPrice(Number(order.limitPrice)) : 'Agora'}</p>{(order.status === 'OPEN' || order.status === 'PARTIALLY_FILLED') && order.mode === 'LIMIT' && <button className="button-danger" onClick={() => cancelOrder(order.id)}>Cancelar ordem</button>}</article>))}</div>
+              <div className="mobile-card-list">{myOrders.map((order) => (<article key={order.id} className="summary-item compact-card market-order-card"><p><strong>{translateOrderType(order.type)}</strong> · {translateOrderMode(order.mode)}</p><p>Quantidade: {order.quantity} · Restante: {order.remainingQuantity}</p><p>Status: {translateOrderStatus(order.status)}</p><p>Preço: {order.limitPrice ? formatPrice(Number(order.limitPrice)) : 'Agora'}</p>{(order.status === 'OPEN' || order.status === 'PARTIALLY_FILLED') && order.mode === 'LIMIT' && <Button variant="danger" onClick={() => cancelOrder(order.id)} disabled={cancelingOrderId === order.id}>{cancelingOrderId === order.id ? 'Cancelando...' : 'Cancelar ordem'}</Button>}</article>))}</div>
             </section>
           )}
 
@@ -546,11 +559,11 @@ export function CompaniesPage() {
                       <form onSubmit={buyInitialOffer}>
                         <p className="info-text">Comprar no lançamento altera o preço atual, mas não cria trade no histórico.</p>
                         <input type="number" min="1" value={initialQty} onChange={(e) => setInitialQty(e.target.value)} placeholder="Quantidade de moedas" required />
-                        <button className="button-success" type="submit">Comprar moedas</button>
+                        <Button variant="success" type="submit" disabled={isBuyingInitial}>{isBuyingInitial ? 'Comprando...' : 'Comprar moedas'}</Button>
                       </form>
                     )}
-                    {buyMode === 'limit' && <form onSubmit={(event) => createLimitOrder('BUY', event)}><input type="number" min="1" value={limitQty} onChange={(e) => setLimitQty(e.target.value)} placeholder="Quantidade de moedas" required /><input type="number" min="0.01" step="0.01" value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço por moeda" required /><div className="summary-item"><p>Subtotal: {formatCurrency(limitSubtotal)}</p><p>Taxa: {buyFee}%</p><p>Total estimado: {formatCurrency(limitTotalBuy)}</p></div><button className="button-success" type="submit">Definir preço de compra</button></form>}
-                    {buyMode === 'market' && <div><input type="number" min="1" value={marketBuyQty} onChange={(e) => setMarketBuyQty(e.target.value)} placeholder="Quantidade de moedas" /><input type="number" min="0" max="100" value={marketBuySlip} onChange={(e) => setMarketBuySlip(e.target.value)} placeholder="Variação máxima (%)" /><button className="button-success" onClick={() => sendMarket('BUY')}>Comprar agora</button><p className="info-text">Preço agora: {formatPrice(bestAsk)}</p></div>}
+                    {buyMode === 'limit' && <form onSubmit={(event) => createLimitOrder('BUY', event)}><input type="number" min="1" value={limitQty} onChange={(e) => setLimitQty(e.target.value)} placeholder="Quantidade de moedas" required /><input type="number" min="0.01" step="0.01" value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço por moeda" required /><div className="summary-item"><p>Subtotal: {formatCurrency(limitSubtotal)}</p><p>Taxa: {buyFee}%</p><p>Total estimado: {formatCurrency(limitTotalBuy)}</p></div><Button variant="success" type="submit" disabled={isSubmittingLimitOrder}>{isSubmittingLimitOrder ? 'Enviando...' : 'Definir preço de compra'}</Button></form>}
+                    {buyMode === 'market' && <div><input type="number" min="1" value={marketBuyQty} onChange={(e) => setMarketBuyQty(e.target.value)} placeholder="Quantidade de moedas" /><input type="number" min="0" max="100" value={marketBuySlip} onChange={(e) => setMarketBuySlip(e.target.value)} placeholder="Variação máxima (%)" /><Button variant="success" onClick={() => sendMarket('BUY')} disabled={isSubmittingMarketOrder}>{isSubmittingMarketOrder ? 'Comprando...' : 'Comprar agora'}</Button><p className="info-text">Preço agora: {formatPrice(bestAsk)}</p></div>}
                   </div>
                 )}
 
@@ -560,8 +573,8 @@ export function CompaniesPage() {
                       <button className={sellMode === 'limit' ? 'quick-pill active' : 'quick-pill'} onClick={() => setSellMode('limit')}>Definir preço</button>
                       <button className={sellMode === 'market' ? 'quick-pill active' : 'quick-pill'} onClick={() => setSellMode('market')}>Vender agora</button>
                     </nav>
-                    {sellMode === 'limit' && <form onSubmit={(event) => createLimitOrder('SELL', event)}><input type="number" min="1" value={limitQty} onChange={(e) => setLimitQty(e.target.value)} placeholder="Quantidade de moedas" required /><input type="number" min="0.01" step="0.01" value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço por moeda" required /><div className="summary-item"><p>Subtotal: {formatCurrency(limitSubtotal)}</p><p>Taxa: {sellFee}%</p><p>Total estimado: {formatCurrency(limitNetSell)}</p></div><button className="button-danger" type="submit">Definir preço de venda</button></form>}
-                    {sellMode === 'market' && <div><input type="number" min="1" value={marketSellQty} onChange={(e) => setMarketSellQty(e.target.value)} placeholder="Quantidade de moedas" /><input type="number" min="0" max="100" value={marketSellSlip} onChange={(e) => setMarketSellSlip(e.target.value)} placeholder="Variação máxima (%)" /><button className="button-danger" onClick={() => sendMarket('SELL')}>Vender agora</button><p className="info-text">Preço agora: {formatPrice(bestBid)}</p></div>}
+                    {sellMode === 'limit' && <form onSubmit={(event) => createLimitOrder('SELL', event)}><input type="number" min="1" value={limitQty} onChange={(e) => setLimitQty(e.target.value)} placeholder="Quantidade de moedas" required /><input type="number" min="0.01" step="0.01" value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço por moeda" required /><div className="summary-item"><p>Subtotal: {formatCurrency(limitSubtotal)}</p><p>Taxa: {sellFee}%</p><p>Total estimado: {formatCurrency(limitNetSell)}</p></div><Button variant="danger" type="submit" disabled={isSubmittingLimitOrder}>{isSubmittingLimitOrder ? 'Enviando...' : 'Definir preço de venda'}</Button></form>}
+                    {sellMode === 'market' && <div><input type="number" min="1" value={marketSellQty} onChange={(e) => setMarketSellQty(e.target.value)} placeholder="Quantidade de moedas" /><input type="number" min="0" max="100" value={marketSellSlip} onChange={(e) => setMarketSellSlip(e.target.value)} placeholder="Variação máxima (%)" /><Button variant="danger" onClick={() => sendMarket('SELL')} disabled={isSubmittingMarketOrder}>{isSubmittingMarketOrder ? 'Vendendo...' : 'Vender agora'}</Button><p className="info-text">Preço agora: {formatPrice(bestBid)}</p></div>}
                   </div>
                 )}
               </section>
