@@ -87,6 +87,20 @@ enum RpcLimitOrderStatus {
   REJECTED
 }
 
+enum CompanyCapitalFlowType {
+  OWNER_RPC_CONTRIBUTION
+  ADMIN_RPC_ADJUSTMENT
+  PROJECT_REVENUE_IN
+  PROJECT_REVENUE_OUT
+}
+
+enum CompanyCapitalFlowSource {
+  OWNER_WALLET
+  ADMIN_ADJUSTMENT
+  MARKET_FEE
+  MANUAL_CORRECTION
+}
+
 model User {
   id           String           @id @default(cuid())
   name         String
@@ -114,6 +128,7 @@ model User {
   withdrawalRequests WithdrawalRequest[] @relation("withdrawal_request_user")
   reviewedWithdrawalRequests WithdrawalRequest[] @relation("withdrawal_request_reviewer")
   boostInjections CompanyBoostInjection[]
+  capitalFlowEntries CompanyCapitalFlowEntry[]
   rpcExchangeTrades RpcExchangeTrade[]
   rpcLimitOrders RpcLimitOrder[]
   testModeWallet TestModeWallet?
@@ -225,6 +240,7 @@ model Company {
   feeDistributions    FeeDistribution[]
   boostAccount        CompanyBoostAccount?
   boostInjections     CompanyBoostInjection[]
+  capitalFlowEntries  CompanyCapitalFlowEntry[]
 }
 
 model CompanyHolding {
@@ -582,4 +598,29 @@ model TestModeReport {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   user         User     @relation(fields: [userId], references: [id])
+}
+
+
+model CompanyCapitalFlowEntry {
+  id                       String                @id @default(cuid())
+  companyId                String
+  actorUserId              String
+  type                     CompanyCapitalFlowType
+  source                   CompanyCapitalFlowSource
+  amountRpc                Decimal               @db.Decimal(18, 2)
+  previousWalletRpcBalance Decimal               @db.Decimal(18, 2)
+  newWalletRpcBalance      Decimal               @db.Decimal(18, 2)
+  previousProjectBalance   Decimal               @db.Decimal(18, 2)
+  newProjectBalance        Decimal               @db.Decimal(18, 2)
+  reason                   String
+  metadata                 String?
+  createdAt                DateTime              @default(now())
+  company                  Company               @relation(fields: [companyId], references: [id])
+  actorUser                User                  @relation(fields: [actorUserId], references: [id])
+
+  @@index([companyId])
+  @@index([actorUserId])
+  @@index([type])
+  @@index([source])
+  @@index([createdAt])
 }
