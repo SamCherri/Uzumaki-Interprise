@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { CsvColumn, toCsv as toCsvFromColumns } from '../services/csv-export-service.js';
 
 type AuthRequest = FastifyRequest & { user: { roles?: string[] } };
 
@@ -17,6 +18,10 @@ function checkAdmin(reply: FastifyReply, request: FastifyRequest) {
     return false;
   }
   return true;
+}
+
+function canViewAdminReports(roles: string[]) {
+  return roles.some((role) => ['SUPER_ADMIN', 'AUDITOR', 'COIN_CHIEF_ADMIN'].includes(role));
 }
 
 
@@ -268,7 +273,8 @@ export async function adminAuditRoutes(app: FastifyInstance) {
 
 
   app.get('/reports/users/:userId', { preHandler: [app.authenticate] }, async (request, reply) => {
-    if (!checkAdmin(reply, request)) return;
+    const roles = ((request as AuthRequest).user.roles ?? []).map((role) => role.toUpperCase());
+    if (!canViewAdminReports(roles)) return reply.status(403).send({ message: 'Sem permissão.' });
 
     const params = z.object({ userId: z.string().min(1) }).parse(request.params);
     const query = z.object({ from: z.string().optional(), to: z.string().optional() }).parse(request.query);
@@ -276,13 +282,7 @@ export async function adminAuditRoutes(app: FastifyInstance) {
 
     const user = await prisma.user.findUnique({
       where: { id: params.userId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        isBlocked: true,
-        roles: { select: { role: { select: { key: true } } } },
-      },
+      select: { id: true, name: true, email: true, characterName: true, bankAccountNumber: true, isBlocked: true, createdAt: true, roles: { select: { role: { select: { key: true } } } } },
     });
 
     if (!user) {
@@ -291,87 +291,75 @@ export async function adminAuditRoutes(app: FastifyInstance) {
 
     const wallet = await prisma.wallet.findUnique({ where: { userId: params.userId } });
 
-    const transactionsWhere = {
-      ...(wallet ? { walletId: wallet.id } : { walletId: '__NO_WALLET__' }),
-      ...(range ? { createdAt: range } : {}),
-    };
-    const transfersInWhere = { receiverId: params.userId, ...(range ? { createdAt: range } : {}) };
-    const transfersOutWhere = { senderId: params.userId, ...(range ? { createdAt: range } : {}) };
-    const transfersWhere = { OR: [{ senderId: params.userId }, { receiverId: params.userId }], ...(range ? { createdAt: range } : {}) };
+    const transactionsWhere = { ...(wallet ? { walletId: wallet.id } : { walletId: '__NO_WALLET__' }), ...(range ? { createdAt: range } : {}) };
     const withdrawalsWhere = { userId: params.userId, ...(range ? { createdAt: range } : {}) };
     const ordersWhere = { userId: params.userId, ...(range ? { createdAt: range } : {}) };
     const holdingsWhere = { userId: params.userId };
+    const adminLogsWhere = { OR: [{ userId: params.userId }, { previous: { contains: params.userId } }, { current: { contains: params.userId } }], ...(range ? { createdAt: range } : {}) };
 
-    const [
-      transactionsCount,
-      recentTransactions,
-      transferredIn,
-      transferredOut,
-      withdrawalsPending,
-      withdrawalsCompleted,
-      recentTransfers,
-      recentWithdrawals,
-      openOrders,
-      filledOrders,
-      recentOrders,
-      holdingsCount,
-      holdings,
-    ] = await Promise.all([
-      prisma.transaction.count({ where: transactionsWhere }),
-      prisma.transaction.findMany({ where: transactionsWhere, orderBy: { createdAt: 'desc' }, take: 10 }),
-      prisma.coinTransfer.aggregate({ where: transfersInWhere, _sum: { amount: true } }),
-      prisma.coinTransfer.aggregate({ where: transfersOutWhere, _sum: { amount: true } }),
-      prisma.withdrawalRequest.aggregate({ where: { ...withdrawalsWhere, status: 'PENDING' }, _sum: { amount: true } }),
-      prisma.withdrawalRequest.aggregate({ where: { ...withdrawalsWhere, status: 'COMPLETED' }, _sum: { amount: true } }),
-      prisma.coinTransfer.findMany({ where: transfersWhere, include: { sender: { select: { id: true, name: true, email: true } }, receiver: { select: { id: true, name: true, email: true } } }, orderBy: { createdAt: 'desc' }, take: 10 }),
-      prisma.withdrawalRequest.findMany({ where: withdrawalsWhere, orderBy: { createdAt: 'desc' }, take: 10 }),
-      prisma.marketOrder.count({ where: { ...ordersWhere, status: { in: ['OPEN', 'PARTIALLY_FILLED'] } } }),
-      prisma.marketOrder.count({ where: { ...ordersWhere, status: 'FILLED' } }),
-      prisma.marketOrder.findMany({ where: ordersWhere, include: { company: { select: { id: true, name: true, ticker: true, status: true } } }, orderBy: { createdAt: 'desc' }, take: 10 }),
-      prisma.companyHolding.count({ where: holdingsWhere }),
-      prisma.companyHolding.findMany({ where: holdingsWhere, include: { company: { select: { id: true, name: true, ticker: true, status: true, currentPrice: true } } }, orderBy: { updatedAt: 'desc' } }),
+    const [recentTransactions, recentWithdrawals, rpcTrades, rpcLimitOrders, recentOrders, holdings, adminLogs] = await Promise.all([
+      prisma.transaction.findMany({ where: transactionsWhere, orderBy: { createdAt: 'desc' }, take: 100 }),
+      prisma.withdrawalRequest.findMany({ where: withdrawalsWhere, orderBy: { createdAt: 'desc' }, take: 100 }),
+      prisma.rpcExchangeTrade.findMany({ where: { userId: params.userId, ...(range ? { createdAt: range } : {}) }, orderBy: { createdAt: 'desc' }, take: 100 }),
+      prisma.rpcLimitOrder.findMany({ where: { userId: params.userId, ...(range ? { createdAt: range } : {}) }, orderBy: { createdAt: 'desc' }, take: 100 }),
+      prisma.marketOrder.findMany({ where: ordersWhere, include: { company: { select: { id: true, name: true, ticker: true, status: true } } }, orderBy: { createdAt: 'desc' }, take: 100 }),
+      prisma.companyHolding.findMany({ where: holdingsWhere, include: { company: { select: { id: true, name: true, ticker: true, status: true, currentPrice: true } } }, orderBy: { updatedAt: 'desc' }, take: 100 }),
+      prisma.adminLog.findMany({ where: adminLogsWhere, orderBy: { createdAt: 'desc' }, take: 100 }),
     ]);
 
     return {
       user: {
         id: user.id,
+        characterName: user.characterName,
+        bankAccountNumber: user.bankAccountNumber,
         name: user.name,
         email: user.email,
-        isBlocked: user.isBlocked,
+        blockedAt: user.isBlocked ? user.createdAt : null,
+        blockedReason: null,
+        createdAt: user.createdAt,
         roles: user.roles.map((item: { role: { key: string } }) => item.role.key),
       },
       wallet: {
-        availableBalance: wallet?.availableBalance ?? 0,
-        lockedBalance: wallet?.lockedBalance ?? 0,
-        pendingWithdrawalBalance: wallet?.pendingWithdrawalBalance ?? 0,
+        fiatAvailableBalance: wallet?.fiatAvailableBalance ?? 0,
+        fiatLockedBalance: wallet?.fiatLockedBalance ?? 0,
+        rpcAvailableBalance: wallet?.rpcAvailableBalance ?? 0,
+        rpcLockedBalance: wallet?.rpcLockedBalance ?? 0,
       },
-      summary: {
-        transactionsCount,
-        transferredIn: transferredIn._sum.amount ?? 0,
-        transferredOut: transferredOut._sum.amount ?? 0,
-        withdrawalsPending: withdrawalsPending._sum.amount ?? 0,
-        withdrawalsCompleted: withdrawalsCompleted._sum.amount ?? 0,
-        openOrders,
-        filledOrders,
-        holdingsCount,
-      },
-      recentTransactions,
-      recentTransfers,
-      recentWithdrawals,
-      recentOrders,
-      holdings,
+      activity: { transactions: recentTransactions, withdrawals: recentWithdrawals, rpcTrades, rpcLimitOrders, marketOrders: recentOrders, companyHoldings: holdings, adminLogs },
     };
   });
 
-  app.get('/reports/brokers/:userId', { preHandler: [app.authenticate] }, async (request, reply) => {
-    if (!checkAdmin(reply, request)) return;
-
+  app.get('/reports/users/:userId.csv', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const roles = ((request as AuthRequest).user.roles ?? []).map((role) => role.toUpperCase());
+    if (!canViewAdminReports(roles)) return reply.status(403).send({ message: 'Sem permissão.' });
     const params = z.object({ userId: z.string().min(1) }).parse(request.params);
+    const reportRequest = await app.inject({ method: 'GET', url: `/admin/reports/users/${params.userId}`, headers: { authorization: request.headers.authorization ?? '' } });
+    if (reportRequest.statusCode !== 200) return reply.code(reportRequest.statusCode).send(reportRequest.json());
+    const report = reportRequest.json() as any;
+    const rows: Array<Record<string, unknown>> = [
+      { section: 'user', key: 'id', value: report.user.id },
+      { section: 'user', key: 'email', value: report.user.email },
+      { section: 'wallet', key: 'fiatAvailableBalance', value: report.wallet.fiatAvailableBalance },
+      { section: 'wallet', key: 'rpcAvailableBalance', value: report.wallet.rpcAvailableBalance },
+      { section: 'summary', key: 'transactionsCount', value: report.activity.transactions.length },
+      { section: 'summary', key: 'withdrawalsCount', value: report.activity.withdrawals.length },
+    ];
+    const csv = toCsvFromColumns(rows, [{ key: 'section', header: 'section' }, { key: 'key', header: 'key' }, { key: 'value', header: 'value' }]);
+    reply.header('Content-Type', 'text/csv; charset=utf-8');
+    reply.header('Content-Disposition', 'attachment; filename="user-report.csv"');
+    return reply.send(csv);
+  });
+
+  app.get('/reports/brokers/:brokerId', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const roles = ((request as AuthRequest).user.roles ?? []).map((role) => role.toUpperCase());
+    if (!canViewAdminReports(roles)) return reply.status(403).send({ message: 'Sem permissão.' });
+
+    const params = z.object({ brokerId: z.string().min(1) }).parse(request.params);
     const query = z.object({ from: z.string().optional(), to: z.string().optional() }).parse(request.query);
     const range = dateRange(query.from, query.to);
 
     const user = await prisma.user.findUnique({
-      where: { id: params.userId },
+      where: { id: params.brokerId },
       select: {
         id: true,
         name: true,
@@ -381,26 +369,30 @@ export async function adminAuditRoutes(app: FastifyInstance) {
     });
 
     if (!user) {
-      return reply.code(404).send({ message: 'Usuário não encontrado.' });
+      return reply.code(404).send({ message: 'Corretor não encontrado.' });
     }
 
     const userRoles = user.roles.map((item: { role: { key: string } }) => item.role.key);
     if (!userRoles.includes('VIRTUAL_BROKER')) {
-      return reply.code(400).send({ message: 'Usuário não é corretor.' });
+      return reply.code(404).send({ message: 'Corretor não encontrado.' });
     }
 
-    const brokerAccount = await prisma.brokerAccount.findUnique({ where: { userId: params.userId } });
-    const brokerTransfersToUsersWhere = { senderId: params.userId, type: 'BROKER_TO_USER' as const, ...(range ? { createdAt: range } : {}) };
-    const treasuryToBrokerWhere = { receiverId: params.userId, type: 'TREASURY_TO_BROKER' as const, ...(range ? { createdAt: range } : {}) };
-    const brokerTransfersWhere = { OR: [{ senderId: params.userId }, { receiverId: params.userId }], ...(range ? { createdAt: range } : {}) };
+    const brokerAccount = await prisma.brokerAccount.findUnique({ where: { userId: params.brokerId } });
+    const brokerTransfersToUsersWhere = { senderId: params.brokerId, type: 'BROKER_TO_USER' as const, ...(range ? { createdAt: range } : {}) };
+    const treasuryToBrokerWhere = { receiverId: params.brokerId, type: 'TREASURY_TO_BROKER' as const, ...(range ? { createdAt: range } : {}) };
+    const brokerTransfersWhere = { OR: [{ senderId: params.brokerId }, { receiverId: params.brokerId }], ...(range ? { createdAt: range } : {}) };
+    const adminLogsWhere = { OR: [{ userId: params.brokerId }, { previous: { contains: params.brokerId } }, { current: { contains: params.brokerId } }], ...(range ? { createdAt: range } : {}) };
+    const wallet = await prisma.wallet.findUnique({ where: { userId: params.brokerId } });
 
-    const [receivedFromTreasury, sentToUsers, transfersToUsersCount, usersServedDistinct, lastTransfer, recentTransfers] = await Promise.all([
+    const [receivedFromTreasury, sentToUsers, transfersToUsersCount, usersServedDistinct, lastTransfer, recentTransfers, adminLogs, transactions] = await Promise.all([
       prisma.coinTransfer.aggregate({ where: treasuryToBrokerWhere, _sum: { amount: true } }),
       prisma.coinTransfer.aggregate({ where: brokerTransfersToUsersWhere, _sum: { amount: true } }),
       prisma.coinTransfer.count({ where: brokerTransfersToUsersWhere }),
       prisma.coinTransfer.findMany({ where: brokerTransfersToUsersWhere, select: { receiverId: true }, distinct: ['receiverId'] }),
       prisma.coinTransfer.findFirst({ where: brokerTransfersWhere, orderBy: { createdAt: 'desc' } }),
       prisma.coinTransfer.findMany({ where: brokerTransfersWhere, include: { sender: { select: { id: true, name: true, email: true } }, receiver: { select: { id: true, name: true, email: true } } }, orderBy: { createdAt: 'desc' }, take: 20 }),
+      prisma.adminLog.findMany({ where: adminLogsWhere, orderBy: { createdAt: 'desc' }, take: 100 }),
+      prisma.transaction.findMany({ where: { ...(wallet ? { walletId: wallet.id } : { walletId: '__NO_WALLET__' }), ...(range ? { createdAt: range } : {}) }, orderBy: { createdAt: 'desc' }, take: 100 }),
     ]);
 
     return {
@@ -410,20 +402,41 @@ export async function adminAuditRoutes(app: FastifyInstance) {
         email: user.email,
         roles: userRoles,
       },
-      brokerAccount: {
-        availableBalance: brokerAccount?.available ?? 0,
-        receivedTotal: brokerAccount?.receivedTotal ?? 0,
-        transferredTotal: Number(brokerAccount?.receivedTotal ?? 0) - Number(brokerAccount?.available ?? 0),
+      characterName: null,
+      brokerAccount,
+      activity: {
+        adminLogs,
+        coinTransfers: recentTransfers,
+        transactions,
+        usersServed: usersServedDistinct.filter((item: { receiverId: string | null }) => item.receiverId).map((item: { receiverId: string | null }) => item.receiverId),
+        summary: { receivedFromTreasury: receivedFromTreasury._sum.amount ?? 0, sentToUsers: sentToUsers._sum.amount ?? 0, transfersToUsersCount, lastTransferAt: lastTransfer?.createdAt ?? null },
       },
-      summary: {
-        receivedFromTreasury: receivedFromTreasury._sum.amount ?? 0,
-        sentToUsers: sentToUsers._sum.amount ?? 0,
-        transfersToUsersCount,
-        usersServedCount: usersServedDistinct.filter((item: { receiverId: string | null }) => item.receiverId).length,
-        lastTransferAt: lastTransfer?.createdAt ?? null,
-      },
-      recentTransfers,
     };
+  });
+  app.get('/reports/brokers/:brokerId.csv', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const roles = ((request as AuthRequest).user.roles ?? []).map((role) => role.toUpperCase());
+    if (!canViewAdminReports(roles)) return reply.status(403).send({ message: 'Sem permissão.' });
+    const params = z.object({ brokerId: z.string().min(1) }).parse(request.params);
+    const brokerResponse = await app.inject({ method: 'GET', url: `/admin/reports/brokers/${params.brokerId}`, headers: { authorization: request.headers.authorization ?? '' } });
+    if (brokerResponse.statusCode !== 200) return reply.code(brokerResponse.statusCode).send(brokerResponse.json());
+    const report = brokerResponse.json() as any;
+    const rows: Array<Record<string, unknown>> = [{ section: 'broker', key: 'id', value: report.broker.id }, { section: 'broker', key: 'email', value: report.broker.email }, { section: 'brokerAccount', key: 'available', value: report.broker.brokerAccount?.available ?? '' }, { section: 'summary', key: 'coinTransfers', value: report.broker.activity.coinTransfers.length }];
+    const csv = toCsvFromColumns(rows, [{ key: 'section', header: 'section' }, { key: 'key', header: 'key' }, { key: 'value', header: 'value' }]);
+    reply.header('Content-Type', 'text/csv; charset=utf-8');
+    reply.header('Content-Disposition', 'attachment; filename="broker-report.csv"');
+    return reply.send(csv);
+  });
+
+  app.get('/reports/admin-logs.csv', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const roles = ((request as AuthRequest).user.roles ?? []).map((role) => role.toUpperCase());
+    if (!canViewAdminReports(roles)) return reply.status(403).send({ message: 'Sem permissão.' });
+    const q = z.object({ from: z.string().optional(), to: z.string().optional(), action: z.string().optional(), userId: z.string().optional(), limit: z.coerce.number().int().min(1).max(5000).default(1000) }).parse(request.query ?? {});
+    const logs = await prisma.adminLog.findMany({ where: { ...(q.action ? { action: q.action } : {}), ...(q.userId ? { userId: q.userId } : {}), ...(q.from || q.to ? { createdAt: { ...(q.from ? { gte: new Date(q.from) } : {}), ...(q.to ? { lte: new Date(q.to) } : {}) } } : {}) }, orderBy: { createdAt: 'desc' }, take: q.limit });
+    const columns: CsvColumn[] = [{ key: 'createdAt', header: 'createdAt' }, { key: 'userId', header: 'userId' }, { key: 'action', header: 'action' }, { key: 'entity', header: 'entity' }, { key: 'reason', header: 'reason' }, { key: 'ip', header: 'ip' }, { key: 'userAgent', header: 'userAgent' }, { key: 'previous', header: 'previous' }, { key: 'current', header: 'current' }];
+    const csv = toCsvFromColumns(logs as Array<Record<string, unknown>>, columns);
+    reply.header('Content-Type', 'text/csv; charset=utf-8');
+    reply.header('Content-Disposition', 'attachment; filename="admin-logs.csv"');
+    return reply.send(csv);
   });
   app.get('/reports/overview', { preHandler: [app.authenticate] }, async (request, reply) => {
     if (!checkAdmin(reply, request)) return;
