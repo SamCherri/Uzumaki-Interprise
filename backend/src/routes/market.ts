@@ -246,12 +246,7 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
 
     const maker = await tx.marketOrder.findUnique({ where: { id: restingOrder.id } });
     if (!maker || maker.remainingQuantity <= 0) continue;
-    if (maker.userId === taker.userId) {
-      if (taker.remainingQuantity === taker.quantity) {
-        throw new Error('Self-trade bloqueado: a ordem precisa de contraparte de outro usuário.');
-      }
-      continue;
-    }
+    if (maker.userId === taker.userId) continue;
 
     const unitPrice = maker.limitPrice;
     if (!unitPrice) continue;
@@ -460,6 +455,13 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
   }
 
   if (taker.mode === 'MARKET') {
+    if (taker.remainingQuantity === taker.quantity) {
+      const hasOnlyOwnLiquidity = initialOppositeOrders.length > 0
+        && initialOppositeOrders.every((order) => order.userId === taker.userId);
+      if (hasOnlyOwnLiquidity) {
+        throw new Error('Não há contraparte válida de outro usuário para executar esta ordem.');
+      }
+    }
     const finalStatus = taker.remainingQuantity === 0 ? 'FILLED' : taker.remainingQuantity < taker.quantity ? 'PARTIALLY_FILLED' : 'REJECTED';
     await tx.marketOrder.update({
       where: { id: taker.id },

@@ -1381,11 +1381,15 @@ test('mercado secundário: self-trade nunca executa e só executa com contrapart
   const ownSell = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${aTk}` }, payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 5, limitPrice: 10 } });
   assert.equal(ownSell.statusCode, 201, ownSell.body);
   const ownBuy = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${aTk}` }, payload: { companyId: company.id, type: 'BUY', mode: 'LIMIT', quantity: 5, limitPrice: 10 } });
-  assert.equal(ownBuy.statusCode, 400, ownBuy.body);
-  assert.match(ownBuy.body, /self-trade bloqueado/i);
+  assert.equal(ownBuy.statusCode, 201, ownBuy.body);
+  const ownBuyOrder = await prisma.marketOrder.findUniqueOrThrow({ where: { id: ownBuy.json().order.id } });
+  assert.equal(ownBuyOrder.status, 'OPEN');
+  const tradesAfterOwn = await prisma.trade.count({ where: { companyId: company.id } });
+  assert.equal(tradesAfterOwn, 0);
 
   const ownOnlyMarket = await app.inject({ method: 'POST', url: `/api/market/companies/${company.id}/buy-market`, headers: { authorization: `Bearer ${aTk}` }, payload: { quantity: 1, slippagePercent: 5 } });
   assert.equal(ownOnlyMarket.statusCode, 400, ownOnlyMarket.body);
+  assert.match(ownOnlyMarket.body, /não há contraparte válida de outro usuário/i);
 
   const externalSell = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${bTk}` }, payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 3, limitPrice: 10 } });
   assert.equal(externalSell.statusCode, 201, externalSell.body);
@@ -1395,4 +1399,39 @@ test('mercado secundário: self-trade nunca executa e só executa com contrapart
   const trades = await prisma.trade.findMany({ where: { companyId: company.id } });
   assert.ok(trades.length >= 1);
   assert.ok(trades.every((t) => t.buyerId !== t.sellerId));
+});
+
+test('self-trade: quando há ordem própria e ordem de terceiro compatível, deve casar só com terceiro', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const a = await mkUser('skip-own-a@test.local');
+  const b = await mkUser('skip-own-b@test.local');
+  await prisma.userRole.createMany({ data: [{ userId: a.id, roleId: rUser.id }, { userId: b.id, roleId: rUser.id }] });
+  await prisma.platformAccount.create({ data: {} });
+  await prisma.wallet.update({ where: { userId: a.id }, data: { rpcAvailableBalance: 500 } });
+  const company = await prisma.company.create({
+    data: { name: 'Skip Own Corp', ticker: 'SKIP3', description: 'desc', sector: 'setor', founderUserId: a.id, status: 'ACTIVE', totalShares: 1000, circulatingShares: 100, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 600, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 10000, approvedAt: new Date(), revenueAccount: { create: {} } },
+  });
+  await prisma.companyHolding.create({ data: { userId: a.id, companyId: company.id, shares: 20, averageBuyPrice: 10, estimatedValue: 200 } });
+  await prisma.companyHolding.create({ data: { userId: b.id, companyId: company.id, shares: 20, averageBuyPrice: 10, estimatedValue: 200 } });
+  const aTk = await token(a.id, ['USER']);
+  const bTk = await token(b.id, ['USER']);
+
+  const sellOwn = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${aTk}` }, payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 5, limitPrice: 10 } });
+  const sellB = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${bTk}` }, payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 5, limitPrice: 10 } });
+  assert.equal(sellOwn.statusCode, 201, sellOwn.body);
+  assert.equal(sellB.statusCode, 201, sellB.body);
+
+  const buyA = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${aTk}` }, payload: { companyId: company.id, type: 'BUY', mode: 'LIMIT', quantity: 5, limitPrice: 10 } });
+  assert.equal(buyA.statusCode, 201, buyA.body);
+
+  const trades = await prisma.trade.findMany({ where: { companyId: company.id } });
+  assert.equal(trades.length, 1);
+  assert.equal(trades[0].buyerId, a.id);
+  assert.equal(trades[0].sellerId, b.id);
+  assert.notEqual(trades[0].buyerId, trades[0].sellerId);
+
+  const ownSellAfter = await prisma.marketOrder.findUniqueOrThrow({ where: { id: sellOwn.json().order.id } });
+  assert.equal(ownSellAfter.status, 'OPEN');
+  assert.equal(ownSellAfter.remainingQuantity, 5);
 });
