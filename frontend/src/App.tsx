@@ -262,7 +262,9 @@ export function App() {
       <main className="container auth-shell">
         <section className="card public-entry-card">
           <header className="public-entry-header">
-            <h1>RPC Exchange</h1>
+            <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+              <img src="/assets/logo-full.png" alt="RPC Exchange" style={{ maxWidth: '280px', height: 'auto' }} />
+            </div>
             <p className="subtitle">Ferramenta de interpretação de exchange para RP.</p>
             <p className="warning">Esta é uma ferramenta de simulação/interpretação de uma exchange. Nenhum valor possui conversão para dinheiro real.</p>
             <p className="info-text">Sem cripto real, sem blockchain, sem Pix, sem cartão e sem gateway de pagamento.</p>
@@ -321,10 +323,12 @@ export function App() {
             <span className="back-placeholder desktop-only" />
           )}
           <button className="hamburger-button mobile-only" type="button" aria-label="Abrir menu" onClick={() => setIsGlobalDrawerOpen(true)}>☰</button>
-          <div className="mobile-topbar-title">
-            <span className="mobile-topbar-badge">Simulação RP</span>
-            <h1>RPC Exchange</h1>
-            <p className="subtitle">Simulação econômica RP</p>
+          <div className="mobile-topbar-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <img src="/assets/rpc_exchange_icon.png" alt="RPC" style={{ width: '36px', height: '36px' }} />
+            <div style={{ textAlign: 'left' }}>
+              <span className="mobile-topbar-badge">Simulação RP</span>
+              <h1 style={{ fontSize: '1.2rem', margin: 0 }}>RPC Exchange</h1>
+            </div>
           </div>
           <button className="button-danger small-button desktop-only" onClick={handleLogout}>
             Sair

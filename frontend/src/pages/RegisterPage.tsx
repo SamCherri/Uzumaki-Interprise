@@ -34,6 +34,9 @@ export function RegisterPage({ onSwitchLogin }: RegisterPageProps) {
 
   return (
     <section className="auth-panel nested-card">
+      <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+        <img src="/assets/logo-full.png" alt="RPC Exchange" style={{ maxWidth: '200px', height: 'auto' }} />
+      </div>
       <h2>Criar conta</h2>
       <form onSubmit={handleSubmit}>
         <label>

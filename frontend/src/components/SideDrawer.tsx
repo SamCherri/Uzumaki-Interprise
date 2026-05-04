@@ -46,6 +46,9 @@ export function SideDrawer({ title, subtitle, open, onClose, items }: SideDrawer
         aria-modal="true"
       >
         <header className="side-drawer-header">
+          <div style={{ marginRight: '12px', display: 'flex', alignItems: 'center' }}>
+            <img src="/assets/rpc_exchange_icon.png" alt="RPC" style={{ width: '32px', height: '32px' }} />
+          </div>
           <div className="side-drawer-title">
             <strong>{title}</strong>
             {subtitle ? <small>{subtitle}</small> : null}
