@@ -253,3 +253,11 @@ Fonte oficial: `docs/ROADMAP_PRIORITARIO.md`.
 - Self-trade bloqueado no matching.
 - Locks de RPC/tokens reforçados para criação/cancelamento/execução parcial.
 - Auditoria de execução parcial e consistência de locks reforçada em testes críticos.
+
+
+## Atualização 2026-05-04 — PR 4 caixa institucional rastreável
+- Caixa institucional separado e consultável por projeto via `CompanyRevenueAccount` + `CompanyCapitalFlowEntry`.
+- Entradas permitidas reforçadas: aporte real da carteira RPC do fundador e receitas/taxas já rastreadas.
+- Entradas proibidas mantidas: crédito livre sem origem, lucro RP externo virando RPC automático.
+- Motivo obrigatório e trilha de auditoria mantidos no aporte do fundador.
+- Sem impacto em preço/trade/order/supply.

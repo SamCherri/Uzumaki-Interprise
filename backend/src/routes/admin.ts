@@ -82,6 +82,43 @@ export async function adminRoutes(app: FastifyInstance) {
     };
   });
 
+
+  app.get('/admin/project-institutional-accounts', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authRequest = request as AuthRequest;
+    const roles = authRequest.user.roles ?? [];
+    if (!requireRole(reply, roles, ['SUPER_ADMIN', 'COIN_CHIEF_ADMIN', 'AUDITOR'], 'Sem permissão para consultar caixas institucionais.')) return;
+
+    const companies = await prisma.company.findMany({
+      include: {
+        revenueAccount: true,
+        capitalFlowEntries: { orderBy: { createdAt: 'desc' }, take: 50 },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const accounts = companies.map((company) => {
+      const entries = company.capitalFlowEntries;
+      const alerts: string[] = [];
+      if (Number(company.revenueAccount?.balance ?? 0) < 0) alerts.push('Saldo institucional negativo');
+      if (entries.some((entry) => Number(entry.amountRpc) <= 0)) alerts.push('Entry com amountRpc <= 0');
+      if (entries.some((entry) => !entry.reason?.trim())) alerts.push('Entry sem reason');
+
+      return {
+        companyId: company.id,
+        ticker: company.ticker,
+        companyName: company.name,
+        founderUserId: company.founderUserId,
+        balance: company.revenueAccount?.balance ?? 0,
+        totalReceivedFees: company.revenueAccount?.totalReceivedFees ?? 0,
+        totalWithdrawn: company.revenueAccount?.totalWithdrawn ?? 0,
+        entriesCount: entries.length,
+        lastEntryAt: entries[0]?.createdAt ?? null,
+        alerts,
+      };
+    });
+
+    return { accounts };
+  });
   app.get('/admin/economic-alerts', { preHandler: [app.authenticate] }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];

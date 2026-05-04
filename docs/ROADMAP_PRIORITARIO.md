@@ -274,3 +274,8 @@ Em caso de conflito:
 - [x] PR 2 — Mercado primário correto (compra da oferta inicial reforçada com débito atômico de RPC, proteção anti-oversell, atualização de holding/oferta/circulação e trilha auditável sem Trade/MarketOrder).
 
 - [x] PR 3 — Mercado secundário seguro (preço no secundário reforçado para mudar somente por Trade real, com bloqueio de self-trade, lock consistente e validações de liquidez/cancelamento).
+
+## Atualização 2026-05-04 — PR 4 caixa institucional rastreável
+- Implementado resumo auditável do caixa institucional por projeto com saldo, histórico recente, totais por tipo/origem e inconsistências básicas read-only.
+- Implementado endpoint admin somente leitura para listar caixas institucionais com alertas básicos.
+- Sem impacto em preço, Trade, MarketOrder, CompanyHolding, supply, mercado primário/secundário, matching, Test Mode e boost legado.

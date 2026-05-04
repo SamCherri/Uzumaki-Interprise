@@ -1469,3 +1469,145 @@ test('market BUY usa slippage com melhor contraparte válida (ignora ordem próp
   assert.equal(trades[0].sellerId, b.id);
   assert.notEqual(trades[0].buyerId, trades[0].sellerId);
 });
+
+test('caixa institucional: fundador consulta, usuário comum bloqueado e admin auditor autorizado', async () => {
+  await resetDb();
+  const rFounder = await mkRole('BUSINESS_OWNER');
+  const rUser = await mkRole('USER');
+  const rAuditor = await mkRole('AUDITOR');
+
+  const founder = await mkUser('founder@inst.local', 'Founder');
+  const outsider = await mkUser('outsider@inst.local', 'Outsider');
+  const auditor = await mkUser('auditor@inst.local', 'Auditor');
+
+  await prisma.userRole.createMany({ data: [
+    { userId: founder.id, roleId: rFounder.id },
+    { userId: founder.id, roleId: rUser.id },
+    { userId: outsider.id, roleId: rUser.id },
+    { userId: auditor.id, roleId: rAuditor.id },
+  ]});
+
+  await prisma.wallet.update({ where: { userId: founder.id }, data: { rpcAvailableBalance: 500 } });
+
+  const company = await prisma.company.create({ data: {
+    name: 'Inst Project', ticker: 'INST4', description: 'Projeto institucional', sector: 'RP', founderUserId: founder.id, status: 'ACTIVE',
+    totalShares: 1000, circulatingShares: 0, ownerSharePercent: 50, publicOfferPercent: 50, ownerShares: 500, publicOfferShares: 500,
+    availableOfferShares: 500, initialPrice: 1, currentPrice: 1, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 1000,
+    approvedAt: new Date(), revenueAccount: { create: {} },
+  }});
+
+  const founderToken = await token(founder.id, ['USER', 'BUSINESS_OWNER']);
+  const contrib = await app.inject({ method: 'POST', url: `/api/project-capital-flow/companies/${company.id}/contribute`, headers: { authorization: `Bearer ${founderToken}` }, payload: { amountRpc: 100, reason: 'Aporte institucional para caixa operacional' } });
+  assert.equal(contrib.statusCode, 200, contrib.body);
+
+  const founderView = await app.inject({ method: 'GET', url: `/api/project-capital-flow/companies/${company.id}`, headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(founderView.statusCode, 200, founderView.body);
+  const founderPayload = founderView.json();
+  assert.equal(Number(founderPayload.institutionalBalance), 100);
+  assert.ok(founderPayload.totalsByType.OWNER_RPC_CONTRIBUTION >= 100);
+  assert.ok(founderPayload.totalsBySource.OWNER_WALLET >= 100);
+
+  const outsiderToken = await token(outsider.id, ['USER']);
+  const outsiderView = await app.inject({ method: 'GET', url: `/api/project-capital-flow/companies/${company.id}`, headers: { authorization: `Bearer ${outsiderToken}` } });
+  assert.equal(outsiderView.statusCode, 403, outsiderView.body);
+
+  const auditorToken = await token(auditor.id, ['AUDITOR']);
+  const auditorView = await app.inject({ method: 'GET', url: `/api/project-capital-flow/companies/${company.id}`, headers: { authorization: `Bearer ${auditorToken}` } });
+  assert.equal(auditorView.statusCode, 200, auditorView.body);
+
+  const adminAccounts = await app.inject({ method: 'GET', url: '/api/admin/project-institutional-accounts', headers: { authorization: `Bearer ${auditorToken}` } });
+  assert.equal(adminAccounts.statusCode, 200, adminAccounts.body);
+});
+
+test('recordProjectInstitutionalEntry rejeita PROJECT_REVENUE_OUT neste PR', async () => {
+  await resetDb();
+  const [{ recordProjectInstitutionalEntry }, { Decimal }] = await Promise.all([
+    import('../src/services/project-institutional-account-service.js'),
+    import('@prisma/client/runtime/library'),
+  ]);
+
+  const founder = await mkUser('outflow@test.local', 'Founder Outflow');
+  const company = await prisma.company.create({ data: {
+    name: 'Outflow Blocked', ticker: 'OUTBLK', description: 'Projeto', sector: 'RP', founderUserId: founder.id, status: 'ACTIVE',
+    totalShares: 1000, circulatingShares: 0, ownerSharePercent: 60, publicOfferPercent: 40, ownerShares: 600, publicOfferShares: 400,
+    availableOfferShares: 400, initialPrice: 1, currentPrice: 1, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 1000,
+    approvedAt: new Date(), revenueAccount: { create: { balance: 200 } },
+  }});
+
+  await assert.rejects(
+    prisma.$transaction((tx) => recordProjectInstitutionalEntry(tx, {
+      companyId: company.id,
+      actorUserId: founder.id,
+      amountRpc: new Decimal(10),
+      reason: 'Tentativa de saída',
+      type: 'PROJECT_REVENUE_OUT',
+      source: 'MANUAL_CORRECTION',
+    })),
+    /Saídas institucionais ainda não são suportadas neste fluxo/,
+  );
+});
+
+test('summary calcula totais completos mesmo com extrato limitado a 50 e ADMIN pode consultar', async () => {
+  await resetDb();
+  const rFounder = await mkRole('BUSINESS_OWNER');
+  const rUser = await mkRole('USER');
+  const rAdmin = await mkRole('ADMIN');
+  const rAuditor = await mkRole('AUDITOR');
+
+  const founder = await mkUser('founder-total@test.local', 'Founder Total');
+  const admin = await mkUser('admin-total@test.local', 'Admin Total');
+  const outsider = await mkUser('outsider-total@test.local', 'Outsider Total');
+
+  await prisma.userRole.createMany({ data: [
+    { userId: founder.id, roleId: rFounder.id },
+    { userId: founder.id, roleId: rUser.id },
+    { userId: admin.id, roleId: rAdmin.id },
+    { userId: outsider.id, roleId: rUser.id },
+  ]});
+
+  const company = await prisma.company.create({ data: {
+    name: 'Totals Full', ticker: 'TTLSF', description: 'Projeto totais', sector: 'RP', founderUserId: founder.id, status: 'ACTIVE',
+    totalShares: 1000, circulatingShares: 0, ownerSharePercent: 50, publicOfferPercent: 50, ownerShares: 500, publicOfferShares: 500,
+    availableOfferShares: 500, initialPrice: 1, currentPrice: 1, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 1000,
+    approvedAt: new Date(), revenueAccount: { create: { balance: 120 } },
+  }});
+
+  const entries = Array.from({ length: 60 }).map((_, i) => ({
+    companyId: company.id,
+    actorUserId: founder.id,
+    type: i < 40 ? 'OWNER_RPC_CONTRIBUTION' : 'PROJECT_REVENUE_IN',
+    source: i < 30 ? 'OWNER_WALLET' : 'MARKET_FEE',
+    amountRpc: 2,
+    previousWalletRpcBalance: 0,
+    newWalletRpcBalance: 0,
+    previousProjectBalance: i * 2,
+    newProjectBalance: (i + 1) * 2,
+    reason: `Entry ${i} válido para total`,
+    metadata: null,
+  }));
+  await prisma.companyCapitalFlowEntry.createMany({ data: entries as any });
+
+  const founderToken = await token(founder.id, ['USER', 'BUSINESS_OWNER']);
+  const founderView = await app.inject({ method: 'GET', url: `/api/project-capital-flow/companies/${company.id}`, headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(founderView.statusCode, 200, founderView.body);
+  const founderPayload = founderView.json();
+  assert.equal(founderPayload.entries.length, 50);
+  assert.equal(Number(founderPayload.totalsByType.OWNER_RPC_CONTRIBUTION), 80);
+  assert.equal(Number(founderPayload.totalsByType.PROJECT_REVENUE_IN), 40);
+  assert.equal(Number(founderPayload.totalsBySource.OWNER_WALLET), 60);
+  assert.equal(Number(founderPayload.totalsBySource.MARKET_FEE), 60);
+
+  const adminToken = await token(admin.id, ['ADMIN']);
+  const adminView = await app.inject({ method: 'GET', url: `/api/project-capital-flow/companies/${company.id}`, headers: { authorization: `Bearer ${adminToken}` } });
+  assert.equal(adminView.statusCode, 200, adminView.body);
+
+  const outsiderToken = await token(outsider.id, ['USER']);
+  const forbiddenAdminList = await app.inject({ method: 'GET', url: '/api/admin/project-institutional-accounts', headers: { authorization: `Bearer ${outsiderToken}` } });
+  assert.equal(forbiddenAdminList.statusCode, 403, forbiddenAdminList.body);
+
+  const auditorUser = await mkUser('auditor-list@test.local', 'Auditor List');
+  await prisma.userRole.create({ data: { userId: auditorUser.id, roleId: rAuditor.id } });
+  const auditorToken = await token(auditorUser.id, ['AUDITOR']);
+  const allowedAdminList = await app.inject({ method: 'GET', url: '/api/admin/project-institutional-accounts', headers: { authorization: `Bearer ${auditorToken}` } });
+  assert.equal(allowedAdminList.statusCode, 200, allowedAdminList.body);
+});
