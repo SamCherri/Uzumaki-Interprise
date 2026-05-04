@@ -404,15 +404,15 @@ export async function companyRoutes(app: FastifyInstance) {
           throw new Error('Quantidade deve ser maior que zero.');
         }
 
+        const priceBefore = company.currentPrice;
         const quantity = new Decimal(body.quantity);
-        const grossAmount = company.initialPrice.mul(quantity);
+        const grossAmount = priceBefore.mul(quantity);
         const feeAmount = grossAmount.mul(company.buyFeePercent).div(100);
         const totalAmount = grossAmount.add(feeAmount);
         const buyerRpcBalanceBefore = wallet.rpcAvailableBalance;
         if (buyerRpcBalanceBefore.lessThan(totalAmount)) {
           throw new Error('Saldo RPC insuficiente para comprar no lançamento.');
         }
-        const priceBefore = company.currentPrice;
         const priceIncrease = grossAmount.div(new Decimal(company.totalShares));
         const priceAfter = priceBefore.add(priceIncrease);
         const nextMarketCap = priceAfter.mul(new Decimal(company.totalShares));
@@ -484,7 +484,7 @@ export async function companyRoutes(app: FastifyInstance) {
             userId: authRequest.user.sub,
             type: 'INITIAL_OFFER_BUY',
             quantity: body.quantity,
-            unitPrice: company.initialPrice,
+            unitPrice: priceBefore,
             grossAmount,
             feeAmount,
             totalAmount,
