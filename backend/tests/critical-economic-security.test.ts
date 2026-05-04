@@ -1435,3 +1435,34 @@ test('self-trade: quando há ordem própria e ordem de terceiro compatível, dev
   assert.equal(ownSellAfter.status, 'OPEN');
   assert.equal(ownSellAfter.remainingQuantity, 5);
 });
+
+test('market BUY usa slippage com melhor contraparte válida (ignora ordem própria no bestPrice)', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const a = await mkUser('slippage-own-a@test.local');
+  const b = await mkUser('slippage-own-b@test.local');
+  await prisma.userRole.createMany({ data: [{ userId: a.id, roleId: rUser.id }, { userId: b.id, roleId: rUser.id }] });
+  await prisma.platformAccount.create({ data: {} });
+  await prisma.wallet.update({ where: { userId: a.id }, data: { rpcAvailableBalance: 1000 } });
+  const company = await prisma.company.create({
+    data: { name: 'Slip Corp', ticker: 'SLIP3', description: 'desc', sector: 'setor', founderUserId: a.id, status: 'ACTIVE', totalShares: 1000, circulatingShares: 100, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 600, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 10000, approvedAt: new Date(), revenueAccount: { create: {} } },
+  });
+  await prisma.companyHolding.create({ data: { userId: a.id, companyId: company.id, shares: 20, averageBuyPrice: 10, estimatedValue: 200 } });
+  await prisma.companyHolding.create({ data: { userId: b.id, companyId: company.id, shares: 20, averageBuyPrice: 10, estimatedValue: 200 } });
+  const aTk = await token(a.id, ['USER']);
+  const bTk = await token(b.id, ['USER']);
+
+  const ownSell = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${aTk}` }, payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 1, limitPrice: 1 } });
+  const bSell = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${bTk}` }, payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 1, limitPrice: 10 } });
+  assert.equal(ownSell.statusCode, 201, ownSell.body);
+  assert.equal(bSell.statusCode, 201, bSell.body);
+
+  const marketBuy = await app.inject({ method: 'POST', url: `/api/market/companies/${company.id}/buy-market`, headers: { authorization: `Bearer ${aTk}` }, payload: { quantity: 1, slippagePercent: 5 } });
+  assert.equal(marketBuy.statusCode, 201, marketBuy.body);
+
+  const trades = await prisma.trade.findMany({ where: { companyId: company.id }, orderBy: { createdAt: 'asc' } });
+  assert.equal(trades.length, 1);
+  assert.equal(trades[0].buyerId, a.id);
+  assert.equal(trades[0].sellerId, b.id);
+  assert.notEqual(trades[0].buyerId, trades[0].sellerId);
+});

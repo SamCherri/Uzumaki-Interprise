@@ -217,11 +217,13 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
         : [{ limitPrice: 'desc' }, { createdAt: 'asc' }],
   });
 
-  if (initialOppositeOrders.length === 0 && taker.mode === 'MARKET') {
-    throw new Error('Não há liquidez suficiente no livro para executar esta ordem.');
+  const validOppositeOrders = initialOppositeOrders.filter((order) => order.userId !== taker.userId);
+
+  if (validOppositeOrders.length === 0 && taker.mode === 'MARKET') {
+    throw new Error('Não há contraparte válida de outro usuário para executar esta ordem.');
   }
 
-  const bestPrice = initialOppositeOrders[0]?.limitPrice ?? null;
+  const bestPrice = validOppositeOrders[0]?.limitPrice ?? null;
 
   let maxBuyPrice: Decimal | null = null;
   let minSellPrice: Decimal | null = null;
@@ -456,8 +458,7 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
 
   if (taker.mode === 'MARKET') {
     if (taker.remainingQuantity === taker.quantity) {
-      const hasOnlyOwnLiquidity = initialOppositeOrders.length > 0
-        && initialOppositeOrders.every((order) => order.userId === taker.userId);
+      const hasOnlyOwnLiquidity = initialOppositeOrders.length > 0 && validOppositeOrders.length === 0;
       if (hasOnlyOwnLiquidity) {
         throw new Error('Não há contraparte válida de outro usuário para executar esta ordem.');
       }
