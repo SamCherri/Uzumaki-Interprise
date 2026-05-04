@@ -20,7 +20,7 @@ export async function projectHolderDistributionRoutes(app: FastifyInstance) {
   });
 
   app.post('/project-holder-distributions/companies/:companyId/programs', { preHandler: [app.authenticate] }, async (request, reply) => {
-    try { const auth = request as AuthRequest; const { companyId } = z.object({ companyId: z.string().min(1) }).parse(request.params); const body = z.object({ budgetRpc: z.coerce.number(), reason: z.string(), excludeFounder: z.boolean().optional() }).parse(request.body); const program = await createHolderDistributionProgram({ companyId, actorUserId: auth.user.sub, actorRoles: auth.user.roles ?? [], ...body, ip: request.ip, userAgent: request.headers['user-agent'] ?? null }); return reply.code(201).send(program); } catch (e) { return handle(reply, e); }
+    try { const auth = request as AuthRequest; const { companyId } = z.object({ companyId: z.string().min(1) }).parse(request.params); const body = z.object({ budgetRpc: z.coerce.number(), reason: z.string(), excludeFounder: z.boolean().optional() }).parse(request.body); const program = await createHolderDistributionProgram({ companyId, actorUserId: auth.user.sub, actorRoles: auth.user.roles ?? [], budgetRpc: body.budgetRpc, reason: body.reason, excludeFounder: body.excludeFounder, ip: request.ip, userAgent: request.headers['user-agent'] ?? null }); return reply.code(201).send(program); } catch (e) { return handle(reply, e); }
   });
 
   app.post('/project-holder-distributions/programs/:programId/execute', { preHandler: [app.authenticate] }, async (request, reply) => {

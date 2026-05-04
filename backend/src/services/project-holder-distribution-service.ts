@@ -15,7 +15,8 @@ export async function createHolderDistributionProgram(input: { companyId: string
   if (reason.length < 10) throw new HttpError(400, 'Motivo deve ter ao menos 10 caracteres.');
   const budgetRpc = round2(new Decimal(input.budgetRpc));
   if (budgetRpc.lte(0)) throw new HttpError(400, 'budgetRpc deve ser maior que zero.');
-  const excludeFounder = input.excludeFounder ?? true;
+  if (input.excludeFounder === false) throw new HttpError(400, 'Inclusão do fundador na distribuição não é suportada nesta política inicial.');
+  const excludeFounder = true;
 
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.$queryRaw`SELECT id FROM "Company" WHERE id = ${input.companyId} FOR UPDATE`;
@@ -62,10 +63,19 @@ export async function executeHolderDistributionProgram(input: { programId: strin
 
     const snapshots = await tx.projectHolderDistributionSnapshot.findMany({ where: { programId: program.id, status: 'PENDING' } });
     let totalPaid = ZERO;
+    let skipped = 0;
     for (const snap of snapshots) {
-      if (snap.calculatedAmountRpc.lte(0)) continue;
+      if (snap.calculatedAmountRpc.lte(0)) {
+        await tx.projectHolderDistributionSnapshot.update({ where: { id: snap.id }, data: { status: 'SKIPPED' } });
+        skipped++;
+        continue;
+      }
       const wallet = await tx.wallet.findUnique({ where: { userId: snap.userId } });
-      if (!wallet) continue;
+      if (!wallet) {
+        await tx.projectHolderDistributionSnapshot.update({ where: { id: snap.id }, data: { status: 'SKIPPED' } });
+        skipped++;
+        continue;
+      }
       await tx.wallet.update({ where: { id: wallet.id }, data: { rpcAvailableBalance: { increment: snap.calculatedAmountRpc } } });
       const tr = await tx.transaction.create({ data: { walletId: wallet.id, type: 'PROJECT_HOLDER_DISTRIBUTION_IN', amount: snap.calculatedAmountRpc, description: `Distribuição para holder do projeto ${program.company.ticker}` } });
       await tx.projectHolderDistributionPayment.create({ data: { programId: program.id, snapshotId: snap.id, companyId: program.companyId, userId: snap.userId, walletId: wallet.id, transactionId: tr.id, amountRpc: snap.calculatedAmountRpc } });
@@ -75,8 +85,10 @@ export async function executeHolderDistributionProgram(input: { programId: strin
     const refund = round2(program.budgetRpc.sub(totalPaid));
     if (refund.gt(0)) await tx.companyRevenueAccount.update({ where: { companyId: program.companyId }, data: { balance: { increment: refund } } });
 
-    const updated = await tx.projectHolderDistributionProgram.update({ where: { id: program.id }, data: { status: 'COMPLETED', distributedRpc: totalPaid, refundedRpc: refund.gt(0) ? refund : ZERO, executedAt: new Date() } });
-    await tx.adminLog.create({ data: { userId: input.actorUserId, action: 'PROJECT_HOLDER_DISTRIBUTION_EXECUTE', entity: 'ProjectHolderDistributionProgram', reason: 'Execução de distribuição para holders', current: JSON.stringify({ programId: program.id, distributedRpc: String(totalPaid), refundedRpc: String(refund) }), ip: input.ip ?? null, userAgent: input.userAgent ?? null } });
+    const finish = await tx.projectHolderDistributionProgram.updateMany({ where: { id: program.id, status: 'READY' }, data: { status: 'COMPLETED', distributedRpc: totalPaid, refundedRpc: refund.gt(0) ? refund : ZERO, executedAt: new Date() } });
+    if (finish.count !== 1) throw new HttpError(409, 'Conflito de concorrência ao finalizar distribuição.');
+    const updated = await tx.projectHolderDistributionProgram.findUniqueOrThrow({ where: { id: program.id } });
+    await tx.adminLog.create({ data: { userId: input.actorUserId, action: 'PROJECT_HOLDER_DISTRIBUTION_EXECUTE', entity: 'ProjectHolderDistributionProgram', reason: 'Execução de distribuição para holders', current: JSON.stringify({ programId: program.id, distributedRpc: String(totalPaid), refundedRpc: String(refund), skipped }), ip: input.ip ?? null, userAgent: input.userAgent ?? null } });
     return updated;
   });
 }

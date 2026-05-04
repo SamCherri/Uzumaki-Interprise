@@ -284,3 +284,6 @@ Fonte oficial: `docs/ROADMAP_PRIORITARIO.md`.
 - Snapshot de holders elegíveis é gravado de forma imutável no programa, com cálculo proporcional por shares e fundador excluído por padrão (`excludeFounder=true`).
 - Execução cria `Transaction` individual por holder, registra pagamentos e marca snapshots como `PAID`, com proteção de reexecução por status.
 - Sobra por arredondamento e cancelamento retornam saldo ao caixa institucional, sem impacto em preço, Trade, MarketOrder, supply, reserva e Test Mode.
+
+- Na PR 7, fundador permanece sempre excluído nesta etapa; tentativa de incluir founder (`excludeFounder=false`) é bloqueada com erro 400.
+- Snapshots sem pagamento elegível (valor <= 0 ou wallet ausente) são marcados como `SKIPPED`, evitando `COMPLETED` com pendências `PENDING`.
