@@ -6,7 +6,7 @@ import { HttpError } from '../lib/http-error.js';
 import { getProjectInstitutionalAccountSummary } from '../services/project-institutional-account-service.js';
 
 type AuthRequest = FastifyRequest & { user: { sub: string; roles?: string[] } };
-const ADMIN_ROLES = ['SUPER_ADMIN', 'COIN_CHIEF_ADMIN', 'AUDITOR'];
+const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN', 'AUDITOR'];
 const isAdmin = (roles: string[]) => roles.some((r) => ADMIN_ROLES.includes(r));
 
 export async function projectCapitalFlowRoutes(app: FastifyInstance) {
