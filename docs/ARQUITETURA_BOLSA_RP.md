@@ -223,3 +223,10 @@ Objetivo da fase de PWA:
 - Débito da wallet RPC e consumo da oferta usam atualização condicional para bloquear saldo negativo e oversell concorrente.
 - Compra inicial atualiza holding, circulação, preço e market cap, gerando `CompanyOperation` + `Transaction` + `FeeDistribution` quando aplicável.
 - Compra inicial não gera `Trade` nem `MarketOrder`; secundário continua responsável por formação de preço via trade real fora da oferta inicial.
+
+## Atualização 2026-05-04 — Mercado secundário seguro (PR 3)
+- Ordens LIMIT entram no livro com lock de saldo/tokens sem mover preço.
+- Cancelamento libera somente lock remanescente e não altera preço.
+- Ordem MARKET executa somente com contraparte real no livro; sem liquidez retorna erro claro.
+- `Company.currentPrice` no secundário atualiza somente por `Trade` executado.
+- Matching com bloqueio de self-trade e suporte a execução parcial consistente.

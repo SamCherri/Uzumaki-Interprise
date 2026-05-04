@@ -307,6 +307,7 @@ export function CompaniesPage() {
     event.preventDefault();
     if (!selected) return;
     try {
+      setIsSubmittingLimitOrder(true);
       if (selected.status !== 'ACTIVE') throw new Error('Mercado pausado. Não é possível criar ordens.');
       await api('/market/orders', {
         method: 'POST',
@@ -314,7 +315,7 @@ export function CompaniesPage() {
       });
       setLimitQty('');
       setLimitPrice('');
-      setMessage(type === 'BUY' ? 'Ordem de compra criada no livro de ofertas.' : 'Ordem de venda criada no livro de ofertas.');
+      setMessage('Ordem criada no livro. O preço só muda quando houver execução.');
       setError('');
       await refreshMarketScreen(selected.id);
     } catch (err) {
@@ -329,6 +330,7 @@ export function CompaniesPage() {
     const quantity = Number(type === 'BUY' ? marketBuyQty : marketSellQty);
     const slippagePercent = Number(type === 'BUY' ? marketBuySlip : marketSellSlip);
     try {
+      setIsSubmittingMarketOrder(true);
       if (selected.status !== 'ACTIVE') throw new Error('Mercado pausado. Não é possível negociar agora.');
       await api(`/market/companies/${selected.id}/${type === 'BUY' ? 'buy-market' : 'sell-market'}`, {
         method: 'POST',
@@ -340,7 +342,12 @@ export function CompaniesPage() {
       setError('');
       await refreshMarketScreen(selected.id);
     } catch (err) {
-      setError(`Não foi possível enviar ordem agora: ${(err as Error).message}`);
+      const baseError = (err as Error).message;
+      if (baseError.includes('Não há liquidez suficiente no livro para executar esta ordem.')) {
+        setError('Não há liquidez suficiente no livro para executar esta ordem.');
+      } else {
+        setError(`Não foi possível enviar ordem agora: ${baseError}`);
+      }
     } finally {
       setIsSubmittingMarketOrder(false);
     }
@@ -349,8 +356,9 @@ export function CompaniesPage() {
   async function cancelOrder(orderId: string) {
     if (!selected) return;
     try {
+      setCancelingOrderId(orderId);
       await api(`/market/orders/${orderId}/cancel`, { method: 'POST' });
-      setMessage('Ordem cancelada com sucesso.');
+      setMessage('Ordem cancelada. O preço não foi alterado.');
       await refreshMarketScreen(selected.id);
     } catch (err) {
       setError(`Falha ao cancelar ordem: ${(err as Error).message}`);
