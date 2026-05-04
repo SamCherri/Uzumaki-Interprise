@@ -1,10 +1,10 @@
-# RPC Exchange
+# <img src="assets/rpc_exchange_icon.png" width="40" height="40" align="center"> RPC Exchange
+
+![RPC Exchange Banner](assets/rpc_exchange_banner.png)
 
 Projeto de **interpretação/simulação** com mercados e tokens virtuais em uma experiência de exchange.
 
 > Ferramenta de interpretação de exchange para RP. Sem dinheiro real, sem cripto real, sem blockchain, sem Pix, sem cartão e sem gateway de pagamento.
-
-
 
 ## Direção atual do produto
 
@@ -45,6 +45,7 @@ O banco oficial é **PostgreSQL/Postgres** com **Prisma ORM** usando `DATABASE_U
 - `frontend/`: React + Vite + TypeScript (painéis iniciais).
 - `backend/`: Fastify + Prisma + TypeScript (API e regras de backend).
 - `docs/`: documentação principal da simulação.
+- `assets/`: recursos visuais e logotipos da plataforma.
 
 ## Documentação técnica
 
@@ -129,28 +130,28 @@ Implementado nesta fase:
    - venda limitada cruza maior preço comprador (FIFO por empate);
    - ordens a mercado consomem livro respeitando tolerância.
 10. Bloqueio de recursos:
-   - compra limitada bloqueia saldo em carteira (`availableBalance -> lockedBalance`);
-   - venda limitada bloqueia tokens (retiradas da holding até execução/cancelamento).
+    - compra limitada bloqueia saldo em carteira (`availableBalance -> lockedBalance`);
+    - venda limitada bloqueia tokens (retiradas da holding até execução/cancelamento).
 11. Cancelamento de ordem limitada liberando saldo/tokens bloqueados.
 12. Registro de trades na tabela `Trade`.
 13. Atualização de preço atual do projeto pelo último trade executado.
 14. Registro de auditoria (`Transaction`, `CompanyOperation`, `AdminLog`) no fluxo de negociação.
 15. Distribuição de taxas implementada com regra fixa 50/50:
-   - 50% da taxa para carteira da plataforma (`PlatformAccount`);
-   - 50% da taxa para carteira de receita do projeto (`CompanyRevenueAccount`).
+    - 50% da taxa para carteira da plataforma (`PlatformAccount`);
+    - 50% da taxa para carteira de receita do projeto (`CompanyRevenueAccount`).
 16. Carteira de receita do projeto criada automaticamente na aprovação do projeto.
 17. Registro detalhado de distribuição em `FeeDistribution` para oferta inicial e trades de mercado.
 18. Endpoints admin para consulta da receita da plataforma e dos projetos.
 19. Saque manual de RPC com fluxo de pendência:
-   - usuário solicita saque;
-   - saldo sai de `availableBalance` e vai para `pendingWithdrawalBalance`;
-   - admin marca processamento/conclui/rejeita;
-   - conclusão remove RPC pendente definitivamente;
-   - rejeição ou cancelamento devolve RPC para saldo disponível.
+    - usuário solicita saque;
+    - saldo sai de `availableBalance` e vai para `pendingWithdrawalBalance`;
+    - admin marca processamento/conclui/rejeita;
+    - conclusão remove RPC pendente definitivamente;
+    - rejeição ou cancelamento devolve RPC para saldo disponível.
 20. Nova tabela `WithdrawalRequest` com status:
-   - `PENDING`, `PROCESSING`, `COMPLETED`, `REJECTED`, `CANCELED`.
+    - `PENDING`, `PROCESSING`, `COMPLETED`, `REJECTED`, `CANCELED`.
 21. Novo campo em carteira:
-   - `pendingWithdrawalBalance`.
+    - `pendingWithdrawalBalance`.
 
 ## Endpoints principais do estado atual
 
@@ -278,6 +279,7 @@ npm run prisma:seed
 - Se `npm install` falhar por bloqueio externo (ex.: erro 403 de registry), registrar o incidente na PR.
 
 ## Admin avançado (RPC Exchange)
+
 - Novo painel admin em abas: Visão geral, Usuários, Corretores, Tokens/Mercados, Saques, Tesouraria, Receitas e Logs.
 - Gestão de usuários: busca, bloqueio/desbloqueio e edição de roles (USER, VIRTUAL_BROKER, BUSINESS_OWNER, ADMIN e SUPER_ADMIN com proteção).
 - Gestão de mercados: criação manual de token, troca de responsável, pausar, reativar, encerrar e exclusão definitiva segura.
@@ -286,6 +288,7 @@ npm run prisma:seed
 - Todas as ações administrativas geram AdminLog.
 
 ## Auditoria e Relatórios Administrativos
+
 - Implementado painel de Auditoria avançada (logs, transações, transferências, saques, ordens e trades) somente leitura.
 - Implementado painel de Relatórios com visão geral financeira, conta da plataforma e receitas por projeto/token.
 - Filtros básicos: busca, status/tipo (quando aplicável), período e paginação (padrão 20, máximo 100).
