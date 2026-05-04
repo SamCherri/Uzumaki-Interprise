@@ -279,3 +279,11 @@ Em caso de conflito:
 - Implementado resumo auditável do caixa institucional por projeto com saldo, histórico recente, totais por tipo/origem e inconsistências básicas read-only.
 - Implementado endpoint admin somente leitura para listar caixas institucionais com alertas básicos.
 - Sem impacto em preço, Trade, MarketOrder, CompanyHolding, supply, mercado primário/secundário, matching, Test Mode e boost legado.
+
+## Atualização 2026-05-04 — PR 5 programa de recompra
+- Implementado programa de recompra com orçamento em RPC institucional existente, reservado no ato da criação.
+- Execução ocorre somente contra ordens SELL reais no livro secundário, com criação de Trade e atualização de preço apenas por execução real.
+- Tokens recomprados são enviados para reserva institucional mínima (`ProjectTokenReserve`), nunca para holding pessoal do fundador.
+- Cancelamento devolve saldo não utilizado para `CompanyRevenueAccount`.
+- Política avançada da reserva permanece para PR 6.
+

@@ -237,3 +237,10 @@ Objetivo da fase de PWA:
 - Consulta por fundador e perfis administrativos de auditoria.
 - Endpoint administrativo read-only para varredura de contas institucionais.
 - Fluxo de aporte do fundador continua debitando RPC existente na carteira pessoal e creditando o caixa institucional sem alterar preço e sem criar ordens/trades.
+
+## Atualização 2026-05-04 — Recompra institucional (PR 5)
+- Introduzido programa de recompra com reserva de orçamento via `ProjectBuybackProgram`.
+- Execução percorre ordens SELL reais elegíveis por preço (menor preço primeiro), com proteção básica anti-self-trade do fundador.
+- Cada execução gera `Trade`, `ProjectBuybackExecution` e entrada em `ProjectTokenReserveEntry`.
+- Reserva mínima de tokens recomprados registrada em `ProjectTokenReserve` (política avançada deixada para PR 6).
+

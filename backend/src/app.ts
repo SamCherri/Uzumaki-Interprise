@@ -19,6 +19,7 @@ import { rpcMarketRoutes } from './routes/rpc-market.js';
 import { systemModeRoutes } from './routes/system-mode.js';
 import { testModeRoutes } from './routes/test-mode.js';
 import { projectCapitalFlowRoutes } from './routes/project-capital-flow.js';
+import { projectBuybackRoutes } from './routes/project-buybacks.js';
 import { globalSystemModeGuard } from './plugins/system-mode-guard.js';
 
 export function buildApp() {
@@ -75,6 +76,7 @@ export function buildApp() {
   app.register(systemModeRoutes, { prefix: '/api' });
   app.register(testModeRoutes, { prefix: '/api' });
   app.register(projectCapitalFlowRoutes, { prefix: '/api' });
+  app.register(projectBuybackRoutes, { prefix: '/api' });
 
   return app;
 }

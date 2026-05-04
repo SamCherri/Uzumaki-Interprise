@@ -42,6 +42,14 @@ enum CompanyOperationType {
   MARKET_ORDER_CANCEL
   MARKET_TRADE_EXECUTED
   PROJECT_BOOST
+  PROJECT_BUYBACK_EXECUTION
+}
+
+enum ProjectBuybackStatus {
+  ACTIVE
+  COMPLETED
+  CANCELED
+  EXPIRED
 }
 
 enum CompanyBoostSource {
@@ -121,9 +129,11 @@ model User {
   transfersIn  CoinTransfer[]   @relation("transfer_receiver")
   holdings     CompanyHolding[]
   operations   CompanyOperation[]
+  createdBuybackPrograms ProjectBuybackProgram[]
   marketOrders MarketOrder[]
   buyTrades    Trade[]            @relation("trade_buyer")
   sellTrades   Trade[]            @relation("trade_seller")
+  buybackExecutionsAsSeller ProjectBuybackExecution[]
   paidFeeDistributions FeeDistribution[] @relation("fee_distribution_payer")
   withdrawalRequests WithdrawalRequest[] @relation("withdrawal_request_user")
   reviewedWithdrawalRequests WithdrawalRequest[] @relation("withdrawal_request_reviewer")
@@ -241,7 +251,12 @@ model Company {
   boostAccount        CompanyBoostAccount?
   boostInjections     CompanyBoostInjection[]
   capitalFlowEntries  CompanyCapitalFlowEntry[]
+  buybackPrograms     ProjectBuybackProgram[]
+  buybackExecutions   ProjectBuybackExecution[]
+  tokenReserve        ProjectTokenReserve?
+  tokenReserveEntries ProjectTokenReserveEntry[] @relation("reserve_entry_company")
 }
+
 
 model CompanyHolding {
   id               String   @id @default(cuid())
@@ -285,6 +300,7 @@ model CompanyOperation {
   feeDistributions FeeDistribution[]
 }
 
+
 model MarketOrder {
   id              String            @id @default(cuid())
   companyId       String
@@ -327,7 +343,9 @@ model Trade {
   buyOrder      MarketOrder? @relation("trade_buy_order", fields: [buyOrderId], references: [id])
   sellOrder     MarketOrder? @relation("trade_sell_order", fields: [sellOrderId], references: [id])
   feeDistributions FeeDistribution[]
+  buybackExecution ProjectBuybackExecution?
 }
+
 
 
 model PlatformAccount {
@@ -623,4 +641,85 @@ model CompanyCapitalFlowEntry {
   @@index([type])
   @@index([source])
   @@index([createdAt])
+}
+
+
+model ProjectBuybackProgram {
+  id               String              @id @default(cuid())
+  companyId        String
+  createdByUserId  String
+  status           ProjectBuybackStatus @default(ACTIVE)
+  budgetRpc        Decimal             @db.Decimal(18, 2)
+  spentRpc         Decimal             @default(0) @db.Decimal(18, 2)
+  remainingRpc     Decimal             @db.Decimal(18, 2)
+  maxPricePerShare Decimal             @db.Decimal(24, 8)
+  targetShares     Int
+  purchasedShares  Int                 @default(0)
+  reason           String
+  expiresAt        DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  canceledAt       DateTime?
+  completedAt      DateTime?
+  company          Company             @relation(fields: [companyId], references: [id])
+  createdBy        User                @relation(fields: [createdByUserId], references: [id])
+  executions       ProjectBuybackExecution[]
+  reserveEntries   ProjectTokenReserveEntry[]
+
+  @@index([companyId, status])
+  @@index([createdByUserId])
+}
+
+model ProjectBuybackExecution {
+  id             String   @id @default(cuid())
+  programId      String
+  companyId      String
+  sellerUserId   String
+  tradeId        String
+  quantity       Int
+  unitPrice      Decimal  @db.Decimal(24, 8)
+  grossAmountRpc Decimal  @db.Decimal(18, 2)
+  feeAmountRpc   Decimal  @default(0) @db.Decimal(18, 2)
+  totalAmountRpc Decimal  @db.Decimal(18, 2)
+  createdAt      DateTime @default(now())
+  program        ProjectBuybackProgram @relation(fields: [programId], references: [id])
+  company        Company  @relation(fields: [companyId], references: [id])
+  seller         User     @relation(fields: [sellerUserId], references: [id])
+  trade          Trade    @relation(fields: [tradeId], references: [id])
+  reserveEntries ProjectTokenReserveEntry[]
+
+  @@unique([tradeId])
+  @@index([programId])
+  @@index([companyId])
+}
+
+model ProjectTokenReserve {
+  id           String   @id @default(cuid())
+  companyId    String   @unique
+  shares       Int      @default(0)
+  totalCostRpc Decimal  @default(0) @db.Decimal(18, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  company      Company  @relation(fields: [companyId], references: [id])
+  entries      ProjectTokenReserveEntry[] @relation("reserve_entry_bucket")
+}
+
+model ProjectTokenReserveEntry {
+  id             String   @id @default(cuid())
+  companyId      String
+  programId      String
+  executionId    String
+  type           String
+  shares         Int
+  unitPrice      Decimal  @db.Decimal(24, 8)
+  totalCostRpc   Decimal  @db.Decimal(18, 2)
+  reason         String
+  createdAt      DateTime @default(now())
+  company        Company  @relation("reserve_entry_company", fields: [companyId], references: [id], map: "fk_reserve_entry_company")
+  program        ProjectBuybackProgram @relation(fields: [programId], references: [id])
+  execution      ProjectBuybackExecution @relation(fields: [executionId], references: [id])
+  reserve        ProjectTokenReserve @relation("reserve_entry_bucket", fields: [companyId], references: [companyId], map: "fk_reserve_entry_bucket")
+
+  @@index([companyId])
+  @@index([programId])
 }
