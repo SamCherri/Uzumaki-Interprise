@@ -47,9 +47,20 @@ type Timeframe = 'Time' | '15m' | '1h' | '4h' | '1D';
 
 
 type InitialOfferBuyResponse = {
+  companyId?: string;
+  ticker?: string;
+  quantity?: number;
   priceBefore?: string | number;
   priceAfter?: string | number;
   priceIncrease?: string | number;
+  grossAmount?: string | number;
+  feeAmount?: string | number;
+  totalAmount?: string | number;
+  availableSharesBefore?: number;
+  availableSharesAfter?: number;
+  buyerRpcBalanceBefore?: string | number;
+  buyerRpcBalanceAfter?: string | number;
+  holdingSharesAfter?: number;
   currentPrice?: string | number;
 };
 
@@ -261,6 +272,7 @@ export function CompaniesPage() {
     event.preventDefault();
     if (!selected) return;
     try {
+      setIsBuyingInitial(true);
       if (selected.status !== 'ACTIVE') throw new Error('Mercado pausado. Não é possível comprar no lançamento inicial.');
       const response = await api<InitialOfferBuyResponse>(`/companies/${selected.id}/buy-initial-offer`, {
         method: 'POST',
@@ -557,7 +569,10 @@ export function CompaniesPage() {
                     </nav>
                     {buyMode === 'initial' && (
                       <form onSubmit={buyInitialOffer}>
-                        <p className="info-text">Comprar no lançamento altera o preço atual, mas não cria trade no histórico.</p>
+                        <p className="info-text">Esta compra é feita direto da oferta inicial do projeto.</p>
+                        <p className="info-text">A compra executada pode alterar o preço conforme a curva de lançamento.</p>
+                        <p className="info-text">Oferta parada não altera preço. Depois da oferta inicial, preço só muda por trade real no mercado secundário.</p>
+                        <p className="info-text">Oferta disponível: {selected.availableOfferShares.toLocaleString('pt-BR')} • Preço atual: {formatPrice(Number(selected.currentPrice))} RPC</p>
                         <input type="number" min="1" value={initialQty} onChange={(e) => setInitialQty(e.target.value)} placeholder="Quantidade de moedas" required />
                         <Button variant="success" type="submit" disabled={isBuyingInitial}>{isBuyingInitial ? 'Comprando...' : 'Comprar moedas'}</Button>
                       </form>

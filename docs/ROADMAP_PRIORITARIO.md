@@ -271,3 +271,4 @@ Em caso de conflito:
 - não criar crédito institucional livre sem origem rastreável.
 
 - [~] PR 1 — Fluxo de capital R$ → RPC → token/projeto (implementação parcial: fluxo base + testes iniciais; ajustes adicionais podem evoluir em follow-up).
+- [x] PR 2 — Mercado primário correto (compra da oferta inicial reforçada com débito atômico de RPC, proteção anti-oversell, atualização de holding/oferta/circulação e trilha auditável sem Trade/MarketOrder).

@@ -227,6 +227,11 @@ test('compra inicial altera preço, cria operação e não cria trade', async ()
   const payload = response.json();
   assert.ok(payload.priceBefore);
   assert.ok(payload.priceAfter);
+  assert.ok(payload.priceIncrease);
+  assert.ok(payload.grossAmount);
+  assert.ok(payload.totalAmount);
+  assert.equal(payload.availableSharesBefore, 600);
+  assert.equal(payload.availableSharesAfter, 550);
   assert.ok(Number(payload.priceAfter) > Number(payload.priceBefore));
   assert.equal(String(payload.currentPrice), String(payload.priceAfter));
 
@@ -237,6 +242,7 @@ test('compra inicial altera preço, cria operação e não cria trade', async ()
   const platform = await prisma.platformAccount.findFirstOrThrow();
   const revenue = await prisma.companyRevenueAccount.findUniqueOrThrow({ where: { companyId: company.id } });
   const tradesCount = await prisma.trade.count({ where: { companyId: company.id } });
+  const marketOrderCount = await prisma.marketOrder.count({ where: { companyId: company.id } });
 
   assert.ok(Number(companyAfter.currentPrice) > 10);
   assert.equal(holding.shares, 50);
@@ -245,6 +251,61 @@ test('compra inicial altera preço, cria operação e não cria trade', async ()
   assert.ok(Number(platform.balance) > 0);
   assert.ok(Number(revenue.balance) > 0);
   assert.equal(tradesCount, 0);
+  assert.equal(marketOrderCount, 0);
+});
+
+test('segunda compra inicial usa currentPrice atualizado como base de custo', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const buyer = await mkUser('initialbuyer2@test.local', 'Initial Buyer 2');
+  await prisma.userRole.create({ data: { userId: buyer.id, roleId: rUser.id } });
+  await prisma.platformAccount.create({ data: {} });
+  await prisma.wallet.update({ where: { userId: buyer.id }, data: { rpcAvailableBalance: 10000 } });
+
+  const company = await prisma.company.create({
+    data: {
+      name: 'Oferta Inicial 2', ticker: 'INIT2', description: 'desc', sector: 'setor', founderUserId: buyer.id, status: 'ACTIVE', totalShares: 1000,
+      circulatingShares: 0, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 600,
+      initialPrice: 10, currentPrice: 10, buyFeePercent: 2, sellFeePercent: 1, fictitiousMarketCap: 10000, approvedAt: new Date(),
+      revenueAccount: { create: {} }, initialOffer: { create: { totalShares: 600, availableShares: 600 } },
+    },
+  });
+
+  const buyerToken = await token(buyer.id, ['USER']);
+  const firstBuy = await app.inject({
+    method: 'POST',
+    url: `/api/companies/${company.id}/buy-initial-offer`,
+    headers: { authorization: `Bearer ${buyerToken}` },
+    payload: { quantity: 50 },
+  });
+  assert.equal(firstBuy.statusCode, 201, firstBuy.body);
+  const firstPayload = firstBuy.json();
+  const firstPriceAfter = Number(firstPayload.priceAfter);
+  assert.ok(firstPriceAfter > 10);
+
+  const walletAfterFirst = await prisma.wallet.findUniqueOrThrow({ where: { userId: buyer.id } });
+  const firstWalletBalanceAfter = Number(walletAfterFirst.rpcAvailableBalance);
+
+  const secondBuy = await app.inject({
+    method: 'POST',
+    url: `/api/companies/${company.id}/buy-initial-offer`,
+    headers: { authorization: `Bearer ${buyerToken}` },
+    payload: { quantity: 10 },
+  });
+  assert.equal(secondBuy.statusCode, 201, secondBuy.body);
+  const secondPayload = secondBuy.json();
+
+  assert.equal(Number(secondPayload.priceBefore), firstPriceAfter);
+
+  const expectedGrossSecond = firstPriceAfter * 10;
+  assert.equal(Number(secondPayload.grossAmount), Number(expectedGrossSecond.toFixed(2)));
+
+  const expectedFeeSecond = expectedGrossSecond * 0.02;
+  const expectedTotalSecond = expectedGrossSecond + expectedFeeSecond;
+
+  const walletAfterSecond = await prisma.wallet.findUniqueOrThrow({ where: { userId: buyer.id } });
+  const secondWalletBalanceAfter = Number(walletAfterSecond.rpcAvailableBalance);
+  assert.equal(Number((firstWalletBalanceAfter - secondWalletBalanceAfter).toFixed(2)), Number(expectedTotalSecond.toFixed(2)));
 });
 
 test('tesouraria envia RPC para corretor e corretor envia para jogador', async () => {

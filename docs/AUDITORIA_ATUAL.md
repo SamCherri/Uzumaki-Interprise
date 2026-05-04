@@ -236,3 +236,12 @@ Fonte oficial: `docs/ROADMAP_PRIORITARIO.md`.
 ## Atualização 2026-05-03 — PR 1 fluxo de capital
 - Implementado aporte de RPC da carteira do fundador para o caixa institucional via `CompanyRevenueAccount` com histórico em `CompanyCapitalFlowEntry`.
 - Aporte não altera preço, não cria Trade e não cria MarketOrder.
+
+
+## Atualização 2026-05-04 — Mercado primário (PR 2)
+- Compra inicial usa apenas RPC já existente na carteira do comprador com débito atômico condicionado a saldo.
+- Oferta inicial é consumida com proteção anti-oversell por atualização atômica condicionada a disponibilidade.
+- Compra executada pode mover preço (`priceBefore` -> `priceAfter`), mas oferta parada não move preço.
+- Compra inicial gera `CompanyOperation`, `Transaction` e `FeeDistribution` (quando taxa > 0).
+- Compra inicial não cria `Trade` e não cria `MarketOrder`.
+- Fluxo não altera Test Mode, supply da RPC, matching engine do secundário ou boost legado.
