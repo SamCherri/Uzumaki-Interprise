@@ -1764,3 +1764,41 @@ test('buyback: cancelar COMPLETED/EXPIRED não devolve saldo novamente', async (
   const revenue = await prisma.companyRevenueAccount.findUniqueOrThrow({ where: { companyId: company.id } });
   assert.equal(Number(revenue.balance), 30);
 });
+
+test('fundador consulta reserva do próprio projeto e usuário comum não acessa projeto alheio', async () => {
+  await resetDb();
+  const founder = await mkUser('reserve-founder@test.local', 'Founder Reserve');
+  const other = await mkUser('reserve-other@test.local', 'Other Reserve');
+  await mkRole('USER');
+  const company = await prisma.company.create({
+    data: {
+      name: 'Reserve Co', ticker: `RSV${Date.now()}`.slice(-6), description: 'desc', sector: 'setor', founderUserId: founder.id,
+      status: 'ACTIVE', totalShares: 1000, circulatingShares: 100, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 500,
+      initialPrice: 10, currentPrice: 10, buyFeePercent: 2, sellFeePercent: 1, fictitiousMarketCap: 1000,
+      tokenReserve: { create: { shares: 20, totalCostRpc: 100, policy: 'HOLD_LOCKED', locked: true } },
+    },
+  });
+  const founderToken = await token(founder.id, ['USER']);
+  const otherToken = await token(other.id, ['USER']);
+
+  const ok = await app.inject({ method: 'GET', url: `/api/project-token-reserves/companies/${company.id}`, headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(ok.statusCode, 200, ok.body);
+  const payload = ok.json();
+  assert.equal(payload.reserve.reserveShares, 20);
+  assert.equal(payload.reserve.policy, 'HOLD_LOCKED');
+
+  const forbidden = await app.inject({ method: 'GET', url: `/api/project-token-reserves/companies/${company.id}`, headers: { authorization: `Bearer ${otherToken}` } });
+  assert.equal(forbidden.statusCode, 403, forbidden.body);
+});
+
+test('admin de auditoria consulta lista read-only de reservas', async () => {
+  await resetDb();
+  const admin = await mkUser('reserve-auditor@test.local', 'Reserve Auditor');
+  await mkRole('AUDITOR');
+  const adminToken = await token(admin.id, ['AUDITOR']);
+
+  const response = await app.inject({ method: 'GET', url: '/api/admin/project-token-reserves', headers: { authorization: `Bearer ${adminToken}` } });
+  assert.equal(response.statusCode, 200, response.body);
+  const payload = response.json();
+  assert.ok(Array.isArray(payload.reserves));
+});
