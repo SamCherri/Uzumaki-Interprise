@@ -269,3 +269,4 @@ Fonte oficial: `docs/ROADMAP_PRIORITARIO.md`.
 - Saldo não utilizado retorna ao caixa institucional no cancelamento.
 - Tokens recomprados vão para `ProjectTokenReserve`, não para carteira pessoal do fundador.
 
+- Nesta PR 5, execução de recompra institucional está configurada como **isenta de taxa de trade** (buyFee/sellFee = 0), com política de taxas podendo evoluir em PR futuro auditado.
