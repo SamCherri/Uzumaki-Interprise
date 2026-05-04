@@ -116,6 +116,19 @@ enum CompanyCapitalFlowSource {
   MANUAL_CORRECTION
 }
 
+enum ProjectHolderDistributionStatus {
+  DRAFT
+  READY
+  COMPLETED
+  CANCELED
+}
+
+enum ProjectHolderDistributionSnapshotStatus {
+  PENDING
+  PAID
+  SKIPPED
+}
+
 model User {
   id           String           @id @default(cuid())
   name         String
@@ -137,6 +150,9 @@ model User {
   holdings     CompanyHolding[]
   operations   CompanyOperation[]
   createdBuybackPrograms ProjectBuybackProgram[]
+  createdHolderDistributionPrograms ProjectHolderDistributionProgram[]
+  holderDistributionSnapshots ProjectHolderDistributionSnapshot[]
+  holderDistributionPayments ProjectHolderDistributionPayment[]
   marketOrders MarketOrder[]
   buyTrades    Trade[]            @relation("trade_buyer")
   sellTrades   Trade[]            @relation("trade_seller")
@@ -258,6 +274,9 @@ model Company {
   boostAccount        CompanyBoostAccount?
   boostInjections     CompanyBoostInjection[]
   capitalFlowEntries  CompanyCapitalFlowEntry[]
+  holderDistributionPrograms ProjectHolderDistributionProgram[]
+  holderDistributionSnapshots ProjectHolderDistributionSnapshot[]
+  holderDistributionPayments ProjectHolderDistributionPayment[]
   buybackPrograms     ProjectBuybackProgram[]
   buybackExecutions   ProjectBuybackExecution[]
   tokenReserve        ProjectTokenReserve?
@@ -733,4 +752,73 @@ model ProjectTokenReserveEntry {
 
   @@index([companyId])
   @@index([programId])
+}
+
+
+model ProjectHolderDistributionProgram {
+  id                   String @id @default(cuid())
+  companyId            String
+  createdByUserId      String
+  status               ProjectHolderDistributionStatus @default(READY)
+  budgetRpc            Decimal @db.Decimal(18,2)
+  distributedRpc       Decimal @default(0) @db.Decimal(18,2)
+  refundedRpc          Decimal @default(0) @db.Decimal(18,2)
+  eligibleShares       Int
+  eligibleHoldersCount Int
+  reason               String
+  excludeFounder       Boolean @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  executedAt           DateTime?
+  canceledAt           DateTime?
+  company              Company @relation(fields:[companyId], references:[id])
+  createdBy            User @relation(fields:[createdByUserId], references:[id])
+  snapshots            ProjectHolderDistributionSnapshot[]
+  payments             ProjectHolderDistributionPayment[]
+
+  @@index([companyId, status])
+  @@index([createdByUserId])
+}
+
+model ProjectHolderDistributionSnapshot {
+  id                  String @id @default(cuid())
+  programId           String
+  companyId           String
+  userId              String
+  shares              Int
+  sharePercent        Decimal @db.Decimal(24,8)
+  calculatedAmountRpc Decimal @db.Decimal(18,2)
+  paidAmountRpc       Decimal @default(0) @db.Decimal(18,2)
+  status              ProjectHolderDistributionSnapshotStatus @default(PENDING)
+  createdAt           DateTime @default(now())
+  paidAt              DateTime?
+  program             ProjectHolderDistributionProgram @relation(fields:[programId], references:[id])
+  company             Company @relation(fields:[companyId], references:[id])
+  user                User @relation(fields:[userId], references:[id])
+  payments            ProjectHolderDistributionPayment[]
+
+  @@index([programId])
+  @@index([companyId])
+  @@index([userId])
+}
+
+model ProjectHolderDistributionPayment {
+  id            String @id @default(cuid())
+  programId     String
+  snapshotId    String
+  companyId     String
+  userId        String
+  walletId      String
+  transactionId String @unique
+  amountRpc     Decimal @db.Decimal(18,2)
+  createdAt     DateTime @default(now())
+  program       ProjectHolderDistributionProgram @relation(fields:[programId], references:[id])
+  snapshot      ProjectHolderDistributionSnapshot @relation(fields:[snapshotId], references:[id])
+  company       Company @relation(fields:[companyId], references:[id])
+  user          User @relation(fields:[userId], references:[id])
+
+  @@index([programId])
+  @@index([snapshotId])
+  @@index([companyId])
+  @@index([userId])
 }

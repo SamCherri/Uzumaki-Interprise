@@ -21,6 +21,7 @@ import { testModeRoutes } from './routes/test-mode.js';
 import { projectCapitalFlowRoutes } from './routes/project-capital-flow.js';
 import { projectBuybackRoutes } from './routes/project-buybacks.js';
 import { projectTokenReserveRoutes } from './routes/project-token-reserves.js';
+import { projectHolderDistributionRoutes } from './routes/project-holder-distributions.js';
 import { globalSystemModeGuard } from './plugins/system-mode-guard.js';
 
 export function buildApp() {
@@ -79,6 +80,7 @@ export function buildApp() {
   app.register(projectCapitalFlowRoutes, { prefix: '/api' });
   app.register(projectBuybackRoutes, { prefix: '/api' });
   app.register(projectTokenReserveRoutes, { prefix: '/api' });
+  app.register(projectHolderDistributionRoutes, { prefix: '/api' });
 
   return app;
 }

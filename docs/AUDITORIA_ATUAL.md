@@ -277,3 +277,10 @@ Fonte oficial: `docs/ROADMAP_PRIORITARIO.md`.
 - Entradas da reserva continuam vinculadas a `ProjectBuybackProgram` e `ProjectBuybackExecution`.
 - Sem queima, distribuição, reoferta, criação de ordem, criação de trade adicional ou alteração de supply/preço fora da execução real de recompra.
 - Auditoria read-only adicionada para monitorar inconsistências de reserva sem autocorreção.
+
+
+## Atualização 2026-05-04 — PR 7 distribuição auditável para holders
+- Distribuição usa apenas RPC existente em `CompanyRevenueAccount`, com débito no ato da criação do programa e sem criação de RPC nova.
+- Snapshot de holders elegíveis é gravado de forma imutável no programa, com cálculo proporcional por shares e fundador excluído por padrão (`excludeFounder=true`).
+- Execução cria `Transaction` individual por holder, registra pagamentos e marca snapshots como `PAID`, com proteção de reexecução por status.
+- Sobra por arredondamento e cancelamento retornam saldo ao caixa institucional, sem impacto em preço, Trade, MarketOrder, supply, reserva e Test Mode.

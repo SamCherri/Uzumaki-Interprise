@@ -250,3 +250,10 @@ Objetivo da fase de PWA:
 - Consulta por projeto exibe quantidade reservada, custo total em RPC, custo médio e histórico de entradas por execução/programa.
 - Perfis administrativos de auditoria possuem visão read-only consolidada com alertas de inconsistência.
 - Sem endpoints de burn, sell, distribute, transfer ou reoffer nesta etapa.
+
+
+## Atualização 2026-05-04 — PR 7 distribuição auditável para holders
+- Distribuição usa apenas RPC existente em `CompanyRevenueAccount`, com débito no ato da criação do programa e sem criação de RPC nova.
+- Snapshot de holders elegíveis é gravado de forma imutável no programa, com cálculo proporcional por shares e fundador excluído por padrão (`excludeFounder=true`).
+- Execução cria `Transaction` individual por holder, registra pagamentos e marca snapshots como `PAID`, com proteção de reexecução por status.
+- Sobra por arredondamento e cancelamento retornam saldo ao caixa institucional, sem impacto em preço, Trade, MarketOrder, supply, reserva e Test Mode.
