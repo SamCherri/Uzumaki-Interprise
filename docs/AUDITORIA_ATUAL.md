@@ -245,3 +245,17 @@ Fonte oficial: `docs/ROADMAP_PRIORITARIO.md`.
 - Compra inicial gera `CompanyOperation`, `Transaction` e `FeeDistribution` (quando taxa > 0).
 - Compra inicial não cria `Trade` e não cria `MarketOrder`.
 - Fluxo não altera Test Mode, supply da RPC, matching engine do secundário ou boost legado.
+
+## Atualização 2026-05-04 — PR 3 mercado secundário seguro
+- Ordem criada no secundário não altera `Company.currentPrice`.
+- Ordem cancelada no secundário não altera `Company.currentPrice`.
+- `Company.currentPrice` no secundário só muda após `Trade` real executado.
+- Self-trade bloqueado no matching.
+- Locks de RPC/tokens reforçados para criação/cancelamento/execução parcial.
+- Auditoria de execução parcial e consistência de locks reforçada em testes críticos.
+
+## Atualização 2026-05-04 — PR 4 caixa institucional rastreável
+- Consulta do caixa institucional com saldo, histórico, totais por tipo/source e alertas simples de inconsistência.
+- Ledger institucional reforçado com entrada rastreável (`CompanyCapitalFlowEntry`) + `AdminLog` + saldos antes/depois.
+- Regras preservadas: caixa institucional não altera preço, não cria Trade, não cria MarketOrder, não altera holdings e não altera supply.
+- Motivo obrigatório e amount positivo em entradas institucionais.

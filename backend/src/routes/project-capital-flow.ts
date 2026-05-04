@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { contributeRpcToProject, HttpError } from '../services/project-capital-flow-service.js';
+import { getProjectInstitutionalAccountSummary } from '../services/project-institutional-account-service.js';
 
 type AuthRequest = FastifyRequest & { user: { sub: string; roles?: string[] } };
 const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN'];
@@ -19,10 +20,19 @@ export async function projectCapitalFlowRoutes(app: FastifyInstance) {
     const auth = request as AuthRequest;
     try {
       const { companyId } = z.object({ companyId: z.string().min(1) }).parse(request.params);
-      const company = await prisma.company.findUnique({ where: { id: companyId }, include: { revenueAccount: true, capitalFlowEntries: { orderBy: { createdAt: 'desc' }, take: 50 } } });
-      if (!company) return reply.code(404).send({ message: 'Projeto não encontrado.' });
+      const summary = await getProjectInstitutionalAccountSummary(companyId);
+      const company = summary.company;
       if (company.founderUserId !== auth.user.sub && !isAdmin((auth.user.roles ?? []).map((r) => r.toUpperCase()))) return reply.code(403).send({ message: 'Sem permissão.' });
-      return { company };
+      return {
+        companyId: company.id,
+        ticker: company.ticker,
+        companyName: company.name,
+        institutionalBalance: summary.balance,
+        entries: summary.entries,
+        totalsByType: summary.totalsByType,
+        totalsBySource: summary.totalsBySource,
+        inconsistencies: summary.inconsistencies,
+      };
     } catch (error) {
       return reply.code(400).send({ message: (error as Error).message });
     }

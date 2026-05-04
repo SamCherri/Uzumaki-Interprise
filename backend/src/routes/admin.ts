@@ -904,6 +904,32 @@ export async function adminRoutes(app: FastifyInstance) {
     };
   });
 
+  app.get('/admin/project-institutional-accounts', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const authRequest = request as AuthRequest;
+    const roles = (authRequest.user.roles ?? []).map((role) => role.toUpperCase());
+    if (!requireRole(reply, roles, ['ADMIN', 'SUPER_ADMIN', 'COIN_CHIEF_ADMIN'], 'Sem permissão para consultar caixas institucionais.')) return;
+
+    const accounts = await prisma.companyRevenueAccount.findMany({
+      include: { company: { select: { id: true, ticker: true, name: true, founderUserId: true } } },
+      orderBy: { updatedAt: 'desc' },
+      take: 200,
+    });
+    return {
+      accounts: accounts.map((account: (typeof accounts)[number]) => ({
+        companyId: account.companyId,
+        ticker: account.company.ticker,
+        companyName: account.company.name,
+        founderUserId: account.company.founderUserId,
+        balance: account.balance,
+        totalReceivedFees: account.totalReceivedFees,
+        totalWithdrawn: account.totalWithdrawn,
+        alerts: [
+          ...(Number(account.balance) < 0 ? ['SALDO_NEGATIVO'] : []),
+        ],
+      })),
+    };
+  });
+
   app.get('/admin/coin-history', { preHandler: [app.authenticate] }, async (request, reply) => {
     const authRequest = request as AuthRequest;
     const roles = authRequest.user.roles ?? [];

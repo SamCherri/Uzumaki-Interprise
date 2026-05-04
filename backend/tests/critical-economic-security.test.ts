@@ -1256,3 +1256,267 @@ test('admin não pode revisar o próprio saque e outro admin pode revisar', asyn
   const otherComplete = await app.inject({ method: 'POST', url: `/api/admin/withdrawals/${withdrawalId}/complete`, headers: { authorization: `Bearer ${tkB}` }, payload: { adminNote: 'ok' } });
   assert.equal(otherComplete.statusCode, 200, otherComplete.body);
 });
+
+test('mercado secundário: criação/cancelamento não movem preço e market sem contraparte válida falha', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const user = await mkUser('secondary-rules@test.local', 'Secondary Rules');
+  await prisma.userRole.create({ data: { userId: user.id, roleId: rUser.id } });
+  await prisma.platformAccount.create({ data: {} });
+  await prisma.wallet.update({ where: { userId: user.id }, data: { rpcAvailableBalance: 500 } });
+
+  const company = await prisma.company.create({
+    data: {
+      name: 'Secondary Rule Co', ticker: 'SECR3', description: 'desc', sector: 'setor', founderUserId: user.id, status: 'ACTIVE', totalShares: 1000,
+      circulatingShares: 100, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 600,
+      initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 10000, approvedAt: new Date(),
+      revenueAccount: { create: {} },
+    },
+  });
+
+  await prisma.companyHolding.create({
+    data: { userId: user.id, companyId: company.id, shares: 50, averageBuyPrice: 10, estimatedValue: 500 },
+  });
+
+  const tk = await token(user.id, ['USER']);
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/market/orders',
+    headers: { authorization: `Bearer ${tk}` },
+    payload: { companyId: company.id, type: 'BUY', mode: 'LIMIT', quantity: 5, limitPrice: 10 },
+  });
+  assert.equal(created.statusCode, 201, created.body);
+  const priceAfterCreate = await prisma.company.findUniqueOrThrow({ where: { id: company.id } });
+  assert.equal(Number(priceAfterCreate.currentPrice), 10);
+
+  const orderId = created.json().order.id as string;
+  const canceled = await app.inject({
+    method: 'POST',
+    url: `/api/market/orders/${orderId}/cancel`,
+    headers: { authorization: `Bearer ${tk}` },
+  });
+  assert.equal(canceled.statusCode, 200, canceled.body);
+  const priceAfterCancel = await prisma.company.findUniqueOrThrow({ where: { id: company.id } });
+  assert.equal(Number(priceAfterCancel.currentPrice), 10);
+
+  const sellAfterCancel = await app.inject({
+    method: 'POST',
+    url: '/api/market/orders',
+    headers: { authorization: `Bearer ${tk}` },
+    payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 2, limitPrice: 9 },
+  });
+  assert.equal(sellAfterCancel.statusCode, 201, sellAfterCancel.body);
+  const tradesAfterSell = await prisma.trade.count({ where: { companyId: company.id } });
+  assert.equal(tradesAfterSell, 0);
+  const priceAfterSell = await prisma.company.findUniqueOrThrow({ where: { id: company.id } });
+  assert.equal(Number(priceAfterSell.currentPrice), 10);
+
+  const noLiquidity = await app.inject({
+    method: 'POST',
+    url: `/api/market/companies/${company.id}/buy-market`,
+    headers: { authorization: `Bearer ${tk}` },
+    payload: { quantity: 1, slippagePercent: 5 },
+  });
+  assert.equal(noLiquidity.statusCode, 400, noLiquidity.body);
+  assert.match(noLiquidity.body, /não há contraparte válida de outro usuário/i);
+});
+
+test('mercado secundário: execução parcial preserva remaining/locks e reembolsa sobra da BUY limitada', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const buyer = await mkUser('partial-buyer@test.local');
+  const seller = await mkUser('partial-seller@test.local');
+  await prisma.userRole.createMany({ data: [{ userId: buyer.id, roleId: rUser.id }, { userId: seller.id, roleId: rUser.id }] });
+  await prisma.platformAccount.create({ data: {} });
+  await prisma.wallet.update({ where: { userId: buyer.id }, data: { rpcAvailableBalance: 1000 } });
+  await prisma.company.create({
+    data: {
+      name: 'Partial Corp', ticker: 'PART3', description: 'desc', sector: 'setor', founderUserId: buyer.id, status: 'ACTIVE', totalShares: 1000,
+      circulatingShares: 100, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 600,
+      initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 10000, approvedAt: new Date(), revenueAccount: { create: {} },
+    },
+  });
+  const company = await prisma.company.findUniqueOrThrow({ where: { ticker: 'PART3' } });
+  await prisma.companyHolding.create({ data: { userId: seller.id, companyId: company.id, shares: 20, averageBuyPrice: 9, estimatedValue: 180 } });
+  const sellerTk = await token(seller.id, ['USER']);
+  const buyerTk = await token(buyer.id, ['USER']);
+
+  const sell = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${sellerTk}` }, payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 10, limitPrice: 9 } });
+  assert.equal(sell.statusCode, 201, sell.body);
+  const buy = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${buyerTk}` }, payload: { companyId: company.id, type: 'BUY', mode: 'LIMIT', quantity: 20, limitPrice: 10 } });
+  assert.equal(buy.statusCode, 201, buy.body);
+
+  const buyOrder = await prisma.marketOrder.findFirstOrThrow({ where: { userId: buyer.id, companyId: company.id, type: 'BUY' } });
+  assert.equal(buyOrder.remainingQuantity, 10);
+  assert.equal(buyOrder.status, 'PARTIALLY_FILLED');
+  assert.ok(Number(buyOrder.lockedCash) > 0);
+  assert.ok(Number(buyOrder.lockedCash) >= 0);
+  assert.ok(Number(buyOrder.lockedShares) >= 0);
+
+  const buyCancel = await app.inject({ method: 'POST', url: `/api/market/orders/${buyOrder.id}/cancel`, headers: { authorization: `Bearer ${buyerTk}` } });
+  assert.equal(buyCancel.statusCode, 200, buyCancel.body);
+  const buyCanceled = await prisma.marketOrder.findUniqueOrThrow({ where: { id: buyOrder.id } });
+  assert.equal(Number(buyCanceled.lockedCash), 0);
+  assert.equal(buyCanceled.status, 'CANCELED');
+
+  const buyerWallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: buyer.id } });
+  assert.equal(Number(buyerWallet.rpcLockedBalance), 0);
+  assert.ok(Number(buyerWallet.rpcAvailableBalance) >= 0);
+});
+
+test('mercado secundário: self-trade nunca executa e só executa com contraparte real', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const a = await mkUser('self-a@test.local');
+  const b = await mkUser('self-b@test.local');
+  await prisma.userRole.createMany({ data: [{ userId: a.id, roleId: rUser.id }, { userId: b.id, roleId: rUser.id }] });
+  await prisma.platformAccount.create({ data: {} });
+  await prisma.wallet.update({ where: { userId: a.id }, data: { rpcAvailableBalance: 500 } });
+  await prisma.wallet.update({ where: { userId: b.id }, data: { rpcAvailableBalance: 500 } });
+  const company = await prisma.company.create({
+    data: { name: 'Self Corp', ticker: 'SELF3', description: 'desc', sector: 'setor', founderUserId: a.id, status: 'ACTIVE', totalShares: 1000, circulatingShares: 100, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 600, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 10000, approvedAt: new Date(), revenueAccount: { create: {} } },
+  });
+  await prisma.companyHolding.create({ data: { userId: a.id, companyId: company.id, shares: 30, averageBuyPrice: 10, estimatedValue: 300 } });
+  await prisma.companyHolding.create({ data: { userId: b.id, companyId: company.id, shares: 30, averageBuyPrice: 10, estimatedValue: 300 } });
+  const aTk = await token(a.id, ['USER']);
+  const bTk = await token(b.id, ['USER']);
+
+  const ownSell = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${aTk}` }, payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 5, limitPrice: 10 } });
+  assert.equal(ownSell.statusCode, 201, ownSell.body);
+  const ownBuy = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${aTk}` }, payload: { companyId: company.id, type: 'BUY', mode: 'LIMIT', quantity: 5, limitPrice: 10 } });
+  assert.equal(ownBuy.statusCode, 201, ownBuy.body);
+  const ownBuyOrder = await prisma.marketOrder.findUniqueOrThrow({ where: { id: ownBuy.json().order.id } });
+  assert.equal(ownBuyOrder.status, 'OPEN');
+  const tradesAfterOwn = await prisma.trade.count({ where: { companyId: company.id } });
+  assert.equal(tradesAfterOwn, 0);
+
+  const ownOnlyMarket = await app.inject({ method: 'POST', url: `/api/market/companies/${company.id}/buy-market`, headers: { authorization: `Bearer ${aTk}` }, payload: { quantity: 1, slippagePercent: 5 } });
+  assert.equal(ownOnlyMarket.statusCode, 400, ownOnlyMarket.body);
+  assert.match(ownOnlyMarket.body, /não há contraparte válida de outro usuário/i);
+
+  const externalSell = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${bTk}` }, payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 3, limitPrice: 10 } });
+  assert.equal(externalSell.statusCode, 201, externalSell.body);
+  const buyWithCounterparty = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${aTk}` }, payload: { companyId: company.id, type: 'BUY', mode: 'LIMIT', quantity: 3, limitPrice: 10 } });
+  assert.equal(buyWithCounterparty.statusCode, 201, buyWithCounterparty.body);
+
+  const trades = await prisma.trade.findMany({ where: { companyId: company.id } });
+  assert.ok(trades.length >= 1);
+  assert.ok(trades.every((t) => t.buyerId !== t.sellerId));
+});
+
+test('self-trade: quando há ordem própria e ordem de terceiro compatível, deve casar só com terceiro', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const a = await mkUser('skip-own-a@test.local');
+  const b = await mkUser('skip-own-b@test.local');
+  await prisma.userRole.createMany({ data: [{ userId: a.id, roleId: rUser.id }, { userId: b.id, roleId: rUser.id }] });
+  await prisma.platformAccount.create({ data: {} });
+  await prisma.wallet.update({ where: { userId: a.id }, data: { rpcAvailableBalance: 500 } });
+  const company = await prisma.company.create({
+    data: { name: 'Skip Own Corp', ticker: 'SKIP3', description: 'desc', sector: 'setor', founderUserId: a.id, status: 'ACTIVE', totalShares: 1000, circulatingShares: 100, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 600, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 10000, approvedAt: new Date(), revenueAccount: { create: {} } },
+  });
+  await prisma.companyHolding.create({ data: { userId: a.id, companyId: company.id, shares: 20, averageBuyPrice: 10, estimatedValue: 200 } });
+  await prisma.companyHolding.create({ data: { userId: b.id, companyId: company.id, shares: 20, averageBuyPrice: 10, estimatedValue: 200 } });
+  const aTk = await token(a.id, ['USER']);
+  const bTk = await token(b.id, ['USER']);
+
+  const sellOwn = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${aTk}` }, payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 5, limitPrice: 10 } });
+  const sellB = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${bTk}` }, payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 5, limitPrice: 10 } });
+  assert.equal(sellOwn.statusCode, 201, sellOwn.body);
+  assert.equal(sellB.statusCode, 201, sellB.body);
+
+  const buyA = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${aTk}` }, payload: { companyId: company.id, type: 'BUY', mode: 'LIMIT', quantity: 5, limitPrice: 10 } });
+  assert.equal(buyA.statusCode, 201, buyA.body);
+
+  const trades = await prisma.trade.findMany({ where: { companyId: company.id } });
+  assert.equal(trades.length, 1);
+  assert.equal(trades[0].buyerId, a.id);
+  assert.equal(trades[0].sellerId, b.id);
+  assert.notEqual(trades[0].buyerId, trades[0].sellerId);
+
+  const ownSellAfter = await prisma.marketOrder.findUniqueOrThrow({ where: { id: sellOwn.json().order.id } });
+  assert.equal(ownSellAfter.status, 'OPEN');
+  assert.equal(ownSellAfter.remainingQuantity, 5);
+});
+
+test('market BUY usa slippage com melhor contraparte válida (ignora ordem própria no bestPrice)', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const a = await mkUser('slippage-own-a@test.local');
+  const b = await mkUser('slippage-own-b@test.local');
+  await prisma.userRole.createMany({ data: [{ userId: a.id, roleId: rUser.id }, { userId: b.id, roleId: rUser.id }] });
+  await prisma.platformAccount.create({ data: {} });
+  await prisma.wallet.update({ where: { userId: a.id }, data: { rpcAvailableBalance: 1000 } });
+  const company = await prisma.company.create({
+    data: { name: 'Slip Corp', ticker: 'SLIP3', description: 'desc', sector: 'setor', founderUserId: a.id, status: 'ACTIVE', totalShares: 1000, circulatingShares: 100, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 600, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 10000, approvedAt: new Date(), revenueAccount: { create: {} } },
+  });
+  await prisma.companyHolding.create({ data: { userId: a.id, companyId: company.id, shares: 20, averageBuyPrice: 10, estimatedValue: 200 } });
+  await prisma.companyHolding.create({ data: { userId: b.id, companyId: company.id, shares: 20, averageBuyPrice: 10, estimatedValue: 200 } });
+  const aTk = await token(a.id, ['USER']);
+  const bTk = await token(b.id, ['USER']);
+
+  const ownSell = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${aTk}` }, payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 1, limitPrice: 1 } });
+  const bSell = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${bTk}` }, payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 1, limitPrice: 10 } });
+  assert.equal(ownSell.statusCode, 201, ownSell.body);
+  assert.equal(bSell.statusCode, 201, bSell.body);
+
+  const marketBuy = await app.inject({ method: 'POST', url: `/api/market/companies/${company.id}/buy-market`, headers: { authorization: `Bearer ${aTk}` }, payload: { quantity: 1, slippagePercent: 5 } });
+  assert.equal(marketBuy.statusCode, 201, marketBuy.body);
+
+  const trades = await prisma.trade.findMany({ where: { companyId: company.id }, orderBy: { createdAt: 'asc' } });
+  assert.equal(trades.length, 1);
+  assert.equal(trades[0].buyerId, a.id);
+  assert.equal(trades[0].sellerId, b.id);
+  assert.notEqual(trades[0].buyerId, trades[0].sellerId);
+});
+
+test('fundador consulta caixa institucional do próprio projeto e usuário comum não consulta projeto alheio', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const founder = await mkUser('inst-founder@test.local');
+  const outsider = await mkUser('inst-outsider@test.local');
+  await prisma.userRole.createMany({ data: [{ userId: founder.id, roleId: rUser.id }, { userId: outsider.id, roleId: rUser.id }] });
+  const company = await prisma.company.create({
+    data: { name: 'Inst Co', ticker: 'INST4', description: 'desc', sector: 'setor', founderUserId: founder.id, status: 'ACTIVE', totalShares: 1000, circulatingShares: 0, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 600, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 10000, approvedAt: new Date(), revenueAccount: { create: { balance: 25 } } },
+  });
+  const founderTk = await token(founder.id, ['USER']);
+  const outsiderTk = await token(outsider.id, ['USER']);
+
+  const ownView = await app.inject({ method: 'GET', url: `/api/project-capital-flow/companies/${company.id}`, headers: { authorization: `Bearer ${founderTk}` } });
+  assert.equal(ownView.statusCode, 200, ownView.body);
+  assert.equal(ownView.json().companyId, company.id);
+  assert.ok(ownView.json().institutionalBalance >= 0);
+
+  const outsiderView = await app.inject({ method: 'GET', url: `/api/project-capital-flow/companies/${company.id}`, headers: { authorization: `Bearer ${outsiderTk}` } });
+  assert.equal(outsiderView.statusCode, 403, outsiderView.body);
+});
+
+test('aporte do fundador registra saldos antes/depois e não altera preço/trade/order/holding', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const founder = await mkUser('inst-contrib-founder@test.local');
+  await prisma.userRole.create({ data: { userId: founder.id, roleId: rUser.id } });
+  await prisma.wallet.update({ where: { userId: founder.id }, data: { rpcAvailableBalance: 200 } });
+  const company = await prisma.company.create({
+    data: { name: 'Contrib Co', ticker: 'CNTR4', description: 'desc', sector: 'setor', founderUserId: founder.id, status: 'ACTIVE', totalShares: 1000, circulatingShares: 100, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 600, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 10000, approvedAt: new Date(), revenueAccount: { create: {} } },
+  });
+  await prisma.companyHolding.create({ data: { userId: founder.id, companyId: company.id, shares: 10, averageBuyPrice: 10, estimatedValue: 100 } });
+  const tk = await token(founder.id, ['USER']);
+  const beforePrice = (await prisma.company.findUniqueOrThrow({ where: { id: company.id } })).currentPrice;
+  const beforeOrders = await prisma.marketOrder.count({ where: { companyId: company.id } });
+  const beforeTrades = await prisma.trade.count({ where: { companyId: company.id } });
+
+  const resp = await app.inject({ method: 'POST', url: `/api/project-capital-flow/companies/${company.id}/contribute`, headers: { authorization: `Bearer ${tk}` }, payload: { amountRpc: 50, reason: 'Aporte institucional para caixa rastreável' } });
+  assert.equal(resp.statusCode, 200, resp.body);
+  assert.ok(resp.json().previousWalletRpcBalance);
+  assert.ok(resp.json().newProjectBalance);
+
+  const after = await prisma.company.findUniqueOrThrow({ where: { id: company.id } });
+  const afterOrders = await prisma.marketOrder.count({ where: { companyId: company.id } });
+  const afterTrades = await prisma.trade.count({ where: { companyId: company.id } });
+  const holdingAfter = await prisma.companyHolding.findUniqueOrThrow({ where: { userId_companyId: { userId: founder.id, companyId: company.id } } });
+  assert.equal(String(after.currentPrice), String(beforePrice));
+  assert.equal(afterOrders, beforeOrders);
+  assert.equal(afterTrades, beforeTrades);
+  assert.equal(holdingAfter.shares, 10);
+});
