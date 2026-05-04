@@ -262,10 +262,9 @@ export function App() {
       <main className="container auth-shell">
         <section className="card public-entry-card">
           <header className="public-entry-header">
-            <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-              <img src="/assets/logo-full.png" alt="RPC Exchange" style={{ maxWidth: '280px', height: 'auto' }} />
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <img src="/assets/logo-full.png" alt="RPC Exchange" style={{ maxWidth: '320px', height: 'auto' }} />
             </div>
-            <p className="subtitle">Ferramenta de interpretação de exchange para RP.</p>
             <p className="warning">Esta é uma ferramenta de simulação/interpretação de uma exchange. Nenhum valor possui conversão para dinheiro real.</p>
             <p className="info-text">Sem cripto real, sem blockchain, sem Pix, sem cartão e sem gateway de pagamento.</p>
           </header>
@@ -324,10 +323,10 @@ export function App() {
           )}
           <button className="hamburger-button mobile-only" type="button" aria-label="Abrir menu" onClick={() => setIsGlobalDrawerOpen(true)}>☰</button>
           <div className="mobile-topbar-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <img src="/assets/rpc_exchange_icon.png" alt="RPC" style={{ width: '36px', height: '36px' }} />
+            <img src="/assets/rpc_exchange_icon.png" alt="RPC" style={{ width: '42px', height: '42px' }} />
             <div style={{ textAlign: 'left' }}>
               <span className="mobile-topbar-badge">Simulação RP</span>
-              <h1 style={{ fontSize: '1.2rem', margin: 0 }}>RPC Exchange</h1>
+              <img src="/assets/logo-full.png" alt="RPC Exchange" style={{ height: '24px', width: 'auto', display: 'block' }} />
             </div>
           </div>
           <button className="button-danger small-button desktop-only" onClick={handleLogout}>
@@ -363,7 +362,9 @@ export function App() {
           <section className="mobile-home-summary mobile-only">
             <div className="mobile-hero-card">
               <span className="mobile-hero-kicker">Painel principal</span>
-              <h2>Bem-vindo à RPC Exchange</h2>
+              <div style={{ marginBottom: '10px' }}>
+                <img src="/assets/logo-full.png" alt="RPC Exchange" style={{ maxWidth: '240px', height: 'auto' }} />
+              </div>
               <p>Negocie tokens, acompanhe sua carteira e acesse seus painéis pelo menu.</p>
             </div>
 
