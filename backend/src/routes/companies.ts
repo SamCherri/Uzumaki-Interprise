@@ -389,6 +389,7 @@ export async function companyRoutes(app: FastifyInstance) {
           create: { userId: authRequest.user.sub },
         });
 
+        await tx.$queryRaw`SELECT id FROM "CompanyInitialOffer" WHERE "companyId" = ${company.id} FOR UPDATE`
         const offer = await tx.companyInitialOffer.findUnique({ where: { companyId: company.id } });
         if (!offer || offer.availableShares <= 0) {
           throw new Error('Lançamento inicial indisponível.');
@@ -413,7 +414,8 @@ export async function companyRoutes(app: FastifyInstance) {
         const priceAfter = priceBefore.add(priceIncrease);
         const nextMarketCap = priceAfter.mul(new Decimal(company.totalShares));
 
-        await tx.wallet.update({ where: { id: wallet.id }, data: { rpcAvailableBalance: walletNext } });
+        const debited = await tx.wallet.updateMany({ where: { id: wallet.id, rpcAvailableBalance: { gte: totalAmount } }, data: { rpcAvailableBalance: { decrement: totalAmount } } });
+        if (debited.count !== 1) throw new Error('Saldo RPC insuficiente para comprar no lançamento.');
 
         const currentHolding = await tx.companyHolding.findUnique({ where: { userId_companyId: { userId: authRequest.user.sub, companyId: company.id } } });
 
@@ -438,7 +440,8 @@ export async function companyRoutes(app: FastifyInstance) {
           },
         });
 
-        await tx.companyInitialOffer.update({ where: { companyId: company.id }, data: { availableShares: offer.availableShares - body.quantity } });
+        const offerUpdated = await tx.companyInitialOffer.updateMany({ where: { companyId: company.id, availableShares: { gte: body.quantity } }, data: { availableShares: { decrement: body.quantity } } });
+        if (offerUpdated.count !== 1) throw new Error('Quantidade solicitada maior que tokens disponíveis no lançamento inicial.');
         await tx.company.update({
           where: { id: company.id },
           data: {
@@ -504,6 +507,8 @@ export async function companyRoutes(app: FastifyInstance) {
           priceIncrease,
           currentPrice: priceAfter,
           marketCapAfter: nextMarketCap,
+          availableSharesBefore: offer.availableShares,
+          availableSharesAfter: offer.availableShares - body.quantity,
         };
       });
 

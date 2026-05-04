@@ -214,3 +214,7 @@ Objetivo da fase de PWA:
 - Reserva institucional do projeto
 - Reserva de tokens recomprados
 - Conta da Exchange
+
+- Fluxo de aporte institucional implementado: fundador usa RPC existente da carteira pessoal para transferir ao caixa institucional do projeto com rastreabilidade e sem impacto direto em preço.
+
+- Mercado primário consolidado: compra direta da oferta inicial com RPC existente em carteira, atualização de holdings/circulação e preço movido apenas por compra executada.

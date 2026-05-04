@@ -231,3 +231,14 @@ A prioridade oficial atual é fechar o ciclo econômico real da Exchange, nesta 
 12. Visual premium.
 
 Fonte oficial: `docs/ROADMAP_PRIORITARIO.md`.
+
+
+## Atualização 2026-05-03 — PR 1 fluxo de capital
+- Implementado aporte de RPC da carteira do fundador para o caixa institucional via `CompanyRevenueAccount` com histórico em `CompanyCapitalFlowEntry`.
+- Aporte não altera preço, não cria Trade e não cria MarketOrder.
+
+
+## Atualização 2026-05-04 — Mercado primário correto (PR2)
+- Compra inicial consolidada com validações de saldo/oferta, proteção transacional e atualização de preço apenas com compra executada.
+- Oferta parada não altera preço.
+- Compra inicial não cria Trade nem MarketOrder.
