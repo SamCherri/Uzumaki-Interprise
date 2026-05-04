@@ -261,3 +261,12 @@ Fonte oficial: `docs/ROADMAP_PRIORITARIO.md`.
 - Entradas proibidas mantidas: crédito livre sem origem, lucro RP externo virando RPC automático.
 - Motivo obrigatório e trilha de auditoria mantidos no aporte do fundador.
 - Sem impacto em preço/trade/order/supply.
+
+## Atualização 2026-05-04 — PR 5 recompra institucional
+- Recompra usa somente RPC institucional já existente em `CompanyRevenueAccount`.
+- Recompra executa apenas contra ordens SELL reais com `Trade` registrado.
+- `Company.currentPrice` só muda no ato da execução real.
+- Saldo não utilizado retorna ao caixa institucional no cancelamento.
+- Tokens recomprados vão para `ProjectTokenReserve`, não para carteira pessoal do fundador.
+
+- Nesta PR 5, execução de recompra institucional está configurada como **isenta de taxa de trade** (buyFee/sellFee = 0), com política de taxas podendo evoluir em PR futuro auditado.

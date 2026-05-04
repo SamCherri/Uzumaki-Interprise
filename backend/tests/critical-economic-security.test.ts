@@ -1611,3 +1611,156 @@ test('summary calcula totais completos mesmo com extrato limitado a 50 e ADMIN p
   const allowedAdminList = await app.inject({ method: 'GET', url: '/api/admin/project-institutional-accounts', headers: { authorization: `Bearer ${auditorToken}` } });
   assert.equal(allowedAdminList.statusCode, 200, allowedAdminList.body);
 });
+
+test('buyback: completa por target e devolve sobra ao caixa institucional', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const founder = await mkUser('bb-founder@test.local', 'Founder');
+  const seller = await mkUser('bb-seller@test.local', 'Seller');
+  await prisma.userRole.createMany({ data: [{ userId: founder.id, roleId: rUser.id }, { userId: seller.id, roleId: rUser.id }] });
+
+  const company = await prisma.company.create({ data: { name: 'Buyback Co', ticker: 'BBK1', description: 'd', sector: 's', founderUserId: founder.id, status: 'ACTIVE', totalShares: 1000, circulatingShares: 100, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 100, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 1000, approvedAt: new Date(), revenueAccount: { create: { balance: 100 } } } });
+  await prisma.companyHolding.create({ data: { userId: seller.id, companyId: company.id, shares: 10, averageBuyPrice: 8, estimatedValue: 80 } });
+
+  const sellerToken = await token(seller.id, ['USER']);
+  await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${sellerToken}` }, payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 5, limitPrice: 10 } });
+
+  const founderToken = await token(founder.id, ['USER']);
+  const created = await app.inject({ method: 'POST', url: `/api/project-buybacks/companies/${company.id}/programs`, headers: { authorization: `Bearer ${founderToken}` }, payload: { budgetRpc: 100, maxPricePerShare: 10, targetShares: 5, reason: 'Programa recompra alvo 5 shares' } });
+  assert.equal(created.statusCode, 201, created.body);
+  const programId = created.json().id;
+
+  const exec = await app.inject({ method: 'POST', url: `/api/project-buybacks/programs/${programId}/execute`, headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(exec.statusCode, 200, exec.body);
+
+  const revenue = await prisma.companyRevenueAccount.findUniqueOrThrow({ where: { companyId: company.id } });
+  const program = await prisma.projectBuybackProgram.findUniqueOrThrow({ where: { id: programId } });
+  assert.equal(program.status, 'COMPLETED');
+  assert.equal(Number(program.remainingRpc), 0);
+  assert.equal(Number(revenue.balance), 50);
+});
+
+test('buyback: admin executor não executa contra ordem SELL própria', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const rAdmin = await mkRole('ADMIN');
+  const founder = await mkUser('bb-founder2@test.local', 'Founder');
+  const admin = await mkUser('bb-admin@test.local', 'Admin');
+  await prisma.userRole.createMany({ data: [{ userId: founder.id, roleId: rUser.id }, { userId: admin.id, roleId: rAdmin.id }] });
+
+  const company = await prisma.company.create({ data: { name: 'Buyback Co2', ticker: 'BBK2', description: 'd', sector: 's', founderUserId: founder.id, status: 'ACTIVE', totalShares: 1000, circulatingShares: 100, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 100, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 1000, approvedAt: new Date(), revenueAccount: { create: { balance: 100 } } } });
+  await prisma.companyHolding.create({ data: { userId: admin.id, companyId: company.id, shares: 10, averageBuyPrice: 8, estimatedValue: 80 } });
+
+  const adminToken = await token(admin.id, ['ADMIN']);
+  await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${adminToken}` }, payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 5, limitPrice: 10 } });
+
+  const created = await app.inject({ method: 'POST', url: `/api/project-buybacks/companies/${company.id}/programs`, headers: { authorization: `Bearer ${adminToken}` }, payload: { budgetRpc: 50, maxPricePerShare: 10, targetShares: 5, reason: 'Programa admin sem self trade' } });
+  assert.equal(created.statusCode, 201, created.body);
+  const programId = created.json().id;
+
+  const exec = await app.inject({ method: 'POST', url: `/api/project-buybacks/programs/${programId}/execute`, headers: { authorization: `Bearer ${adminToken}` } });
+  assert.equal(exec.statusCode, 200, exec.body);
+  const trades = await prisma.trade.findMany({ where: { companyId: company.id } });
+  assert.equal(trades.length, 0);
+});
+
+test('buyback: programa expirado devolve saldo e marca EXPIRED', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const founder = await mkUser('bb-founder3@test.local', 'Founder');
+  await prisma.userRole.create({ data: { userId: founder.id, roleId: rUser.id } });
+  const company = await prisma.company.create({ data: { name: 'Buyback Co3', ticker: 'BBK3', description: 'd', sector: 's', founderUserId: founder.id, status: 'ACTIVE', totalShares: 1000, circulatingShares: 100, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 100, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 1000, approvedAt: new Date(), revenueAccount: { create: { balance: 30 } } } });
+
+  const founderToken = await token(founder.id, ['USER']);
+  const created = await app.inject({ method: 'POST', url: `/api/project-buybacks/companies/${company.id}/programs`, headers: { authorization: `Bearer ${founderToken}` }, payload: { budgetRpc: 30, maxPricePerShare: 10, targetShares: 5, reason: 'Programa para expirar com retorno', expiresAt: '2020-01-01T00:00:00.000Z' } });
+  assert.equal(created.statusCode, 201, created.body);
+  const programId = created.json().id;
+
+  const exec = await app.inject({ method: 'POST', url: `/api/project-buybacks/programs/${programId}/execute`, headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(exec.statusCode, 400);
+  const program = await prisma.projectBuybackProgram.findUniqueOrThrow({ where: { id: programId } });
+  const revenue = await prisma.companyRevenueAccount.findUniqueOrThrow({ where: { companyId: company.id } });
+  assert.equal(program.status, 'EXPIRED');
+  assert.equal(Number(program.remainingRpc), 0);
+  assert.equal(Number(revenue.balance), 30);
+});
+
+test('buyback: não executa ordem com lockedShares insuficiente e mantém ordem sem negativo', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const founder = await mkUser('bb-founder4@test.local');
+  const seller = await mkUser('bb-seller4@test.local');
+  await prisma.userRole.createMany({ data: [{ userId: founder.id, roleId: rUser.id }, { userId: seller.id, roleId: rUser.id }] });
+  const company = await prisma.company.create({ data: { name: 'Buyback Co4', ticker: 'BBK4', description: 'd', sector: 's', founderUserId: founder.id, status: 'ACTIVE', totalShares: 1000, circulatingShares: 100, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 100, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 1000, approvedAt: new Date(), revenueAccount: { create: { balance: 100 } } } });
+  const order = await prisma.marketOrder.create({ data: { companyId: company.id, userId: seller.id, type: 'SELL', mode: 'LIMIT', quantity: 5, remainingQuantity: 5, limitPrice: 10, lockedShares: 1, status: 'OPEN' } });
+
+  const founderToken = await token(founder.id, ['USER']);
+  const created = await app.inject({ method: 'POST', url: `/api/project-buybacks/companies/${company.id}/programs`, headers: { authorization: `Bearer ${founderToken}` }, payload: { budgetRpc: 100, maxPricePerShare: 10, targetShares: 5, reason: 'Programa para validar lock insuficiente' } });
+  const programId = created.json().id;
+  const exec = await app.inject({ method: 'POST', url: `/api/project-buybacks/programs/${programId}/execute`, headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(exec.statusCode, 200, exec.body);
+
+  const orderAfter = await prisma.marketOrder.findUniqueOrThrow({ where: { id: order.id } });
+  assert.equal(orderAfter.remainingQuantity, 5);
+  assert.equal(orderAfter.lockedShares, 1);
+  assert.ok(orderAfter.remainingQuantity >= 0);
+  assert.ok(orderAfter.lockedShares >= 0);
+});
+
+test('buyback: spentRpc nunca ultrapassa budgetRpc', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const founder = await mkUser('bb-founder5@test.local');
+  const seller = await mkUser('bb-seller5@test.local');
+  await prisma.userRole.createMany({ data: [{ userId: founder.id, roleId: rUser.id }, { userId: seller.id, roleId: rUser.id }] });
+  const company = await prisma.company.create({ data: { name: 'Buyback Co5', ticker: 'BBK5', description: 'd', sector: 's', founderUserId: founder.id, status: 'ACTIVE', totalShares: 1000, circulatingShares: 100, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 100, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 1000, approvedAt: new Date(), revenueAccount: { create: { balance: 30 } } } });
+  await prisma.companyHolding.create({ data: { userId: seller.id, companyId: company.id, shares: 10, averageBuyPrice: 8, estimatedValue: 80 } });
+  const sellerToken = await token(seller.id, ['USER']);
+  await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${sellerToken}` }, payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 10, limitPrice: 10 } });
+
+  const founderToken = await token(founder.id, ['USER']);
+  const created = await app.inject({ method: 'POST', url: `/api/project-buybacks/companies/${company.id}/programs`, headers: { authorization: `Bearer ${founderToken}` }, payload: { budgetRpc: 30, maxPricePerShare: 10, targetShares: 10, reason: 'Programa budget limitado para spent' } });
+  const programId = created.json().id;
+  const exec = await app.inject({ method: 'POST', url: `/api/project-buybacks/programs/${programId}/execute`, headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(exec.statusCode, 200, exec.body);
+  const program = await prisma.projectBuybackProgram.findUniqueOrThrow({ where: { id: programId } });
+  assert.ok(Number(program.spentRpc) <= Number(program.budgetRpc));
+});
+
+test('buyback: cancel ACTIVE devolve remaining e segunda tentativa não duplica saldo', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const founder = await mkUser('bb-founder6@test.local');
+  await prisma.userRole.create({ data: { userId: founder.id, roleId: rUser.id } });
+  const company = await prisma.company.create({ data: { name: 'Buyback Co6', ticker: 'BBK6', description: 'd', sector: 's', founderUserId: founder.id, status: 'ACTIVE', totalShares: 1000, circulatingShares: 100, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 100, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 1000, approvedAt: new Date(), revenueAccount: { create: { balance: 60 } } } });
+  const founderToken = await token(founder.id, ['USER']);
+  const created = await app.inject({ method: 'POST', url: `/api/project-buybacks/companies/${company.id}/programs`, headers: { authorization: `Bearer ${founderToken}` }, payload: { budgetRpc: 40, maxPricePerShare: 10, targetShares: 5, reason: 'Programa para testar cancelamento seguro' } });
+  const programId = created.json().id;
+
+  const cancel1 = await app.inject({ method: 'POST', url: `/api/project-buybacks/programs/${programId}/cancel`, headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(cancel1.statusCode, 200, cancel1.body);
+  const revenueAfter1 = await prisma.companyRevenueAccount.findUniqueOrThrow({ where: { companyId: company.id } });
+  assert.equal(Number(revenueAfter1.balance), 60);
+
+  const cancel2 = await app.inject({ method: 'POST', url: `/api/project-buybacks/programs/${programId}/cancel`, headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(cancel2.statusCode, 400, cancel2.body);
+  const revenueAfter2 = await prisma.companyRevenueAccount.findUniqueOrThrow({ where: { companyId: company.id } });
+  assert.equal(Number(revenueAfter2.balance), 60);
+});
+
+test('buyback: cancelar COMPLETED/EXPIRED não devolve saldo novamente', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const founder = await mkUser('bb-founder7@test.local');
+  await prisma.userRole.create({ data: { userId: founder.id, roleId: rUser.id } });
+  const company = await prisma.company.create({ data: { name: 'Buyback Co7', ticker: 'BBK7', description: 'd', sector: 's', founderUserId: founder.id, status: 'ACTIVE', totalShares: 1000, circulatingShares: 100, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 100, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 1000, approvedAt: new Date(), revenueAccount: { create: { balance: 30 } } } });
+  const founderToken = await token(founder.id, ['USER']);
+  const created = await app.inject({ method: 'POST', url: `/api/project-buybacks/companies/${company.id}/programs`, headers: { authorization: `Bearer ${founderToken}` }, payload: { budgetRpc: 30, maxPricePerShare: 10, targetShares: 5, reason: 'Programa expira e não pode cancelar depois', expiresAt: '2020-01-01T00:00:00.000Z' } });
+  const programId = created.json().id;
+  await app.inject({ method: 'POST', url: `/api/project-buybacks/programs/${programId}/execute`, headers: { authorization: `Bearer ${founderToken}` } });
+
+  const cancel = await app.inject({ method: 'POST', url: `/api/project-buybacks/programs/${programId}/cancel`, headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(cancel.statusCode, 400, cancel.body);
+  const revenue = await prisma.companyRevenueAccount.findUniqueOrThrow({ where: { companyId: company.id } });
+  assert.equal(Number(revenue.balance), 30);
+});
