@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../lib/prisma.js';
-import { ensureCompanyRevenueAccount } from './fee-distribution-service.js';
+import { recordProjectInstitutionalEntry } from './project-institutional-account-service.js';
 
 export class HttpError extends Error { constructor(public statusCode: number, message: string) { super(message); } }
 
@@ -29,23 +29,26 @@ export async function contributeRpcToProject(input: { companyId: string; actorUs
     });
     if (debited.count !== 1) throw new HttpError(400, 'Saldo RPC insuficiente na carteira.');
 
-    const revenue = await ensureCompanyRevenueAccount(tx, company.id);
-    const previousProjectBalance = revenue.balance;
-    await tx.companyRevenueAccount.updateMany({ where: { id: revenue.id }, data: { balance: { increment: amount } } });
-
     const walletAfter = await tx.wallet.findUniqueOrThrow({ where: { userId: input.actorUserId } });
-    const revenueAfter = await tx.companyRevenueAccount.findUniqueOrThrow({ where: { id: revenue.id } });
 
-    const entry = await tx.companyCapitalFlowEntry.create({ data: {
-      companyId: company.id, actorUserId: input.actorUserId, type: 'OWNER_RPC_CONTRIBUTION', source: 'OWNER_WALLET', amountRpc: amount,
-      previousWalletRpcBalance, newWalletRpcBalance: walletAfter.rpcAvailableBalance,
-      previousProjectBalance, newProjectBalance: revenueAfter.balance, reason,
+    const entry = await recordProjectInstitutionalEntry(tx, {
+      companyId: company.id,
+      actorUserId: input.actorUserId,
+      amountRpc: amount,
+      reason,
+      type: 'OWNER_RPC_CONTRIBUTION',
+      source: 'OWNER_WALLET',
+      previousWalletRpcBalance,
+      newWalletRpcBalance: walletAfter.rpcAvailableBalance,
       metadata: JSON.stringify({ ip: input.ip ?? null, userAgent: input.userAgent ?? null }),
-    } });
+    });
+
+    const previousProjectBalance = entry.previousProjectBalance;
+    const newProjectBalance = entry.newProjectBalance;
 
     await tx.transaction.create({ data: { walletId: walletBefore.id, type: 'PROJECT_RPC_CONTRIBUTION', amount, description: `Aporte RPC no projeto ${company.ticker}` } });
     await tx.adminLog.create({ data: { userId: input.actorUserId, action: 'PROJECT_RPC_CONTRIBUTION', entity: 'CompanyRevenueAccount', reason, ip: input.ip ?? null, userAgent: input.userAgent ?? null } });
 
-    return { companyId: company.id, amountRpc: amount, previousWalletRpcBalance, newWalletRpcBalance: walletAfter.rpcAvailableBalance, previousProjectBalance, newProjectBalance: revenueAfter.balance, entryId: entry.id };
+    return { companyId: company.id, amountRpc: amount, previousWalletRpcBalance, newWalletRpcBalance: walletAfter.rpcAvailableBalance, previousProjectBalance, newProjectBalance, entryId: entry.id };
   });
 }

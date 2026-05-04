@@ -1469,3 +1469,52 @@ test('market BUY usa slippage com melhor contraparte válida (ignora ordem próp
   assert.equal(trades[0].sellerId, b.id);
   assert.notEqual(trades[0].buyerId, trades[0].sellerId);
 });
+
+test('caixa institucional: fundador consulta, usuário comum bloqueado e admin auditor autorizado', async () => {
+  await resetDb();
+  const rFounder = await mkRole('BUSINESS_OWNER');
+  const rUser = await mkRole('USER');
+  const rAuditor = await mkRole('AUDITOR');
+
+  const founder = await mkUser('founder@inst.local', 'Founder');
+  const outsider = await mkUser('outsider@inst.local', 'Outsider');
+  const auditor = await mkUser('auditor@inst.local', 'Auditor');
+
+  await prisma.userRole.createMany({ data: [
+    { userId: founder.id, roleId: rFounder.id },
+    { userId: founder.id, roleId: rUser.id },
+    { userId: outsider.id, roleId: rUser.id },
+    { userId: auditor.id, roleId: rAuditor.id },
+  ]});
+
+  await prisma.wallet.update({ where: { userId: founder.id }, data: { rpcAvailableBalance: 500 } });
+
+  const company = await prisma.company.create({ data: {
+    name: 'Inst Project', ticker: 'INST4', description: 'Projeto institucional', sector: 'RP', founderUserId: founder.id, status: 'ACTIVE',
+    totalShares: 1000, circulatingShares: 0, ownerSharePercent: 50, publicOfferPercent: 50, ownerShares: 500, publicOfferShares: 500,
+    availableOfferShares: 500, initialPrice: 1, currentPrice: 1, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 1000,
+    approvedAt: new Date(), revenueAccount: { create: {} },
+  }});
+
+  const founderToken = await token(founder.id, ['USER', 'BUSINESS_OWNER']);
+  const contrib = await app.inject({ method: 'POST', url: `/api/project-capital-flow/companies/${company.id}/contribute`, headers: { authorization: `Bearer ${founderToken}` }, payload: { amountRpc: 100, reason: 'Aporte institucional para caixa operacional' } });
+  assert.equal(contrib.statusCode, 200, contrib.body);
+
+  const founderView = await app.inject({ method: 'GET', url: `/api/project-capital-flow/companies/${company.id}`, headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(founderView.statusCode, 200, founderView.body);
+  const founderPayload = founderView.json();
+  assert.equal(Number(founderPayload.institutionalBalance), 100);
+  assert.ok(founderPayload.totalsByType.OWNER_RPC_CONTRIBUTION >= 100);
+  assert.ok(founderPayload.totalsBySource.OWNER_WALLET >= 100);
+
+  const outsiderToken = await token(outsider.id, ['USER']);
+  const outsiderView = await app.inject({ method: 'GET', url: `/api/project-capital-flow/companies/${company.id}`, headers: { authorization: `Bearer ${outsiderToken}` } });
+  assert.equal(outsiderView.statusCode, 403, outsiderView.body);
+
+  const auditorToken = await token(auditor.id, ['AUDITOR']);
+  const auditorView = await app.inject({ method: 'GET', url: `/api/project-capital-flow/companies/${company.id}`, headers: { authorization: `Bearer ${auditorToken}` } });
+  assert.equal(auditorView.statusCode, 200, auditorView.body);
+
+  const adminAccounts = await app.inject({ method: 'GET', url: '/api/admin/project-institutional-accounts', headers: { authorization: `Bearer ${auditorToken}` } });
+  assert.equal(adminAccounts.statusCode, 200, adminAccounts.body);
+});

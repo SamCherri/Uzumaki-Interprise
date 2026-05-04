@@ -230,3 +230,10 @@ Objetivo da fase de PWA:
 - Ordem MARKET executa somente com contraparte real no livro; sem liquidez retorna erro claro.
 - `Company.currentPrice` no secundário atualiza somente por `Trade` executado.
 - Matching com bloqueio de self-trade e suporte a execução parcial consistente.
+
+
+## Atualização 2026-05-04 — Caixa institucional rastreável (PR 4)
+- Serviço de resumo institucional por projeto com saldo, extrato recente, totais por tipo/origem e inconsistências read-only.
+- Consulta por fundador e perfis administrativos de auditoria.
+- Endpoint administrativo read-only para varredura de contas institucionais.
+- Fluxo de aporte do fundador continua debitando RPC existente na carteira pessoal e creditando o caixa institucional sem alterar preço e sem criar ordens/trades.
