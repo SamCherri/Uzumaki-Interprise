@@ -245,3 +245,11 @@ Fonte oficial: `docs/ROADMAP_PRIORITARIO.md`.
 - Compra inicial gera `CompanyOperation`, `Transaction` e `FeeDistribution` (quando taxa > 0).
 - Compra inicial não cria `Trade` e não cria `MarketOrder`.
 - Fluxo não altera Test Mode, supply da RPC, matching engine do secundário ou boost legado.
+
+## Atualização 2026-05-04 — PR 3 mercado secundário seguro
+- Ordem criada no secundário não altera `Company.currentPrice`.
+- Ordem cancelada no secundário não altera `Company.currentPrice`.
+- `Company.currentPrice` no secundário só muda após `Trade` real executado.
+- Self-trade bloqueado no matching.
+- Locks de RPC/tokens reforçados para criação/cancelamento/execução parcial.
+- Auditoria de execução parcial e consistência de locks reforçada em testes críticos.

@@ -1256,3 +1256,64 @@ test('admin não pode revisar o próprio saque e outro admin pode revisar', asyn
   const otherComplete = await app.inject({ method: 'POST', url: `/api/admin/withdrawals/${withdrawalId}/complete`, headers: { authorization: `Bearer ${tkB}` }, payload: { adminNote: 'ok' } });
   assert.equal(otherComplete.statusCode, 200, otherComplete.body);
 });
+
+test('mercado secundário: criação/cancelamento não movem preço, self-trade bloqueado e market sem liquidez falha', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const user = await mkUser('secondary-rules@test.local', 'Secondary Rules');
+  await prisma.userRole.create({ data: { userId: user.id, roleId: rUser.id } });
+  await prisma.platformAccount.create({ data: {} });
+  await prisma.wallet.update({ where: { userId: user.id }, data: { rpcAvailableBalance: 500 } });
+
+  const company = await prisma.company.create({
+    data: {
+      name: 'Secondary Rule Co', ticker: 'SECR3', description: 'desc', sector: 'setor', founderUserId: user.id, status: 'ACTIVE', totalShares: 1000,
+      circulatingShares: 100, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 600,
+      initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 10000, approvedAt: new Date(),
+      revenueAccount: { create: {} },
+    },
+  });
+
+  await prisma.companyHolding.create({
+    data: { userId: user.id, companyId: company.id, shares: 50, averageBuyPrice: 10, estimatedValue: 500 },
+  });
+
+  const tk = await token(user.id, ['USER']);
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/market/orders',
+    headers: { authorization: `Bearer ${tk}` },
+    payload: { companyId: company.id, type: 'BUY', mode: 'LIMIT', quantity: 5, limitPrice: 10 },
+  });
+  assert.equal(created.statusCode, 201, created.body);
+  const priceAfterCreate = await prisma.company.findUniqueOrThrow({ where: { id: company.id } });
+  assert.equal(Number(priceAfterCreate.currentPrice), 10);
+
+  const orderId = created.json().order.id as string;
+  const canceled = await app.inject({
+    method: 'POST',
+    url: `/api/market/orders/${orderId}/cancel`,
+    headers: { authorization: `Bearer ${tk}` },
+  });
+  assert.equal(canceled.statusCode, 200, canceled.body);
+  const priceAfterCancel = await prisma.company.findUniqueOrThrow({ where: { id: company.id } });
+  assert.equal(Number(priceAfterCancel.currentPrice), 10);
+
+  const selfTradeBlocked = await app.inject({
+    method: 'POST',
+    url: '/api/market/orders',
+    headers: { authorization: `Bearer ${tk}` },
+    payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 2, limitPrice: 9 },
+  });
+  assert.equal(selfTradeBlocked.statusCode, 400, selfTradeBlocked.body);
+  assert.match(selfTradeBlocked.body, /self-trade bloqueado/i);
+
+  const noLiquidity = await app.inject({
+    method: 'POST',
+    url: `/api/market/companies/${company.id}/buy-market`,
+    headers: { authorization: `Bearer ${tk}` },
+    payload: { quantity: 1, slippagePercent: 5 },
+  });
+  assert.equal(noLiquidity.statusCode, 400, noLiquidity.body);
+  assert.match(noLiquidity.body, /não há liquidez suficiente no livro para executar esta ordem/i);
+});

@@ -214,7 +214,7 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
   });
 
   if (initialOppositeOrders.length === 0 && taker.mode === 'MARKET') {
-    throw new Error('Livro sem liquidez para executar ordem a mercado.');
+    throw new Error('Não há liquidez suficiente no livro para executar esta ordem.');
   }
 
   const bestPrice = initialOppositeOrders[0]?.limitPrice ?? null;
@@ -242,7 +242,12 @@ async function runMatching(tx: Tx, takerOrderId: string, meta: { ip?: string; us
 
     const maker = await tx.marketOrder.findUnique({ where: { id: restingOrder.id } });
     if (!maker || maker.remainingQuantity <= 0) continue;
-    if (maker.userId === taker.userId) continue;
+    if (maker.userId === taker.userId) {
+      if (taker.remainingQuantity === taker.quantity) {
+        throw new Error('Self-trade bloqueado: a ordem precisa de contraparte de outro usuário.');
+      }
+      continue;
+    }
 
     const unitPrice = maker.limitPrice;
     if (!unitPrice) continue;
