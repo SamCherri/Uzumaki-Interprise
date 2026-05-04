@@ -237,6 +237,7 @@ test('compra inicial altera preço, cria operação e não cria trade', async ()
   const platform = await prisma.platformAccount.findFirstOrThrow();
   const revenue = await prisma.companyRevenueAccount.findUniqueOrThrow({ where: { companyId: company.id } });
   const tradesCount = await prisma.trade.count({ where: { companyId: company.id } });
+  const marketOrdersCount = await prisma.marketOrder.count({ where: { companyId: company.id } });
 
   assert.ok(Number(companyAfter.currentPrice) > 10);
   assert.equal(holding.shares, 50);
@@ -245,6 +246,29 @@ test('compra inicial altera preço, cria operação e não cria trade', async ()
   assert.ok(Number(platform.balance) > 0);
   assert.ok(Number(revenue.balance) > 0);
   assert.equal(tradesCount, 0);
+  assert.equal(marketOrdersCount, 0);
+});
+
+
+test('compra inicial bloqueia saldo insuficiente, projeto inativo e quantidade inválida', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const buyer = await mkUser('initialguard@test.local');
+  await prisma.userRole.create({ data: { userId: buyer.id, roleId: rUser.id } });
+  await prisma.wallet.update({ where: { userId: buyer.id }, data: { rpcAvailableBalance: 10 } });
+
+  const company = await prisma.company.create({ data: { name: 'Guarda Inicial', ticker: 'GINT1', description: 'desc', sector: 'setor', founderUserId: buyer.id, status: 'ACTIVE', totalShares: 1000, circulatingShares: 0, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 600, initialPrice: 10, currentPrice: 10, buyFeePercent: 2, sellFeePercent: 1, fictitiousMarketCap: 10000, approvedAt: new Date(), revenueAccount: { create: {} }, initialOffer: { create: { totalShares: 600, availableShares: 600 } } } });
+
+  const tk = await token(buyer.id, ['USER']);
+  const invalidQty = await app.inject({ method: 'POST', url: `/api/companies/${company.id}/buy-initial-offer`, headers: { authorization: `Bearer ${tk}` }, payload: { quantity: 0 } });
+  assert.equal(invalidQty.statusCode, 400, invalidQty.body);
+
+  const insufficient = await app.inject({ method: 'POST', url: `/api/companies/${company.id}/buy-initial-offer`, headers: { authorization: `Bearer ${tk}` }, payload: { quantity: 2 } });
+  assert.equal(insufficient.statusCode, 400, insufficient.body);
+
+  await prisma.company.update({ where: { id: company.id }, data: { status: 'SUSPENDED' } });
+  const inactive = await app.inject({ method: 'POST', url: `/api/companies/${company.id}/buy-initial-offer`, headers: { authorization: `Bearer ${tk}` }, payload: { quantity: 1 } });
+  assert.equal(inactive.statusCode, 400, inactive.body);
 });
 
 test('tesouraria envia RPC para corretor e corretor envia para jogador', async () => {

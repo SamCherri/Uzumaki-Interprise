@@ -349,6 +349,9 @@ export function CompaniesPage() {
 
   const buyFee = Number(selected?.buyFeePercent ?? '0');
   const sellFee = Number(selected?.sellFeePercent ?? '0');
+  const initialSubtotal = (Number(initialQty) || 0) * Number(selected?.currentPrice ?? 0);
+  const initialFeeTotal = initialSubtotal * (buyFee / 100);
+  const initialTotal = initialSubtotal + initialFeeTotal;
   const limitSubtotal = (Number(limitQty) || 0) * (Number(limitPrice) || 0);
   const limitTotalBuy = limitSubtotal * (1 + buyFee / 100);
   const limitNetSell = limitSubtotal * (1 - sellFee / 100);
@@ -557,9 +560,9 @@ export function CompaniesPage() {
                     </nav>
                     {buyMode === 'initial' && (
                       <form onSubmit={buyInitialOffer}>
-                        <p className="info-text">Comprar no lançamento altera o preço atual, mas não cria trade no histórico.</p>
+                        <p className="info-text">Esta compra é feita direto da oferta inicial do projeto.</p><p className="info-text">Essa compra pode alterar o preço conforme a curva de lançamento.</p><p className="info-text">Disponível: {selected.availableOfferShares.toLocaleString('pt-BR')} tokens.</p>{selected.availableOfferShares <= 0 ? <p className="status-message error">Oferta inicial encerrada. Use o mercado secundário (livro de ofertas).</p> : <div className="summary-item"><p>Preço atual: {formatPrice(Number(selected.currentPrice))}</p><p>Estimativa custo: {formatCurrency(initialSubtotal)} RPC</p><p>Taxa estimada: {formatCurrency(initialFeeTotal)} RPC</p><p>Total estimado: {formatCurrency(initialTotal)} RPC</p></div>}
                         <input type="number" min="1" value={initialQty} onChange={(e) => setInitialQty(e.target.value)} placeholder="Quantidade de moedas" required />
-                        <Button variant="success" type="submit" disabled={isBuyingInitial}>{isBuyingInitial ? 'Comprando...' : 'Comprar moedas'}</Button>
+                        <Button variant="success" type="submit" disabled={isBuyingInitial}>{isBuyingInitial ? 'Comprando...' : 'Comprar na oferta inicial'}</Button>
                       </form>
                     )}
                     {buyMode === 'limit' && <form onSubmit={(event) => createLimitOrder('BUY', event)}><input type="number" min="1" value={limitQty} onChange={(e) => setLimitQty(e.target.value)} placeholder="Quantidade de moedas" required /><input type="number" min="0.01" step="0.01" value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço por moeda" required /><div className="summary-item"><p>Subtotal: {formatCurrency(limitSubtotal)}</p><p>Taxa: {buyFee}%</p><p>Total estimado: {formatCurrency(limitTotalBuy)}</p></div><Button variant="success" type="submit" disabled={isSubmittingLimitOrder}>{isSubmittingLimitOrder ? 'Enviando...' : 'Definir preço de compra'}</Button></form>}

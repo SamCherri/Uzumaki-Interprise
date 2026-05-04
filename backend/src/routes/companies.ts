@@ -5,7 +5,8 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { MAX_COMPANY_TRADES_PER_MINUTE, MAX_PROJECT_CREATIONS_PER_DAY } from '../config/anti-abuse-limits.js';
 import { COMPANY_RULES } from '../constants/company-rules.js';
-import { distributeFee, ensureCompanyRevenueAccount } from '../services/fee-distribution-service.js';
+import { ensureCompanyRevenueAccount } from '../services/fee-distribution-service.js';
+import { buyInitialOffer } from '../services/primary-market-service.js';
 import { validateDescriptionAllowed, validatePublicNameAllowed, validateTickerAllowed } from '../services/content-moderation-service.js';
 
 type AuthRequest = FastifyRequest & { user: { sub: string; roles?: string[] } };
@@ -375,139 +376,8 @@ export async function companyRoutes(app: FastifyInstance) {
 
     try {
       const body = buyInitialOfferSchema.parse(request.body);
-
-      const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-        await tx.$queryRaw`SELECT id FROM "Company" WHERE id = ${params.id} FOR UPDATE`;
-        const company = await tx.company.findUnique({ where: { id: params.id } });
-        if (!company || company.status !== 'ACTIVE') {
-          throw new Error('Mercado não está ativo para compra de lançamento inicial.');
-        }
-
-        const wallet = await tx.wallet.upsert({
-          where: { userId: authRequest.user.sub },
-          update: {},
-          create: { userId: authRequest.user.sub },
-        });
-
-        const offer = await tx.companyInitialOffer.findUnique({ where: { companyId: company.id } });
-        if (!offer || offer.availableShares <= 0) {
-          throw new Error('Lançamento inicial indisponível.');
-        }
-
-        if (body.quantity > offer.availableShares) {
-          throw new Error('Quantidade solicitada maior que tokens disponíveis no lançamento inicial.');
-        }
-
-        const quantity = new Decimal(body.quantity);
-        const grossAmount = company.initialPrice.mul(quantity);
-        const feeAmount = grossAmount.mul(company.buyFeePercent).div(100);
-        const totalAmount = grossAmount.add(feeAmount);
-
-        if (wallet.rpcAvailableBalance.lessThan(totalAmount)) {
-          throw new Error('Saldo RPC insuficiente para comprar no lançamento.');
-        }
-
-        const walletNext = wallet.rpcAvailableBalance.sub(totalAmount);
-        const priceBefore = company.currentPrice;
-        const priceIncrease = grossAmount.div(new Decimal(company.totalShares));
-        const priceAfter = priceBefore.add(priceIncrease);
-        const nextMarketCap = priceAfter.mul(new Decimal(company.totalShares));
-
-        await tx.wallet.update({ where: { id: wallet.id }, data: { rpcAvailableBalance: walletNext } });
-
-        const currentHolding = await tx.companyHolding.findUnique({ where: { userId_companyId: { userId: authRequest.user.sub, companyId: company.id } } });
-
-        const newShares = (currentHolding?.shares ?? 0) + body.quantity;
-        const prevCost = new Decimal(currentHolding?.shares ?? 0).mul(currentHolding?.averageBuyPrice ?? new Decimal(0));
-        const newCost = prevCost.add(grossAmount);
-        const nextAveragePrice = newShares > 0 ? newCost.div(new Decimal(newShares)) : new Decimal(0);
-
-        await tx.companyHolding.upsert({
-          where: { userId_companyId: { userId: authRequest.user.sub, companyId: company.id } },
-          update: {
-            shares: newShares,
-            averageBuyPrice: nextAveragePrice,
-            estimatedValue: new Decimal(newShares).mul(priceAfter),
-          },
-          create: {
-            userId: authRequest.user.sub,
-            companyId: company.id,
-            shares: body.quantity,
-            averageBuyPrice: company.initialPrice,
-            estimatedValue: quantity.mul(priceAfter),
-          },
-        });
-
-        await tx.companyInitialOffer.update({ where: { companyId: company.id }, data: { availableShares: offer.availableShares - body.quantity } });
-        await tx.company.update({
-          where: { id: company.id },
-          data: {
-            availableOfferShares: company.availableOfferShares - body.quantity,
-            circulatingShares: company.circulatingShares + body.quantity,
-            currentPrice: priceAfter,
-            fictitiousMarketCap: nextMarketCap,
-          },
-        });
-
-        await tx.transaction.create({
-          data: {
-            walletId: wallet.id,
-            type: 'COMPANY_INITIAL_OFFER_BUY',
-            amount: totalAmount,
-            description: `Compra de ${body.quantity} tokens no lançamento inicial de ${company.ticker}`,
-          },
-        });
-
-        const operation = await tx.companyOperation.create({
-          data: {
-            companyId: company.id,
-            userId: authRequest.user.sub,
-            type: 'INITIAL_OFFER_BUY',
-            quantity: body.quantity,
-            unitPrice: company.initialPrice,
-            grossAmount,
-            feeAmount,
-            totalAmount,
-            description: `Compra no lançamento inicial (${company.ticker}) com ajuste de preço automático.`,
-          },
-        });
-
-        await distributeFee(tx, {
-          companyId: company.id,
-          operationId: operation.id,
-          payerUserId: authRequest.user.sub,
-          sourceType: 'INITIAL_OFFER_BUY',
-          totalFeeAmount: feeAmount,
-        });
-
-        await tx.adminLog.create({
-          data: {
-            userId: authRequest.user.sub,
-            action: 'COMPANY_INITIAL_OFFER_BUY',
-            entity: 'CompanyOperation',
-            reason: `Compra de ${body.quantity} tokens (${company.ticker})`,
-            previous: JSON.stringify({ wallet: wallet.rpcAvailableBalance.toString(), availableOfferShares: offer.availableShares }),
-            current: JSON.stringify({ wallet: walletNext.toString(), availableOfferShares: offer.availableShares - body.quantity, totalAmount: totalAmount.toString(), priceBefore: priceBefore.toString(), priceAfter: priceAfter.toString() }),
-            ip: request.ip,
-            userAgent: request.headers['user-agent'] ?? null,
-          },
-        });
-
-        return {
-          operation,
-          balance: walletNext,
-          totalAmount,
-          feeAmount,
-          grossAmount,
-          priceBefore,
-          priceAfter,
-          priceIncrease,
-          currentPrice: priceAfter,
-          marketCapAfter: nextMarketCap,
-        };
-      });
-
-      return reply.code(201).send(result);
+      const result = await buyInitialOffer({ companyId: params.id, buyerUserId: authRequest.user.sub, quantity: body.quantity, ip: request.ip, userAgent: request.headers['user-agent'] ?? null });
+      return reply.code(201).send({ ...result, priceBefore: result.unitPriceBefore, priceAfter: result.unitPriceAfter, currentPrice: result.unitPriceAfter });
     } catch (error) {
       return reply.code(400).send({ message: (error as Error).message });
     }

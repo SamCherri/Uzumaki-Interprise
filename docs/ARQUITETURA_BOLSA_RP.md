@@ -216,3 +216,9 @@ Objetivo da fase de PWA:
 - Conta da Exchange
 
 - Fluxo de aporte institucional implementado: fundador usa RPC existente da carteira pessoal para transferir ao caixa institucional do projeto com rastreabilidade e sem impacto direto em preço.
+
+## Atualização 2026-05-04 — Mercado primário consolidado
+- O mercado primário permite compra direta na oferta inicial (`CompanyInitialOffer`) sem depender de vendedor do secundário.
+- A compra usa RPC já existente na carteira do comprador, reduz `availableShares`, aumenta `circulatingShares` e atualiza holding.
+- O preço só muda quando a compra inicial executa; oferta parada não altera preço.
+- A compra inicial é auditável e não cria Trade/MarketOrder do mercado secundário.
