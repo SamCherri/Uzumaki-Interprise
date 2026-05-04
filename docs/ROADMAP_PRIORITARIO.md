@@ -269,3 +269,5 @@ Em caso de conflito:
 - não criar volume falso;
 - não criar liquidez falsa;
 - não criar crédito institucional livre sem origem rastreável.
+
+- [~] PR 1 — Fluxo de capital R$ → RPC → token/projeto (implementação parcial: fluxo base + testes iniciais; ajustes adicionais podem evoluir em follow-up).
