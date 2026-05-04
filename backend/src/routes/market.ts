@@ -83,13 +83,17 @@ export async function cancelOrderWithRelease(
 
   if (order.type === 'BUY' && order.lockedCash.greaterThan(0)) {
     const wallet = await ensureWallet(tx, order.userId);
-    await tx.wallet.update({
-      where: { id: wallet.id },
+    await tx.$queryRaw`SELECT id FROM "Wallet" WHERE id = ${wallet.id} FOR UPDATE`;
+    const unlocked = await tx.wallet.updateMany({
+      where: { id: wallet.id, rpcLockedBalance: { gte: order.lockedCash } },
       data: {
-        rpcLockedBalance: wallet.rpcLockedBalance.sub(order.lockedCash),
-        rpcAvailableBalance: wallet.rpcAvailableBalance.add(order.lockedCash),
+        rpcLockedBalance: { decrement: order.lockedCash },
+        rpcAvailableBalance: { increment: order.lockedCash },
       },
     });
+    if (unlocked.count !== 1) {
+      throw new Error('Falha ao liberar RPC travado da ordem de compra cancelada.');
+    }
   }
 
   if (order.type === 'SELL' && order.lockedShares > 0) {
@@ -509,21 +513,21 @@ export async function marketRoutes(app: FastifyInstance) {
         let lockedCash = ZERO;
         let lockedShares = 0;
 
-        if (body.type === 'BUY') {
+      if (body.type === 'BUY') {
           const fee = gross.mul(company.buyFeePercent).div(100);
           lockedCash = gross.add(fee);
 
-          if (wallet.rpcAvailableBalance.lessThan(lockedCash)) {
-            throw new Error('Saldo insuficiente para bloquear ordem limitada de compra.');
-          }
-
-          await tx.wallet.update({
-            where: { id: wallet.id },
+          await tx.$queryRaw`SELECT id FROM "Wallet" WHERE id = ${wallet.id} FOR UPDATE`;
+          const locked = await tx.wallet.updateMany({
+            where: { id: wallet.id, userId: authRequest.user.sub, rpcAvailableBalance: { gte: lockedCash } },
             data: {
-              rpcAvailableBalance: wallet.rpcAvailableBalance.sub(lockedCash),
-              rpcLockedBalance: wallet.rpcLockedBalance.add(lockedCash),
+              rpcAvailableBalance: { decrement: lockedCash },
+              rpcLockedBalance: { increment: lockedCash },
             },
           });
+          if (locked.count !== 1) {
+            throw new Error('Saldo insuficiente para bloquear ordem limitada de compra.');
+          }
         }
 
         if (body.type === 'SELL') {
@@ -531,14 +535,16 @@ export async function marketRoutes(app: FastifyInstance) {
           if (!holding || holding.shares < body.quantity) {
             throw new Error('Você não possui tokens suficientes para criar ordem de venda.');
           }
+          await tx.$queryRaw`SELECT id FROM "CompanyHolding" WHERE id = ${holding.id} FOR UPDATE`;
 
           lockedShares = body.quantity;
-          await tx.companyHolding.update({
-            where: { id: holding.id },
-            data: {
-              shares: holding.shares - body.quantity,
-            },
+          const locked = await tx.companyHolding.updateMany({
+            where: { id: holding.id, shares: { gte: body.quantity } },
+            data: { shares: { decrement: body.quantity } },
           });
+          if (locked.count !== 1) {
+            throw new Error('Tokens insuficientes para bloquear ordem limitada de venda.');
+          }
         }
 
         const created = await tx.marketOrder.create({
