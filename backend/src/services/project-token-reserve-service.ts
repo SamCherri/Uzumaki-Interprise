@@ -1,4 +1,3 @@
-import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../lib/prisma.js';
 import { HttpError } from '../lib/http-error.js';
 
@@ -11,12 +10,11 @@ function hasAuditRole(roles: string[] = []) {
 function toNum(value: unknown) { return Number(value ?? 0); }
 
 export async function auditProjectTokenReserve(companyId: string) {
-  const [company, reserve, entries, executions, founderHolding] = await Promise.all([
+  const [company, reserve, entries, executions] = await Promise.all([
     prisma.company.findUnique({ where: { id: companyId } }),
     prisma.projectTokenReserve.findUnique({ where: { companyId } }),
     prisma.projectTokenReserveEntry.findMany({ where: { companyId }, include: { program: true, execution: true } }),
     prisma.projectBuybackExecution.findMany({ where: { companyId } }),
-    prisma.company.findUnique({ where: { id: companyId }, select: { founderUserId: true, holdings: true } }),
   ]);
 
   if (!company) throw new HttpError(404, 'Projeto não encontrado.');
@@ -49,9 +47,6 @@ export async function auditProjectTokenReserve(companyId: string) {
   if (Math.abs(entryCost - reserveCost) > 0.01) issues.push('RESERVE_COST_SUM_MISMATCH');
   if (reserveShares > 0 && entries.length === 0) issues.push('RESERVE_WITH_SHARES_WITHOUT_ENTRIES');
   if (reserveCost > 0 && reserveShares === 0) issues.push('RESERVE_COST_WITHOUT_SHARES');
-  if (founderHolding?.holdings?.some((h) => h.userId === founderHolding.founderUserId && h.shares > 0) && reserveShares > 0) {
-    issues.push('FOUNDER_HAS_HOLDING_WHILE_RESERVE_EXISTS');
-  }
 
   return {
     companyId,

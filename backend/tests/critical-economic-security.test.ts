@@ -1802,3 +1802,70 @@ test('admin de auditoria consulta lista read-only de reservas', async () => {
   const payload = response.json();
   assert.ok(Array.isArray(payload.reserves));
 });
+
+test('buyback reserva institucional mantém vínculos, custos e auditoria de divergência', async () => {
+  await resetDb();
+  const role = await mkRole('USER');
+  const founder = await mkUser('reserve-founder2@test.local');
+  const seller = await mkUser('reserve-seller2@test.local');
+  await prisma.userRole.createMany({ data: [{ userId: founder.id, roleId: role.id }, { userId: seller.id, roleId: role.id }] });
+
+  const company = await prisma.company.create({ data: { name: 'Reserve Co2', ticker: 'RSV2', description: 'desc', sector: 'setor', founderUserId: founder.id, status: 'ACTIVE', totalShares: 1000, circulatingShares: 100, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 500, initialPrice: 10, currentPrice: 10, buyFeePercent: 2, sellFeePercent: 1, fictitiousMarketCap: 1000, revenueAccount: { create: { balance: 100 } } } });
+  await prisma.companyHolding.create({ data: { userId: seller.id, companyId: company.id, shares: 10, averageBuyPrice: 8, estimatedValue: 80 } });
+
+  const sellerToken = await token(seller.id, ['USER']);
+  const sellOrder = await app.inject({ method: 'POST', url: '/api/market/orders', headers: { authorization: `Bearer ${sellerToken}` }, payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 4, limitPrice: 10 } });
+  assert.equal(sellOrder.statusCode, 201, sellOrder.body);
+
+  const founderToken = await token(founder.id, ['USER']);
+  const created = await app.inject({ method: 'POST', url: `/api/project-buybacks/companies/${company.id}/programs`, headers: { authorization: `Bearer ${founderToken}` }, payload: { budgetRpc: 60, maxPricePerShare: 10, targetShares: 4, reason: 'Programa para validar reserva institucional completa' } });
+  assert.equal(created.statusCode, 201, created.body);
+  const programId = created.json().id;
+
+  const executed = await app.inject({ method: 'POST', url: `/api/project-buybacks/programs/${programId}/execute`, headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(executed.statusCode, 200, executed.body);
+
+  const reserve = await prisma.projectTokenReserve.findUniqueOrThrow({ where: { companyId: company.id } });
+  const entry = await prisma.projectTokenReserveEntry.findFirstOrThrow({ where: { companyId: company.id, type: 'BUYBACK_IN' } });
+  assert.equal(reserve.shares, 4);
+  assert.equal(Number(reserve.totalCostRpc), 40);
+  assert.equal(entry.programId, programId);
+  assert.ok(entry.executionId);
+  assert.equal(entry.shares, 4);
+  assert.equal(Number(entry.totalCostRpc), 40);
+
+  const summary = await app.inject({ method: 'GET', url: `/api/project-token-reserves/companies/${company.id}`, headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(summary.statusCode, 200, summary.body);
+  const summaryBody = summary.json();
+  assert.equal(summaryBody.reserve.averageCostRpc, 10);
+  assert.equal(summaryBody.inconsistencies.includes('RESERVE_SHARES_SUM_MISMATCH'), false);
+  assert.equal(summaryBody.inconsistencies.includes('RESERVE_COST_SUM_MISMATCH'), false);
+
+  const founderHolding = await prisma.companyHolding.findUnique({ where: { userId_companyId: { userId: founder.id, companyId: company.id } } });
+  assert.equal(founderHolding, null);
+
+  await prisma.projectTokenReserve.update({ where: { companyId: company.id }, data: { shares: 5 } });
+  const auditResponse = await app.inject({ method: 'GET', url: `/api/admin/project-token-reserves/companies/${company.id}/audit`, headers: { authorization: `Bearer ${await token(founder.id, ['COIN_CHIEF_ADMIN'])}` } });
+  assert.equal(auditResponse.statusCode, 200, auditResponse.body);
+  assert.equal(auditResponse.json().inconsistencies.includes('RESERVE_SHARES_SUM_MISMATCH'), true);
+
+  await prisma.projectTokenReserveEntry.deleteMany({ where: { companyId: company.id } });
+  const auditAfterDelete = await app.inject({ method: 'GET', url: `/api/admin/project-token-reserves/companies/${company.id}/audit`, headers: { authorization: `Bearer ${await token(founder.id, ['SUPER_ADMIN'])}` } });
+  assert.equal(auditAfterDelete.statusCode, 200, auditAfterDelete.body);
+  const issues = auditAfterDelete.json().inconsistencies as string[];
+  assert.ok(issues.some((i) => i.startsWith('EXECUTION_WITHOUT_RESERVE_ENTRY:')));
+});
+
+test('reserva retorna HttpError correto para projeto inexistente e acesso indevido', async () => {
+  await resetDb();
+  const user = await mkUser('reserve-user3@test.local');
+  const other = await mkUser('reserve-user4@test.local');
+  await mkRole('USER');
+
+  const notFound = await app.inject({ method: 'GET', url: '/api/project-token-reserves/companies/company-inexistente', headers: { authorization: `Bearer ${await token(user.id, ['USER'])}` } });
+  assert.equal(notFound.statusCode, 404, notFound.body);
+
+  const company = await prisma.company.create({ data: { name: 'Reserve Co3', ticker: 'RSV3', description: 'd', sector: 's', founderUserId: user.id, status: 'ACTIVE', totalShares: 1000, circulatingShares: 0, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 600, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 1000 } });
+  const forbidden = await app.inject({ method: 'GET', url: `/api/project-token-reserves/companies/${company.id}`, headers: { authorization: `Bearer ${await token(other.id, ['USER'])}` } });
+  assert.equal(forbidden.statusCode, 403, forbidden.body);
+});
