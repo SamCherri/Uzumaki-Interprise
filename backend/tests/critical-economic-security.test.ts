@@ -1257,7 +1257,7 @@ test('admin não pode revisar o próprio saque e outro admin pode revisar', asyn
   assert.equal(otherComplete.statusCode, 200, otherComplete.body);
 });
 
-test('mercado secundário: criação/cancelamento não movem preço, self-trade bloqueado e market sem liquidez falha', async () => {
+test('mercado secundário: criação/cancelamento não movem preço e market sem contraparte válida falha', async () => {
   await resetDb();
   const rUser = await mkRole('USER');
   const user = await mkUser('secondary-rules@test.local', 'Secondary Rules');
@@ -1299,14 +1299,17 @@ test('mercado secundário: criação/cancelamento não movem preço, self-trade 
   const priceAfterCancel = await prisma.company.findUniqueOrThrow({ where: { id: company.id } });
   assert.equal(Number(priceAfterCancel.currentPrice), 10);
 
-  const selfTradeBlocked = await app.inject({
+  const sellAfterCancel = await app.inject({
     method: 'POST',
     url: '/api/market/orders',
     headers: { authorization: `Bearer ${tk}` },
     payload: { companyId: company.id, type: 'SELL', mode: 'LIMIT', quantity: 2, limitPrice: 9 },
   });
-  assert.equal(selfTradeBlocked.statusCode, 400, selfTradeBlocked.body);
-  assert.match(selfTradeBlocked.body, /self-trade bloqueado/i);
+  assert.equal(sellAfterCancel.statusCode, 201, sellAfterCancel.body);
+  const tradesAfterSell = await prisma.trade.count({ where: { companyId: company.id } });
+  assert.equal(tradesAfterSell, 0);
+  const priceAfterSell = await prisma.company.findUniqueOrThrow({ where: { id: company.id } });
+  assert.equal(Number(priceAfterSell.currentPrice), 10);
 
   const noLiquidity = await app.inject({
     method: 'POST',
@@ -1315,7 +1318,7 @@ test('mercado secundário: criação/cancelamento não movem preço, self-trade 
     payload: { quantity: 1, slippagePercent: 5 },
   });
   assert.equal(noLiquidity.statusCode, 400, noLiquidity.body);
-  assert.match(noLiquidity.body, /não há liquidez suficiente no livro para executar esta ordem/i);
+  assert.match(noLiquidity.body, /não há contraparte válida de outro usuário/i);
 });
 
 test('mercado secundário: execução parcial preserva remaining/locks e reembolsa sobra da BUY limitada', async () => {
