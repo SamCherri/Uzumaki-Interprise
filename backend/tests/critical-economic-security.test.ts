@@ -227,6 +227,11 @@ test('compra inicial altera preço, cria operação e não cria trade', async ()
   const payload = response.json();
   assert.ok(payload.priceBefore);
   assert.ok(payload.priceAfter);
+  assert.ok(payload.priceIncrease);
+  assert.ok(payload.grossAmount);
+  assert.ok(payload.totalAmount);
+  assert.equal(payload.availableSharesBefore, 600);
+  assert.equal(payload.availableSharesAfter, 550);
   assert.ok(Number(payload.priceAfter) > Number(payload.priceBefore));
   assert.equal(String(payload.currentPrice), String(payload.priceAfter));
 
@@ -237,6 +242,7 @@ test('compra inicial altera preço, cria operação e não cria trade', async ()
   const platform = await prisma.platformAccount.findFirstOrThrow();
   const revenue = await prisma.companyRevenueAccount.findUniqueOrThrow({ where: { companyId: company.id } });
   const tradesCount = await prisma.trade.count({ where: { companyId: company.id } });
+  const marketOrderCount = await prisma.marketOrder.count({ where: { companyId: company.id } });
 
   assert.ok(Number(companyAfter.currentPrice) > 10);
   assert.equal(holding.shares, 50);
@@ -245,6 +251,7 @@ test('compra inicial altera preço, cria operação e não cria trade', async ()
   assert.ok(Number(platform.balance) > 0);
   assert.ok(Number(revenue.balance) > 0);
   assert.equal(tradesCount, 0);
+  assert.equal(marketOrderCount, 0);
 });
 
 test('tesouraria envia RPC para corretor e corretor envia para jogador', async () => {

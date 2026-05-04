@@ -383,11 +383,13 @@ export async function companyRoutes(app: FastifyInstance) {
           throw new Error('Mercado não está ativo para compra de lançamento inicial.');
         }
 
+        await tx.$queryRaw`SELECT id FROM "CompanyInitialOffer" WHERE "companyId" = ${company.id} FOR UPDATE`;
         const wallet = await tx.wallet.upsert({
           where: { userId: authRequest.user.sub },
           update: {},
           create: { userId: authRequest.user.sub },
         });
+        await tx.$queryRaw`SELECT id FROM "Wallet" WHERE id = ${wallet.id} FOR UPDATE`;
 
         const offer = await tx.companyInitialOffer.findUnique({ where: { companyId: company.id } });
         if (!offer || offer.availableShares <= 0) {
@@ -398,22 +400,40 @@ export async function companyRoutes(app: FastifyInstance) {
           throw new Error('Quantidade solicitada maior que tokens disponíveis no lançamento inicial.');
         }
 
+        if (body.quantity <= 0) {
+          throw new Error('Quantidade deve ser maior que zero.');
+        }
+
         const quantity = new Decimal(body.quantity);
         const grossAmount = company.initialPrice.mul(quantity);
         const feeAmount = grossAmount.mul(company.buyFeePercent).div(100);
         const totalAmount = grossAmount.add(feeAmount);
-
-        if (wallet.rpcAvailableBalance.lessThan(totalAmount)) {
+        const buyerRpcBalanceBefore = wallet.rpcAvailableBalance;
+        if (buyerRpcBalanceBefore.lessThan(totalAmount)) {
           throw new Error('Saldo RPC insuficiente para comprar no lançamento.');
         }
-
-        const walletNext = wallet.rpcAvailableBalance.sub(totalAmount);
         const priceBefore = company.currentPrice;
         const priceIncrease = grossAmount.div(new Decimal(company.totalShares));
         const priceAfter = priceBefore.add(priceIncrease);
         const nextMarketCap = priceAfter.mul(new Decimal(company.totalShares));
 
-        await tx.wallet.update({ where: { id: wallet.id }, data: { rpcAvailableBalance: walletNext } });
+        const debitWallet = await tx.wallet.updateMany({
+          where: { id: wallet.id, userId: authRequest.user.sub, rpcAvailableBalance: { gte: totalAmount } },
+          data: { rpcAvailableBalance: { decrement: totalAmount } },
+        });
+        if (debitWallet.count !== 1) {
+          throw new Error('Saldo RPC insuficiente para concluir a compra no lançamento.');
+        }
+
+        const consumeOffer = await tx.companyInitialOffer.updateMany({
+          where: { companyId: company.id, availableShares: { gte: body.quantity } },
+          data: { availableShares: { decrement: body.quantity } },
+        });
+        if (consumeOffer.count !== 1) {
+          throw new Error('Oferta inicial insuficiente para concluir a compra.');
+        }
+        const walletAfterDebit = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+        const walletNext = walletAfterDebit.rpcAvailableBalance;
 
         const currentHolding = await tx.companyHolding.findUnique({ where: { userId_companyId: { userId: authRequest.user.sub, companyId: company.id } } });
 
@@ -438,11 +458,11 @@ export async function companyRoutes(app: FastifyInstance) {
           },
         });
 
-        await tx.companyInitialOffer.update({ where: { companyId: company.id }, data: { availableShares: offer.availableShares - body.quantity } });
+        const availableSharesAfter = offer.availableShares - body.quantity;
         await tx.company.update({
           where: { id: company.id },
           data: {
-            availableOfferShares: company.availableOfferShares - body.quantity,
+            availableOfferShares: availableSharesAfter,
             circulatingShares: company.circulatingShares + body.quantity,
             currentPrice: priceAfter,
             fictitiousMarketCap: nextMarketCap,
@@ -494,15 +514,22 @@ export async function companyRoutes(app: FastifyInstance) {
         });
 
         return {
+          companyId: company.id,
+          ticker: company.ticker,
+          quantity: body.quantity,
           operation,
-          balance: walletNext,
-          totalAmount,
-          feeAmount,
           grossAmount,
+          feeAmount,
+          totalAmount,
           priceBefore,
           priceAfter,
           priceIncrease,
           currentPrice: priceAfter,
+          availableSharesBefore: offer.availableShares,
+          availableSharesAfter,
+          buyerRpcBalanceBefore,
+          buyerRpcBalanceAfter: walletNext,
+          holdingSharesAfter: newShares,
           marketCapAfter: nextMarketCap,
         };
       });

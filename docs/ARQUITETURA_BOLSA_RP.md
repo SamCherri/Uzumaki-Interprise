@@ -216,3 +216,10 @@ Objetivo da fase de PWA:
 - Conta da Exchange
 
 - Fluxo de aporte institucional implementado: fundador usa RPC existente da carteira pessoal para transferir ao caixa institucional do projeto com rastreabilidade e sem impacto direto em preço.
+
+
+## Atualização 2026-05-04 — Mercado primário reforçado
+- Compra da oferta inicial ocorre em transação atômica, com validação de saldo RPC e de disponibilidade da oferta.
+- Débito da wallet RPC e consumo da oferta usam atualização condicional para bloquear saldo negativo e oversell concorrente.
+- Compra inicial atualiza holding, circulação, preço e market cap, gerando `CompanyOperation` + `Transaction` + `FeeDistribution` quando aplicável.
+- Compra inicial não gera `Trade` nem `MarketOrder`; secundário continua responsável por formação de preço via trade real fora da oferta inicial.
