@@ -1869,3 +1869,172 @@ test('reserva retorna HttpError correto para projeto inexistente e acesso indevi
   const forbidden = await app.inject({ method: 'GET', url: `/api/project-token-reserves/companies/${company.id}`, headers: { authorization: `Bearer ${await token(other.id, ['USER'])}` } });
   assert.equal(forbidden.statusCode, 403, forbidden.body);
 });
+
+test('holder distribution: criação/execução/cancelamento seguem regras econômicas e invariantes', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const rAuditor = await mkRole('AUDITOR');
+  const founder = await mkUser('hd-founder@test.local', 'Founder HD');
+  const holderA = await mkUser('hd-a@test.local');
+  const holderB = await mkUser('hd-b@test.local');
+  const outsider = await mkUser('hd-outsider@test.local');
+  const auditor = await mkUser('hd-auditor@test.local');
+  await prisma.userRole.createMany({ data: [
+    { userId: founder.id, roleId: rUser.id },
+    { userId: holderA.id, roleId: rUser.id },
+    { userId: holderB.id, roleId: rUser.id },
+    { userId: outsider.id, roleId: rUser.id },
+    { userId: auditor.id, roleId: rAuditor.id },
+  ] });
+
+  const company = await prisma.company.create({ data: { name: 'Holder Dist', ticker: 'HDST1', description: 'd', sector: 's', founderUserId: founder.id, status: 'ACTIVE', totalShares: 1000, circulatingShares: 200, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 400, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 10000, approvedAt: new Date(), revenueAccount: { create: { balance: 100 } } } });
+  await prisma.companyHolding.createMany({ data: [
+    { companyId: company.id, userId: founder.id, shares: 50, averageBuyPrice: 10, estimatedValue: 500 },
+    { companyId: company.id, userId: holderA.id, shares: 100, averageBuyPrice: 10, estimatedValue: 1000 },
+    { companyId: company.id, userId: holderB.id, shares: 300, averageBuyPrice: 10, estimatedValue: 3000 },
+  ] });
+
+  const founderToken = await token(founder.id, ['USER']);
+  const outsiderToken = await token(outsider.id, ['USER']);
+
+  const budgetInvalid = await app.inject({ method: 'POST', url: `/api/project-holder-distributions/companies/${company.id}/programs`, headers: { authorization: `Bearer ${founderToken}` }, payload: { budgetRpc: 0, reason: 'motivo valido para bloquear budget' } });
+  assert.equal(budgetInvalid.statusCode, 400);
+  const reasonInvalid = await app.inject({ method: 'POST', url: `/api/project-holder-distributions/companies/${company.id}/programs`, headers: { authorization: `Bearer ${founderToken}` }, payload: { budgetRpc: 10, reason: 'curto' } });
+  assert.equal(reasonInvalid.statusCode, 400);
+  const founderIncludeBlocked = await app.inject({ method: 'POST', url: `/api/project-holder-distributions/companies/${company.id}/programs`, headers: { authorization: `Bearer ${founderToken}` }, payload: { budgetRpc: 10, reason: 'Motivo válido para testar founder bloqueado', excludeFounder: false } });
+  assert.equal(founderIncludeBlocked.statusCode, 400);
+  assert.match(founderIncludeBlocked.body, /não é suportada nesta política inicial/i);
+  const outsiderForbidden = await app.inject({ method: 'POST', url: `/api/project-holder-distributions/companies/${company.id}/programs`, headers: { authorization: `Bearer ${outsiderToken}` }, payload: { budgetRpc: 10, reason: 'Motivo válido para usuário comum' } });
+  assert.equal(outsiderForbidden.statusCode, 403);
+
+  const priceBefore = await prisma.company.findUniqueOrThrow({ where: { id: company.id } });
+  const create = await app.inject({ method: 'POST', url: `/api/project-holder-distributions/companies/${company.id}/programs`, headers: { authorization: `Bearer ${founderToken}` }, payload: { budgetRpc: 25, reason: 'Distribuição auditável para holders do projeto' } });
+  assert.equal(create.statusCode, 201, create.body);
+  const programId = create.json().id as string;
+
+  const program = await prisma.projectHolderDistributionProgram.findUniqueOrThrow({ where: { id: programId } });
+  const snaps = await prisma.projectHolderDistributionSnapshot.findMany({ where: { programId }, orderBy: { userId: 'asc' } });
+  const revenueAfterCreate = await prisma.companyRevenueAccount.findUniqueOrThrow({ where: { companyId: company.id } });
+  assert.equal(snaps.length, 2);
+  assert.ok(snaps.every((s) => s.userId !== founder.id));
+  assert.equal(program.eligibleShares, 400);
+  assert.equal(Number(revenueAfterCreate.balance), 75);
+  assert.equal(program.status, 'READY');
+  const priceAfterCreate = await prisma.company.findUniqueOrThrow({ where: { id: company.id } });
+  assert.equal(String(priceBefore.currentPrice), String(priceAfterCreate.currentPrice));
+  assert.equal(await prisma.trade.count({ where: { companyId: company.id } }), 0);
+  assert.equal(await prisma.marketOrder.count({ where: { companyId: company.id } }), 0);
+
+  const execute = await app.inject({ method: 'POST', url: `/api/project-holder-distributions/programs/${programId}/execute`, headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(execute.statusCode, 200, execute.body);
+  const executeTwice = await app.inject({ method: 'POST', url: `/api/project-holder-distributions/programs/${programId}/execute`, headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(executeTwice.statusCode, 400);
+
+  const programAfterExec = await prisma.projectHolderDistributionProgram.findUniqueOrThrow({ where: { id: programId } });
+  const snapsAfterExec = await prisma.projectHolderDistributionSnapshot.findMany({ where: { programId } });
+  assert.equal(programAfterExec.status, 'COMPLETED');
+  assert.ok(snapsAfterExec.every((s) => s.status !== 'PENDING'));
+  assert.ok(snapsAfterExec.some((s) => s.status === 'PAID'));
+  const payments = await prisma.projectHolderDistributionPayment.findMany({ where: { programId } });
+  assert.equal(payments.length, snapsAfterExec.filter((s) => s.status === 'PAID').length);
+  const txs = await prisma.transaction.findMany({ where: { type: 'PROJECT_HOLDER_DISTRIBUTION_IN' } });
+  assert.ok(txs.length >= 1);
+  const walletA = await prisma.wallet.findUniqueOrThrow({ where: { userId: holderA.id } });
+  const walletB = await prisma.wallet.findUniqueOrThrow({ where: { userId: holderB.id } });
+  assert.ok(Number(walletA.rpcAvailableBalance) > 0);
+  assert.ok(Number(walletB.rpcAvailableBalance) > 0);
+  const cancelCompleted = await app.inject({ method: 'POST', url: `/api/project-holder-distributions/programs/${programId}/cancel`, headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(cancelCompleted.statusCode, 400);
+
+  const cancelProgram = await app.inject({ method: 'POST', url: `/api/project-holder-distributions/companies/${company.id}/programs`, headers: { authorization: `Bearer ${founderToken}` }, payload: { budgetRpc: 10, reason: 'Programa para cancelar antes da execução' } });
+  const cancelProgramId = cancelProgram.json().id as string;
+  const revenueBeforeCancel = await prisma.companyRevenueAccount.findUniqueOrThrow({ where: { companyId: company.id } });
+  const cancel = await app.inject({ method: 'POST', url: `/api/project-holder-distributions/programs/${cancelProgramId}/cancel`, headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(cancel.statusCode, 200);
+  const cancelTwice = await app.inject({ method: 'POST', url: `/api/project-holder-distributions/programs/${cancelProgramId}/cancel`, headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(cancelTwice.statusCode, 400);
+  const revenueAfterCancel = await prisma.companyRevenueAccount.findUniqueOrThrow({ where: { companyId: company.id } });
+  assert.equal(Number((Number(revenueAfterCancel.balance) - Number(revenueBeforeCancel.balance)).toFixed(2)), 10);
+
+  const reserve = await prisma.projectTokenReserve.findUnique({ where: { companyId: company.id } });
+  assert.equal(reserve, null);
+  const companyAfterAll = await prisma.company.findUniqueOrThrow({ where: { id: company.id } });
+  assert.equal(companyAfterAll.totalShares, 1000);
+  assert.equal(companyAfterAll.circulatingShares, 200);
+  const testModeCount = await prisma.systemModeConfig.count();
+  assert.equal(testModeCount, 0);
+});
+
+test('holder distribution: snapshot vazio/projeto não ativo/saldo insuficiente e permissões auditor', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const rAuditor = await mkRole('AUDITOR');
+  const founder = await mkUser('hd2-founder@test.local');
+  const holder = await mkUser('hd2-holder@test.local');
+  const auditor = await mkUser('hd2-auditor@test.local');
+  await prisma.userRole.createMany({ data: [{ userId: founder.id, roleId: rUser.id }, { userId: holder.id, roleId: rUser.id }, { userId: auditor.id, roleId: rAuditor.id }] });
+
+  const inactive = await prisma.company.create({ data: { name: 'Inativo', ticker: 'HDIN1', description: 'd', sector: 's', founderUserId: founder.id, status: 'PENDING', totalShares: 100, circulatingShares: 0, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 40, publicOfferShares: 60, availableOfferShares: 60, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 1000, revenueAccount: { create: { balance: 5 } } } });
+  const active = await prisma.company.create({ data: { name: 'Ativo', ticker: 'HDACT1', description: 'd', sector: 's', founderUserId: founder.id, status: 'ACTIVE', totalShares: 100, circulatingShares: 0, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 40, publicOfferShares: 60, availableOfferShares: 60, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 1000, revenueAccount: { create: { balance: 5 } } } });
+
+  const founderToken = await token(founder.id, ['USER']);
+  const auditorToken = await token(auditor.id, ['AUDITOR']);
+
+  const inactiveResp = await app.inject({ method: 'POST', url: `/api/project-holder-distributions/companies/${inactive.id}/programs`, headers: { authorization: `Bearer ${founderToken}` }, payload: { budgetRpc: 1, reason: 'Motivo válido projeto inativo' } });
+  assert.equal(inactiveResp.statusCode, 400);
+
+  const emptySnap = await app.inject({ method: 'POST', url: `/api/project-holder-distributions/companies/${active.id}/programs`, headers: { authorization: `Bearer ${founderToken}` }, payload: { budgetRpc: 1, reason: 'Motivo válido snapshot vazio' } });
+  assert.equal(emptySnap.statusCode, 400);
+
+  await prisma.companyHolding.create({ data: { companyId: active.id, userId: holder.id, shares: 10, averageBuyPrice: 10, estimatedValue: 100 } });
+  const noBalance = await app.inject({ method: 'POST', url: `/api/project-holder-distributions/companies/${active.id}/programs`, headers: { authorization: `Bearer ${founderToken}` }, payload: { budgetRpc: 50, reason: 'Motivo válido saldo insuficiente' } });
+  assert.equal(noBalance.statusCode, 400);
+
+  const ok = await app.inject({ method: 'POST', url: `/api/project-holder-distributions/companies/${active.id}/programs`, headers: { authorization: `Bearer ${founderToken}` }, payload: { budgetRpc: 2, reason: 'Motivo válido para consulta auditor' } });
+  assert.equal(ok.statusCode, 201);
+  const programId = ok.json().id as string;
+
+  const adminView = await app.inject({ method: 'GET', url: '/api/admin/project-holder-distributions', headers: { authorization: `Bearer ${auditorToken}` } });
+  assert.equal(adminView.statusCode, 200);
+  const auditorExec = await app.inject({ method: 'POST', url: `/api/project-holder-distributions/programs/${programId}/execute`, headers: { authorization: `Bearer ${auditorToken}` } });
+  assert.equal(auditorExec.statusCode, 403);
+  const notFound = await app.inject({ method: 'POST', url: '/api/project-holder-distributions/programs/programa-inexistente/execute', headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(notFound.statusCode, 404);
+});
+
+test('holder distribution: cálculo por centavos evita negativos com muitos holders e orçamento pequeno', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const founder = await mkUser('hdc-founder@test.local');
+  await prisma.userRole.create({ data: { userId: founder.id, roleId: rUser.id } });
+
+  const company = await prisma.company.create({ data: { name: 'Holder Cents', ticker: 'HDCNT', description: 'd', sector: 's', founderUserId: founder.id, status: 'ACTIVE', totalShares: 1000, circulatingShares: 10, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600, availableOfferShares: 100, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 1000, approvedAt: new Date(), revenueAccount: { create: { balance: 1 } } } });
+
+  const holders: { userId: string; shares: number }[] = [];
+  for (let i = 0; i < 9; i++) {
+    const u = await mkUser(`hdc-${i}@test.local`);
+    await prisma.userRole.create({ data: { userId: u.id, roleId: rUser.id } });
+    holders.push({ userId: u.id, shares: i + 1 });
+  }
+  await prisma.companyHolding.createMany({ data: holders.map((h) => ({ companyId: company.id, userId: h.userId, shares: h.shares, averageBuyPrice: 10, estimatedValue: h.shares * 10 })) });
+
+  const founderToken = await token(founder.id, ['USER']);
+  const create = await app.inject({ method: 'POST', url: `/api/project-holder-distributions/companies/${company.id}/programs`, headers: { authorization: `Bearer ${founderToken}` }, payload: { budgetRpc: 0.03, reason: 'Distribuição de orçamento pequeno com muitos holders' } });
+  assert.equal(create.statusCode, 201, create.body);
+  const programId = create.json().id as string;
+
+  const snapshots = await prisma.projectHolderDistributionSnapshot.findMany({ where: { programId } });
+  assert.equal(snapshots.length, 9);
+  assert.ok(snapshots.every((s) => Number(s.calculatedAmountRpc) >= 0));
+  const sum = snapshots.reduce((acc, s) => acc + Number(s.calculatedAmountRpc), 0);
+  assert.equal(Number(sum.toFixed(2)), 0.03);
+
+  const exec = await app.inject({ method: 'POST', url: `/api/project-holder-distributions/programs/${programId}/execute`, headers: { authorization: `Bearer ${founderToken}` } });
+  assert.equal(exec.statusCode, 200, exec.body);
+  const snapshotsAfter = await prisma.projectHolderDistributionSnapshot.findMany({ where: { programId } });
+  assert.ok(snapshotsAfter.every((s) => s.status !== 'PENDING'));
+
+  const program = await prisma.projectHolderDistributionProgram.findUniqueOrThrow({ where: { id: programId } });
+  assert.equal(program.status, 'COMPLETED');
+  assert.equal(Number(program.budgetRpc), Number((Number(program.distributedRpc) + Number(program.refundedRpc)).toFixed(2)));
+});

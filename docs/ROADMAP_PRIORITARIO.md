@@ -293,3 +293,5 @@ Em caso de conflito:
 - Implementadas consultas read-only por fundador e por perfis de auditoria (`SUPER_ADMIN`, `COIN_CHIEF_ADMIN`, `AUDITOR`) com histórico de entradas e custo médio.
 - Implementada auditoria read-only de inconsistências da reserva (somatórios, vínculos com execução/programa e validações de integridade).
 - Não implementado nesta PR: queima, distribuição, reoferta controlada e venda/transferência de tokens reservados.
+
+- [~] PR 7 — Distribuição para holders, se mantida (implementação base auditável com snapshot, execução idempotente e devolução de sobra; UI avançada pode evoluir em follow-up).
