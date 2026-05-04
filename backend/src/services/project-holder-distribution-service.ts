@@ -8,6 +8,31 @@ const ADMIN_ROLES = ['SUPER_ADMIN', 'COIN_CHIEF_ADMIN'];
 const AUDIT_ROLES = ['SUPER_ADMIN', 'COIN_CHIEF_ADMIN', 'AUDITOR'];
 const round2 = (v: Decimal) => v.toDecimalPlaces(2);
 
+function allocateByCents(input: { budgetRpc: Decimal; holders: { userId: string; shares: number }[]; eligibleShares: number }) {
+  const budgetCents = Number(input.budgetRpc.mul(100).toDecimalPlaces(0));
+  const base = input.holders.map((h, idx) => {
+    const rawNumerator = budgetCents * h.shares;
+    const floorCents = Math.floor(rawNumerator / input.eligibleShares);
+    const remainderNumerator = rawNumerator % input.eligibleShares;
+    return { idx, userId: h.userId, shares: h.shares, floorCents, remainderNumerator };
+  });
+  const used = base.reduce((acc, b) => acc + b.floorCents, 0);
+  let leftover = budgetCents - used;
+  const ranking = [...base].sort((a, b) => (b.remainderNumerator - a.remainderNumerator) || (b.shares - a.shares) || a.userId.localeCompare(b.userId));
+  const plus = new Map<number, number>();
+  for (const item of ranking) {
+    if (leftover <= 0) break;
+    plus.set(item.idx, (plus.get(item.idx) ?? 0) + 1);
+    leftover -= 1;
+  }
+
+  return base.map((item) => ({
+    ...item,
+    cents: item.floorCents + (plus.get(item.idx) ?? 0),
+    amount: new Decimal(item.floorCents + (plus.get(item.idx) ?? 0)).div(100).toDecimalPlaces(2),
+  }));
+}
+
 function hasAnyRole(roles: string[], allowed: string[]) { return roles.some((r) => allowed.includes(r.toUpperCase())); }
 
 export async function createHolderDistributionProgram(input: { companyId: string; actorUserId: string; actorRoles?: string[]; budgetRpc: number; reason: string; excludeFounder?: boolean; ip?: string; userAgent?: string | null }) {
@@ -38,13 +63,15 @@ export async function createHolderDistributionProgram(input: { companyId: string
 
     const program = await tx.projectHolderDistributionProgram.create({ data: { companyId: input.companyId, createdByUserId: input.actorUserId, status: 'READY', budgetRpc, eligibleShares, eligibleHoldersCount: holders.length, reason, excludeFounder } });
 
-    let allocated = ZERO;
-    for (let idx = 0; idx < holders.length; idx++) {
-      const h = holders[idx];
+    const allocations = allocateByCents({ budgetRpc, holders: holders.map((h) => ({ userId: h.userId, shares: h.shares })), eligibleShares });
+    const totalCents = allocations.reduce((acc, item) => acc + item.cents, 0);
+    if (totalCents !== Number(budgetRpc.mul(100).toDecimalPlaces(0))) throw new HttpError(400, 'Falha ao distribuir orçamento em centavos.');
+
+    for (const h of holders) {
+      const alloc = allocations.find((a) => a.userId === h.userId);
+      if (!alloc) throw new HttpError(400, 'Falha ao localizar alocação de holder.');
       const percent = new Decimal(h.shares).div(eligibleShares).toDecimalPlaces(8);
-      const value = idx === holders.length - 1 ? budgetRpc.sub(allocated) : round2(budgetRpc.mul(percent));
-      allocated = allocated.add(value);
-      await tx.projectHolderDistributionSnapshot.create({ data: { programId: program.id, companyId: input.companyId, userId: h.userId, shares: h.shares, sharePercent: percent, calculatedAmountRpc: value } });
+      await tx.projectHolderDistributionSnapshot.create({ data: { programId: program.id, companyId: input.companyId, userId: h.userId, shares: h.shares, sharePercent: percent, calculatedAmountRpc: alloc.amount } });
     }
 
     await tx.adminLog.create({ data: { userId: input.actorUserId, action: 'PROJECT_HOLDER_DISTRIBUTION_CREATE', entity: 'ProjectHolderDistributionProgram', reason, current: JSON.stringify({ programId: program.id, companyId: input.companyId, budgetRpc: String(budgetRpc), excludeFounder }), ip: input.ip ?? null, userAgent: input.userAgent ?? null } });
