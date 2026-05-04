@@ -131,14 +131,26 @@ export async function executeBuybackProgram(input: { programId: string; actorUse
 
 export async function cancelBuybackProgram(input: { programId: string; actorUserId: string; actorRoles?: string[]; ip?: string; userAgent?: string | null }) {
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    await tx.$queryRaw`SELECT id FROM "ProjectBuybackProgram" WHERE id = ${input.programId} FOR UPDATE`;
     const program = await tx.projectBuybackProgram.findUnique({ where: { id: input.programId }, include: { company: true } });
     if (!program) throw new HttpError(404, 'Programa não encontrado.');
     const isOwner = program.company.founderUserId === input.actorUserId;
     if (!isOwner && !hasAdminRole(input.actorRoles ?? [])) throw new HttpError(403, 'Sem permissão.');
     if (program.status !== 'ACTIVE') throw new HttpError(400, 'Apenas ACTIVE pode cancelar.');
-    if (program.remainingRpc.gt(0)) await tx.companyRevenueAccount.update({ where: { companyId: program.companyId }, data: { balance: { increment: program.remainingRpc } } });
-    const updated = await tx.projectBuybackProgram.update({ where: { id: program.id }, data: { status: 'CANCELED', canceledAt: new Date(), remainingRpc: ZERO } });
-    await tx.adminLog.create({ data: { userId: input.actorUserId, action: 'PROJECT_BUYBACK_CANCEL', entity: 'ProjectBuybackProgram', reason: 'Cancelado pelo ator autorizado', current: JSON.stringify({ programId: program.id }), ip: input.ip ?? null, userAgent: input.userAgent ?? null } });
+
+    const remainingBeforeCancel = program.remainingRpc;
+    const canceled = await tx.projectBuybackProgram.updateMany({
+      where: { id: program.id, status: 'ACTIVE', remainingRpc: remainingBeforeCancel },
+      data: { status: 'CANCELED', canceledAt: new Date(), remainingRpc: ZERO },
+    });
+    if (canceled.count !== 1) throw new HttpError(409, 'Conflito de concorrência ao cancelar programa.');
+
+    if (remainingBeforeCancel.gt(0)) {
+      await tx.companyRevenueAccount.update({ where: { companyId: program.companyId }, data: { balance: { increment: remainingBeforeCancel } } });
+    }
+
+    const updated = await tx.projectBuybackProgram.findUniqueOrThrow({ where: { id: program.id } });
+    await tx.adminLog.create({ data: { userId: input.actorUserId, action: 'PROJECT_BUYBACK_CANCEL', entity: 'ProjectBuybackProgram', reason: 'Cancelado pelo ator autorizado', current: JSON.stringify({ programId: program.id, refundedRpc: String(remainingBeforeCancel) }), ip: input.ip ?? null, userAgent: input.userAgent ?? null } });
     return updated;
   });
 }
