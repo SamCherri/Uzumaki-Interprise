@@ -287,3 +287,9 @@ Em caso de conflito:
 - Cancelamento devolve saldo não utilizado para `CompanyRevenueAccount`.
 - Política avançada da reserva permanece para PR 6.
 
+
+## Atualização 2026-05-04 — PR 6 reserva institucional de tokens recomprados
+- Implementada política formal da reserva institucional com `HOLD_LOCKED` como padrão e flags de bloqueio para uso futuro governado.
+- Implementadas consultas read-only por fundador e por perfis de auditoria (`SUPER_ADMIN`, `COIN_CHIEF_ADMIN`, `AUDITOR`) com histórico de entradas e custo médio.
+- Implementada auditoria read-only de inconsistências da reserva (somatórios, vínculos com execução/programa e validações de integridade).
+- Não implementado nesta PR: queima, distribuição, reoferta controlada e venda/transferência de tokens reservados.

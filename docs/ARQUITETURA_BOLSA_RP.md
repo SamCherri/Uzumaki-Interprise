@@ -244,3 +244,9 @@ Objetivo da fase de PWA:
 - Cada execução gera `Trade`, `ProjectBuybackExecution` e entrada em `ProjectTokenReserveEntry`.
 - Reserva mínima de tokens recomprados registrada em `ProjectTokenReserve` (política avançada deixada para PR 6).
 
+
+## Atualização 2026-05-04 — Reserva institucional de tokens recomprados (PR 6)
+- A reserva institucional de recompra foi formalizada com política `HOLD_LOCKED` e bloqueio padrão (`locked = true`).
+- Consulta por projeto exibe quantidade reservada, custo total em RPC, custo médio e histórico de entradas por execução/programa.
+- Perfis administrativos de auditoria possuem visão read-only consolidada com alertas de inconsistência.
+- Sem endpoints de burn, sell, distribute, transfer ou reoffer nesta etapa.

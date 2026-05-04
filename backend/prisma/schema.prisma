@@ -58,6 +58,13 @@ enum CompanyBoostSource {
   ADMIN_ADJUSTMENT
 }
 
+enum ProjectTokenReservePolicy {
+  HOLD_LOCKED
+  BURN_FUTURE
+  EVENT_REWARD_FUTURE
+  CONTROLLED_REOFFER_FUTURE
+}
+
 enum MarketOrderType {
   BUY
   SELL
@@ -698,6 +705,10 @@ model ProjectTokenReserve {
   companyId    String   @unique
   shares       Int      @default(0)
   totalCostRpc Decimal  @default(0) @db.Decimal(18, 2)
+  policy       ProjectTokenReservePolicy @default(HOLD_LOCKED)
+  locked       Boolean  @default(true)
+  notes        String?
+  lastAuditAt  DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   company      Company  @relation(fields: [companyId], references: [id])

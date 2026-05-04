@@ -270,3 +270,10 @@ Fonte oficial: `docs/ROADMAP_PRIORITARIO.md`.
 - Tokens recomprados vão para `ProjectTokenReserve`, não para carteira pessoal do fundador.
 
 - Nesta PR 5, execução de recompra institucional está configurada como **isenta de taxa de trade** (buyFee/sellFee = 0), com política de taxas podendo evoluir em PR futuro auditado.
+
+## Atualização 2026-05-04 — PR 6 política da reserva de recompra
+- Tokens recomprados permanecem em `ProjectTokenReserve` institucional e não são creditados em `CompanyHolding` pessoal do fundador.
+- Política padrão da reserva definida como `HOLD_LOCKED`, com tokens bloqueados para uso futuro governado.
+- Entradas da reserva continuam vinculadas a `ProjectBuybackProgram` e `ProjectBuybackExecution`.
+- Sem queima, distribuição, reoferta, criação de ordem, criação de trade adicional ou alteração de supply/preço fora da execução real de recompra.
+- Auditoria read-only adicionada para monitorar inconsistências de reserva sem autocorreção.
