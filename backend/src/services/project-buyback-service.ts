@@ -54,7 +54,10 @@ export async function executeBuybackProgram(input: { programId: string; actorUse
     const isOwner = loaded.company.founderUserId === input.actorUserId;
     if (!isOwner && !hasAdminRole(input.actorRoles ?? [])) throw new HttpError(403, 'Sem permissão.');
 
-    const program = await expireProgramIfNeeded(tx, loaded.id, input.actorUserId);
+    await tx.$queryRaw`SELECT id FROM "ProjectBuybackProgram" WHERE id = ${input.programId} FOR UPDATE`;
+    const lockedProgram = await tx.projectBuybackProgram.findUnique({ where: { id: input.programId } });
+    if (!lockedProgram) throw new HttpError(404, 'Programa não encontrado.');
+    const program = await expireProgramIfNeeded(tx, lockedProgram.id, input.actorUserId);
     if (program.status === 'EXPIRED') throw new HttpError(400, 'Programa expirado.');
     if (program.status !== 'ACTIVE') throw new HttpError(400, 'Programa não está ativo.');
 
@@ -67,30 +70,47 @@ export async function executeBuybackProgram(input: { programId: string; actorUse
 
     for (const order of sellOrders) {
       if (remainingRpc.lte(0) || purchasedShares >= program.targetShares) break;
-      if (input.actorUserId === order.userId) continue;
-      const maxByBudget = Number(remainingRpc.div(order.limitPrice!).floor());
-      const maxByTarget = program.targetShares - purchasedShares;
-      const qty = Math.min(order.remainingQuantity, maxByBudget, maxByTarget);
-      if (qty <= 0) continue;
-      const gross = order.limitPrice!.mul(qty).toDecimalPlaces(2);
 
-      const sellerWallet = await tx.wallet.findUniqueOrThrow({ where: { userId: order.userId } });
+      await tx.$queryRaw`SELECT id FROM "MarketOrder" WHERE id = ${order.id} FOR UPDATE`;
+      const freshOrder = await tx.marketOrder.findUnique({ where: { id: order.id } });
+      if (!freshOrder) continue;
+      if (!['OPEN', 'PARTIALLY_FILLED'].includes(freshOrder.status)) continue;
+      if (freshOrder.remainingQuantity <= 0) continue;
+      if (!freshOrder.limitPrice || freshOrder.limitPrice.gt(program.maxPricePerShare)) continue;
+      if ([loaded.company.founderUserId, input.actorUserId].includes(freshOrder.userId)) continue;
+
+      const maxByBudget = Number(remainingRpc.div(freshOrder.limitPrice).floor());
+      const maxByTarget = program.targetShares - purchasedShares;
+      const qty = Math.min(freshOrder.remainingQuantity, maxByBudget, maxByTarget);
+      if (qty <= 0) continue;
+      if (freshOrder.lockedShares < qty) continue;
+
+      const gross = freshOrder.limitPrice.mul(qty).toDecimalPlaces(2);
+      const nextStatus = freshOrder.remainingQuantity === qty ? 'FILLED' : 'PARTIALLY_FILLED';
+
+      const orderUpdate = await tx.marketOrder.updateMany({
+        where: { id: freshOrder.id, remainingQuantity: { gte: qty }, lockedShares: { gte: qty }, status: { in: ['OPEN', 'PARTIALLY_FILLED'] } },
+        data: { remainingQuantity: { decrement: qty }, lockedShares: { decrement: qty }, status: nextStatus, executedAt: nextStatus === 'FILLED' ? new Date() : null },
+      });
+      if (orderUpdate.count !== 1) continue;
+
+      const sellerWallet = await tx.wallet.findUniqueOrThrow({ where: { userId: freshOrder.userId } });
       await tx.wallet.update({ where: { id: sellerWallet.id }, data: { rpcAvailableBalance: { increment: gross } } });
       await tx.transaction.create({ data: { walletId: sellerWallet.id, type: 'PROJECT_BUYBACK_SELL_CREDIT', amount: gross, description: `Venda para recompra institucional ${loaded.company.ticker}` } });
 
-      if (input.actorUserId === order.userId) throw new HttpError(400, 'Self-trade bloqueado.');
-      const trade = await tx.trade.create({ data: { companyId: program.companyId, buyerId: input.actorUserId, sellerId: order.userId, buyOrderId: null, sellOrderId: order.id, quantity: qty, unitPrice: order.limitPrice!, grossAmount: gross, buyFeeAmount: ZERO, sellFeeAmount: ZERO } });
-      const marketCap = order.limitPrice!.mul(loaded.company.circulatingShares).toDecimalPlaces(8);
-      await tx.company.update({ where: { id: program.companyId }, data: { currentPrice: order.limitPrice!, fictitiousMarketCap: marketCap } });
-      await tx.marketOrder.update({ where: { id: order.id }, data: { remainingQuantity: { decrement: qty }, lockedShares: { decrement: qty }, status: order.remainingQuantity === qty ? 'FILLED' : 'PARTIALLY_FILLED', executedAt: order.remainingQuantity === qty ? new Date() : null } });
+      if (input.actorUserId === freshOrder.userId) throw new HttpError(400, 'Self-trade bloqueado.');
+      const trade = await tx.trade.create({ data: { companyId: program.companyId, buyerId: input.actorUserId, sellerId: freshOrder.userId, buyOrderId: null, sellOrderId: freshOrder.id, quantity: qty, unitPrice: freshOrder.limitPrice, grossAmount: gross, buyFeeAmount: ZERO, sellFeeAmount: ZERO } });
+      const marketCap = freshOrder.limitPrice.mul(loaded.company.circulatingShares).toDecimalPlaces(8);
+      await tx.company.update({ where: { id: program.companyId }, data: { currentPrice: freshOrder.limitPrice, fictitiousMarketCap: marketCap } });
 
       await tx.projectTokenReserve.upsert({ where: { companyId: program.companyId }, create: { companyId: program.companyId, shares: qty, totalCostRpc: gross }, update: { shares: { increment: qty }, totalCostRpc: { increment: gross } } });
-      const exec = await tx.projectBuybackExecution.create({ data: { programId: program.id, companyId: program.companyId, sellerUserId: order.userId, tradeId: trade.id, quantity: qty, unitPrice: order.limitPrice!, grossAmountRpc: gross, totalAmountRpc: gross } });
-      await tx.projectTokenReserveEntry.create({ data: { companyId: program.companyId, programId: program.id, executionId: exec.id, type: 'BUYBACK_IN', shares: qty, unitPrice: order.limitPrice!, totalCostRpc: gross, reason: `Recompra programa ${program.id}` } });
-      await tx.companyOperation.create({ data: { companyId: program.companyId, userId: input.actorUserId, type: 'PROJECT_BUYBACK_EXECUTION', quantity: qty, unitPrice: order.limitPrice!, grossAmount: gross, feeAmount: ZERO, totalAmount: gross, description: `Execução de recompra institucional (${program.id})` } });
+      const exec = await tx.projectBuybackExecution.create({ data: { programId: program.id, companyId: program.companyId, sellerUserId: freshOrder.userId, tradeId: trade.id, quantity: qty, unitPrice: freshOrder.limitPrice, grossAmountRpc: gross, totalAmountRpc: gross } });
+      await tx.projectTokenReserveEntry.create({ data: { companyId: program.companyId, programId: program.id, executionId: exec.id, type: 'BUYBACK_IN', shares: qty, unitPrice: freshOrder.limitPrice, totalCostRpc: gross, reason: `Recompra programa ${program.id}` } });
+      await tx.companyOperation.create({ data: { companyId: program.companyId, userId: input.actorUserId, type: 'PROJECT_BUYBACK_EXECUTION', quantity: qty, unitPrice: freshOrder.limitPrice, grossAmount: gross, feeAmount: ZERO, totalAmount: gross, description: `Execução de recompra institucional (${program.id})` } });
 
       remainingRpc = remainingRpc.sub(gross).toDecimalPlaces(2);
       spentRpc = spentRpc.add(gross).toDecimalPlaces(2);
+      if (spentRpc.gt(program.budgetRpc)) throw new HttpError(400, 'Inconsistência: spentRpc acima do orçamento.');
       purchasedShares += qty;
       executed++;
     }
