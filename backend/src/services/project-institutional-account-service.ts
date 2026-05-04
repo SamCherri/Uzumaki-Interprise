@@ -1,11 +1,11 @@
-import { Prisma } from '@prisma/client';
+import { CompanyCapitalFlowSource, CompanyCapitalFlowType, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../lib/prisma.js';
 import { ensureCompanyRevenueAccount } from './fee-distribution-service.js';
-import { HttpError } from './project-capital-flow-service.js';
+import { HttpError } from '../lib/http-error.js';
 
-const ALLOWED_TYPES = new Set(['OWNER_RPC_CONTRIBUTION', 'ADMIN_RPC_ADJUSTMENT', 'PROJECT_REVENUE_IN', 'PROJECT_REVENUE_OUT']);
-const ALLOWED_SOURCES = new Set(['OWNER_WALLET', 'ADMIN_ADJUSTMENT', 'MARKET_FEE', 'MANUAL_CORRECTION']);
+const ALLOWED_TYPES = new Set<CompanyCapitalFlowType>(['OWNER_RPC_CONTRIBUTION', 'ADMIN_RPC_ADJUSTMENT', 'PROJECT_REVENUE_IN', 'PROJECT_REVENUE_OUT']);
+const ALLOWED_SOURCES = new Set<CompanyCapitalFlowSource>(['OWNER_WALLET', 'ADMIN_ADJUSTMENT', 'MARKET_FEE', 'MANUAL_CORRECTION']);
 
 export async function getProjectInstitutionalAccountSummary(companyId: string) {
   const company = await prisma.company.findUnique({
@@ -43,7 +43,7 @@ export async function getProjectInstitutionalAccountSummary(companyId: string) {
 
 export async function recordProjectInstitutionalEntry(
   tx: Prisma.TransactionClient,
-  input: { companyId: string; actorUserId: string; amountRpc: Decimal; reason: string; type: string; source: string; previousWalletRpcBalance?: Decimal; newWalletRpcBalance?: Decimal; metadata?: string | null },
+  input: { companyId: string; actorUserId: string; amountRpc: Decimal; reason: string; type: CompanyCapitalFlowType; source: CompanyCapitalFlowSource; previousWalletRpcBalance?: Decimal; newWalletRpcBalance?: Decimal; metadata?: string | null },
 ) {
   if (input.amountRpc.lte(0)) throw new HttpError(400, 'amountRpc deve ser maior que zero.');
   if (!input.reason.trim()) throw new HttpError(400, 'reason é obrigatório.');
@@ -61,8 +61,8 @@ export async function recordProjectInstitutionalEntry(
     data: {
       companyId: input.companyId,
       actorUserId: input.actorUserId,
-      type: input.type as any,
-      source: input.source as any,
+      type: input.type,
+      source: input.source,
       amountRpc: input.amountRpc,
       previousProjectBalance,
       newProjectBalance: revenueAfter.balance,

@@ -1,7 +1,8 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { contributeRpcToProject, HttpError } from '../services/project-capital-flow-service.js';
+import { contributeRpcToProject } from '../services/project-capital-flow-service.js';
+import { HttpError } from '../lib/http-error.js';
 import { getProjectInstitutionalAccountSummary } from '../services/project-institutional-account-service.js';
 
 type AuthRequest = FastifyRequest & { user: { sub: string; roles?: string[] } };

@@ -2,8 +2,7 @@ import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../lib/prisma.js';
 import { recordProjectInstitutionalEntry } from './project-institutional-account-service.js';
-
-export class HttpError extends Error { constructor(public statusCode: number, message: string) { super(message); } }
+import { HttpError } from '../lib/http-error.js';
 
 export async function contributeRpcToProject(input: { companyId: string; actorUserId: string; amountRpc: number; reason: string; ip?: string; userAgent?: string | null }) {
   const reason = input.reason.trim();
