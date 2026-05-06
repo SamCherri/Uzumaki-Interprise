@@ -6,7 +6,7 @@ type ActionButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'primary' | 'secondary' | 'success' | 'danger';
 };
 
-export function ActionButton({ loading = false, loadingText = 'Processando...', disabled, children, className, variant = 'primary', ...rest }: ActionButtonProps) {
+export function ActionButton({ loading = false, loadingText = 'Processando...', disabled, children, className, variant = 'primary', type = 'button', ...rest }: ActionButtonProps) {
   const variantClass =
     variant === 'primary' ? 'button-primary' :
     variant === 'secondary' ? 'button-secondary' :
@@ -15,6 +15,7 @@ export function ActionButton({ loading = false, loadingText = 'Processando...', 
   return (
     <button
       {...rest}
+      type={type}
       className={`${variantClass}${className ? ` ${className}` : ''}`}
       disabled={loading || disabled}
       aria-busy={loading}
