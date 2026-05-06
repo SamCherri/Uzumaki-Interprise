@@ -323,3 +323,11 @@ Fonte oficial: `docs/ROADMAP_PRIORITARIO.md`.
 - Sem impacto econômico: não altera saldo, preço, Trade, MarketOrder, CompanyHolding ou taxa 50/50.
 - Sem backend e sem migration nesta etapa.
 - Avisos econômicos e de simulação RP preservados nos fluxos existentes.
+
+
+## 20) Diretriz de arquitetura visual frontend (2026-05-06)
+
+- A interface atual não deve ser considerada estado final de UX/UI.
+- O visual premium inicial já existe, porém ainda demanda repaginação estrutural mobile-first por tela.
+- Risco atual registrado: PRs visuais superficiais (componente sem uso real, CSS sem substituição de layout, navegação parcial por perfil e duplicação visual).
+- Mitigação oficial: toda PR visual deve seguir `docs/FRONTEND_VISION.md` com checklist obrigatório e validação de navegação por perfil.
