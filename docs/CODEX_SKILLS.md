@@ -71,6 +71,10 @@ Use esta skill para:
 - Textos em português.
 - Visual consistente com RPC Exchange.
 - Não copiar marca de terceiros.
+- Seguir `docs/FRONTEND_VISION.md` em repaginação visual.
+- Não fazer PR visual apenas com tokens/classes sem aplicação real.
+- Aplicar componentes em telas reais e remover duplicações visuais.
+- Validar navegação por perfil (usuário normal, admin e test mode restrito).
 
 ## Proibido
 

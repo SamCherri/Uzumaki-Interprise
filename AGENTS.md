@@ -85,6 +85,7 @@ Antes de tarefas de produto, economia, mercado, RPC, projeto/token, simulador, a
 3. docs/ROADMAP_PRIORITARIO.md
 4. docs/ARQUITETURA_BOLSA_RP.md
 5. docs/AUDITORIA_ATUAL.md
+6. docs/FRONTEND_VISION.md (obrigatório para repaginação visual/frontend estrutural)
 
 Regras adicionais:
 - Se houver conflito entre documentação antiga e ROADMAP_PRIORITARIO.md, seguir ROADMAP_PRIORITARIO.md.

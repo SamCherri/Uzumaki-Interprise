@@ -319,3 +319,27 @@ Limitações e pendências:
 - Componentes visuais reutilizáveis criados: `PageShell`, `PremiumCard`, `SectionHeader`, `StatusBadge`, `EmptyState`, `LoadingState` e `InfoCallout`, além da evolução de `MetricCard`.
 - Objetivo: consistência visual premium inicial, manutenção de mobile-first e reaproveitamento sem alterar lógica econômica.
 - Limites desta PR: sem refactor econômico, sem backend/migration, sem gráfico premium avançado e sem livro de ordens premium completo.
+
+
+## Arquitetura frontend mobile-first
+
+Diretriz oficial de repaginação visual:
+- Basear telas no `AppShell` com `MobileTopbar` + `BottomNav` + `SideDrawer`.
+- Usar `BottomSheet` para ações contextuais (compra/venda, confirmação e preview) no mobile.
+- Priorizar `BrandLogo` em HTML/CSS (incluindo monograma RPC) em vez de imagens visuais ruins nas áreas principais.
+
+Hierarquia recomendada por página:
+1. Topbar/hero compacto;
+2. métricas principais;
+3. ação principal;
+4. dados secundários (gráfico/livro/listas/histórico);
+5. ações administrativas/contextuais no drawer ou sheet.
+
+Navegação por perfil deve manter:
+- usuário normal: Início, Mercados, Carteira, RPC/R$, Menu;
+- usuário restrito Test Mode: Teste, Ranking, Bug, Menu;
+- drawer por seções: Principal, Simulador, Projetos, Administração e Conta.
+
+Regra de qualidade:
+- evitar PR visual superficial (CSS isolado, componente sem uso real, botão/aba sem conteúdo funcional);
+- sempre substituir/organizar layout antigo quando a tarefa pedir repaginação estrutural.
