@@ -261,6 +261,8 @@ Objetivo da fase de PWA:
 
 ## Atualização 2026-05-06 — Política da RPC (PR 8)
 - Implementado serviço administrativo read-only para consolidar circulação da RPC com fontes econômicas reais do banco.
-- Cálculo inclui: wallets (available/locked/pending), tesouraria, corretoras, PlatformAccount, CompanyRevenueAccount e orçamento ativo reservado em recompra.
+- Cálculo inclui: wallets RPC reais (rpcAvailable/rpcLocked), tesouraria, corretoras, PlatformAccount, CompanyRevenueAccount e orçamento ativo reservado em recompra.
 - Cálculo exclui acumuladores históricos (ex.: BrokerAccount.receivedTotal) para evitar dupla contagem.
 - Auditoria econômica read-only reporta inconsistências sem autocorreção automática.
+
+- Saques atuais de WithdrawalRequest são tratados como fluxo fiat/R$ fictício (`fiatWithdrawn`) e não reduzem supply RPC real.

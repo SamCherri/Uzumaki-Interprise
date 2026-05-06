@@ -1,7 +1,6 @@
 import { prisma } from '../lib/prisma.js';
 
 const READ_ROLES = ['SUPER_ADMIN', 'COIN_CHIEF_ADMIN', 'AUDITOR', 'ADMIN'];
-
 const toNum = (v: unknown) => Number(v ?? 0);
 
 export function assertRpcPolicyReadAccess(actorRoles: string[]) {
@@ -14,9 +13,9 @@ export function assertRpcPolicyReadAccess(actorRoles: string[]) {
 
 export async function calculateRpcSupplySnapshot() {
   const [wallets, treasury, brokers, platformAccounts, revenueAccounts, buybackPrograms, withdrawals, issuances, transfers] = await Promise.all([
-    prisma.wallet.findMany({ select: { id: true, userId: true, rpcAvailableBalance: true, rpcLockedBalance: true, pendingWithdrawalBalance: true } }),
+    prisma.wallet.findMany({ select: { id: true, userId: true, rpcAvailableBalance: true, rpcLockedBalance: true } }),
     prisma.treasuryAccount.findMany({ select: { id: true, balance: true } }),
-    prisma.brokerAccount.findMany({ select: { id: true, userId: true, available: true, receivedTotal: true } }),
+    prisma.brokerAccount.findMany({ select: { id: true, userId: true, available: true } }),
     prisma.platformAccount.findMany({ select: { id: true, balance: true } }),
     prisma.companyRevenueAccount.findMany({ select: { id: true, companyId: true, balance: true } }),
     prisma.projectBuybackProgram.findMany({ where: { status: 'ACTIVE' }, select: { id: true, companyId: true, remainingRpc: true } }),
@@ -27,14 +26,14 @@ export async function calculateRpcSupplySnapshot() {
 
   const availableRpc = wallets.reduce((acc, w) => acc + toNum(w.rpcAvailableBalance), 0);
   const lockedRpc = wallets.reduce((acc, w) => acc + toNum(w.rpcLockedBalance), 0);
-  const pendingWithdrawalRpc = wallets.reduce((acc, w) => acc + toNum(w.pendingWithdrawalBalance), 0);
+  const pendingWithdrawalRpc = 0;
   const treasuryRpc = treasury.reduce((acc, t) => acc + toNum(t.balance), 0);
   const brokerRpc = brokers.reduce((acc, b) => acc + toNum(b.available), 0);
   const platformRpc = platformAccounts.reduce((acc, p) => acc + toNum(p.balance), 0);
   const companyRevenueRpc = revenueAccounts.reduce((acc, r) => acc + toNum(r.balance), 0);
   const buybackReservedRpc = buybackPrograms.reduce((acc, b) => acc + toNum(b.remainingRpc), 0);
 
-  const userWalletRpc = availableRpc + lockedRpc + pendingWithdrawalRpc;
+  const userWalletRpc = availableRpc + lockedRpc;
   const circulatingRpc = userWalletRpc + treasuryRpc + brokerRpc + platformRpc + companyRevenueRpc + buybackReservedRpc;
 
   return {
@@ -49,7 +48,8 @@ export async function calculateRpcSupplySnapshot() {
     buybackReservedRpc,
     circulatingRpc,
     totalIssued: toNum(issuances._sum.amount),
-    totalWithdrawn: toNum(withdrawals._sum.amount),
+    totalWithdrawn: 0,
+    fiatWithdrawn: toNum(withdrawals._sum.amount),
     totalBurned: 0,
     lastTransfers: transfers,
   };
@@ -72,7 +72,7 @@ export async function auditRpcSupplyConsistency() {
   for (const w of wallets) {
     if (toNum(w.rpcAvailableBalance) < 0) issues.push({ code: 'NEGATIVE_WALLET_RPC_AVAILABLE', severity: 'CRITICAL', entity: 'Wallet', entityId: w.id, message: 'rpcAvailableBalance negativo.' });
     if (toNum(w.rpcLockedBalance) < 0) issues.push({ code: 'NEGATIVE_WALLET_RPC_LOCKED', severity: 'CRITICAL', entity: 'Wallet', entityId: w.id, message: 'rpcLockedBalance negativo.' });
-    if (toNum(w.pendingWithdrawalBalance) < 0) issues.push({ code: 'NEGATIVE_WALLET_RPC_PENDING', severity: 'CRITICAL', entity: 'Wallet', entityId: w.id, message: 'pendingWithdrawalBalance negativo.' });
+    if (toNum(w.pendingWithdrawalBalance) < 0) issues.push({ code: 'LEGACY_PENDING_WITHDRAWAL_BALANCE_REVIEW', severity: 'WARNING', entity: 'Wallet', entityId: w.id, message: 'pendingWithdrawalBalance legado negativo (não entra no supply RPC).' });
   }
   for (const t of treasury) if (toNum(t.balance) < 0) issues.push({ code: 'NEGATIVE_TREASURY_BALANCE', severity: 'CRITICAL', entity: 'TreasuryAccount', entityId: t.id, message: 'Saldo da tesouraria negativo.' });
   for (const b of brokers) if (toNum(b.available) < 0) issues.push({ code: 'NEGATIVE_BROKER_BALANCE', severity: 'CRITICAL', entity: 'BrokerAccount', entityId: b.id, message: 'Saldo do corretor negativo.' });

@@ -291,6 +291,8 @@ Fonte oficial: `docs/ROADMAP_PRIORITARIO.md`.
 
 ## Atualização 2026-05-06 — PR 8 Política de supply da RPC
 - RPC reafirmada como moeda fictícia interna (sem dinheiro real, Pix, cartão, gateway, blockchain ou saque real).
-- Adicionado resumo read-only de supply/circulação com rastreio de carteiras, tesouraria, corretoras, conta da exchange, caixa institucional e reserva ativa de recompra.
+- Adicionado resumo read-only de supply/circulação com rastreio de rpcAvailable/rpcLocked das carteiras, tesouraria, corretoras, conta da exchange, caixa institucional e reserva ativa de recompra.
 - Auditoria read-only adicionada para detectar inconsistências de supply/circulação e metadados obrigatórios de emissão/transferência.
 - Test Mode permanece isolado e não entra no cálculo da RPC real.
+
+- Saques atuais de WithdrawalRequest são tratados como fluxo fiat/R$ fictício (`fiatWithdrawn`) e não reduzem supply RPC real.
