@@ -14,6 +14,7 @@ import { TestModeRankingPage } from './pages/TestModeRankingPage';
 import { TestModeReportPage } from './pages/TestModeReportPage';
 import { api, getCurrentUser, CurrentUserResponse } from './services/api';
 import { SideDrawer, SideDrawerItem } from './components/SideDrawer';
+import { BrandLogo } from './components/BrandLogo';
 
 type PublicTab = 'login' | 'register';
 type PrivateScreen = 'home' | 'markets' | 'wallet' | 'rpc-market' | 'withdrawals' | 'company-request' | 'admin' | 'broker' | 'my-projects' | 'test-mode' | 'test-ranking' | 'test-report';
@@ -262,13 +263,7 @@ export function App() {
       <main className="container auth-shell app-shell">
         <section className="card public-entry-card auth-card premium-panel">
           <header className="public-entry-header page-hero-compact">
-            <div className="auth-logo auth-lockup">
-              <img className="app-logo-sm" src="/assets/rpc_exchange_icon.png" alt="RPC Exchange" />
-              <div>
-                <strong>RPC Exchange</strong>
-                <small>Simulação econômica RP</small>
-              </div>
-            </div>
+            <BrandLogo size="hero" className="auth-logo auth-lockup" />
             <p className="warning compact-callout">Ambiente RP de simulação econômica. Saldos e tokens não possuem valor real.</p>
             <p className="info-text">Sem Pix, cartão, blockchain, cripto real ou promessa de lucro.</p>
           </header>
@@ -328,12 +323,8 @@ export function App() {
             <span className="back-placeholder desktop-only" />
           )}
           <button className="hamburger-button mobile-only" type="button" aria-label="Abrir menu" onClick={() => setIsGlobalDrawerOpen(true)}>☰</button>
-          <div className="mobile-topbar-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <img src="/assets/rpc_exchange_icon.png" alt="RPC" style={{ width: '42px', height: '42px' }} />
-            <div style={{ textAlign: 'left' }}>
-              <span className="mobile-topbar-badge">Simulação RP</span>
-              <img src="/assets/logo-full.png" alt="RPC Exchange" style={{ height: '24px', width: 'auto', display: 'block' }} />
-            </div>
+          <div className="mobile-topbar-title">
+            <BrandLogo size="sm" subtitle={false} />
           </div>
           <button className="button-danger small-button desktop-only" onClick={handleLogout}>
             Sair
@@ -368,9 +359,7 @@ export function App() {
           <section className="mobile-home-summary mobile-only">
             <div className="mobile-hero-card">
               <span className="mobile-hero-kicker">Painel principal</span>
-              <div style={{ marginBottom: '10px' }}>
-                <img src="/assets/logo-full.png" alt="RPC Exchange" style={{ maxWidth: '240px', height: 'auto' }} />
-              </div>
+              <div style={{ marginBottom: '10px' }}><BrandLogo size="md" /></div>
               <p>Negocie tokens, acompanhe sua carteira e acesse seus painéis pelo menu.</p>
             </div>
 
