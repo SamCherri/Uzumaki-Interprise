@@ -69,7 +69,7 @@ export function SideDrawer({ title, subtitle, open, onClose, items }: SideDrawer
                 onClose();
               }}
             >
-              {item.icon ? <span aria-hidden="true">{item.icon}</span> : null}
+              {item.icon ? <span className="nav-icon-badge" aria-hidden="true">{item.icon}</span> : null}
               <span>{item.label}</span>
             </button>
           ))}
@@ -84,7 +84,7 @@ export function SideDrawer({ title, subtitle, open, onClose, items }: SideDrawer
                 onClose();
               }}
             >
-              {item.icon ? <span aria-hidden="true">{item.icon}</span> : null}
+              {item.icon ? <span className="nav-icon-badge" aria-hidden="true">{item.icon}</span> : null}
               <span>{item.label}</span>
             </button>
           ))}
@@ -99,7 +99,7 @@ export function SideDrawer({ title, subtitle, open, onClose, items }: SideDrawer
                 onClose();
               }}
             >
-              {item.icon ? <span aria-hidden="true">{item.icon}</span> : null}
+              {item.icon ? <span className="nav-icon-badge" aria-hidden="true">{item.icon}</span> : null}
               <span>{item.label}</span>
             </button>
           ))}

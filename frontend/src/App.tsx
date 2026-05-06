@@ -262,21 +262,18 @@ export function App() {
       <main className="container auth-shell app-shell">
         <section className="card public-entry-card auth-card premium-panel">
           <header className="public-entry-header page-hero-compact">
-            <div className="auth-logo">
-              <img className="app-logo app-logo-hero" src="/assets/logo-full.png" alt="RPC Exchange" />
+            <div className="auth-logo auth-lockup">
+              <img className="app-logo-sm" src="/assets/rpc_exchange_icon.png" alt="RPC Exchange" />
+              <div>
+                <strong>RPC Exchange</strong>
+                <small>Simulação econômica RP</small>
+              </div>
             </div>
             <p className="warning compact-callout">Ambiente RP de simulação econômica. Saldos e tokens não possuem valor real.</p>
             <p className="info-text">Sem Pix, cartão, blockchain, cripto real ou promessa de lucro.</p>
           </header>
 
-          <article className="card install-card nested-card glass-panel">
-            <h3>📲 Instalar aplicativo</h3>
-            <p className="info-text">Use a RPC Exchange como app no celular.</p>
-            <button className="button-primary" onClick={handleInstallClick} type="button">
-              Instalar aplicativo
-            </button>
-            {installHint && <p className="info-text">{installHint}</p>}
-          </article>
+          
 
           <div className="benefits-grid nested-card">
             <span>🪙 Crie e negocie tokens</span>
@@ -305,7 +302,16 @@ export function App() {
           ) : (
             <RegisterPage onSwitchLogin={() => setPublicTab('login')} />
           )}
-        </section>
+        
+
+          <article className="card install-card nested-card glass-panel">
+            <h3>📲 Instalar aplicativo</h3>
+            <p className="info-text">Use a RPC Exchange como app no celular.</p>
+            <button className="button-primary" onClick={handleInstallClick} type="button">
+              Instalar aplicativo
+            </button>
+            {installHint && <p className="info-text">{installHint}</p>}
+          </article></section>
       </main>
     );
   }

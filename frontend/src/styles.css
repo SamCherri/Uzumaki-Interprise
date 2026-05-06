@@ -944,3 +944,22 @@ body { background: radial-gradient(circle at top, #111c34 0%, var(--bg-app) 55%)
   .card { padding: 12px; }
   .market-stats-row { grid-template-columns: repeat(2, minmax(0,1fr)); }
 }
+.auth-lockup { display:flex; align-items:center; gap:10px; justify-content:center; max-width:220px; margin:0 auto; }
+.auth-lockup strong { display:block; font-size:1.05rem; letter-spacing:.01em; }
+.auth-lockup small { display:block; color:var(--text-muted); font-size:.75rem; }
+.auth-lockup .app-logo-sm { width:40px; height:40px; border-radius:10px; background:#0b1426; padding:4px; }
+.public-entry-card .install-card { padding:10px; }
+.public-entry-card .benefits-grid { grid-template-columns: repeat(2,minmax(0,1fr)); font-size:.82rem; gap:4px; }
+.auth-panel form { display:grid; gap:8px; }
+.auth-panel input, .auth-panel button { min-height:42px; }
+.nav-icon-badge { width:22px; height:22px; border-radius:7px; display:inline-flex; align-items:center; justify-content:center; font-size:.62rem; font-weight:700; background:rgba(59,130,246,.2); border:1px solid rgba(59,130,246,.35); color:#dbeafe; }
+.side-drawer-item { min-height:36px; padding:7px 10px; }
+.testmode-shell { display:grid; gap:10px; }
+.testmode-hero { padding:12px; display:grid; gap:8px; }
+.testmode-hero-top { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+@media (max-width: 640px){
+  .public-entry-card { padding:12px; }
+  .public-entry-card .install-card { order: 5; }
+  .public-entry-card .benefits-grid { display:none; }
+  .auth-lockup { max-width:190px; }
+}
