@@ -235,7 +235,7 @@ export function App() {
   const globalDrawerItems = useMemo<SideDrawerItem[]>(() => {
     const items: SideDrawerItem[] = [
       ...(shouldShowTestModeEntry ? [
-        { key: 'test-mode', label: 'Modo Teste', icon: 'TM', active: screen === 'test-mode', onClick: () => setScreen('test-mode'), section: 'simulator' } as SideDrawerItem,
+        { key: 'test-mode', label: 'Modo Teste', icon: '🧪', active: screen === 'test-mode', onClick: () => setScreen('test-mode'), section: 'simulator' } as SideDrawerItem,
         { key: 'test-ranking', label: 'Ranking Teste', icon: '🏆', active: screen === 'test-ranking', onClick: () => setScreen('test-ranking'), section: 'simulator' } as SideDrawerItem,
         { key: 'test-report', label: 'Reportar Bug', icon: '🐞', active: screen === 'test-report', onClick: () => setScreen('test-report'), section: 'simulator' } as SideDrawerItem,
       ] : []),
@@ -312,18 +312,25 @@ export function App() {
     );
   }
 
-  const bottomNavItems = [
-    { key: 'home', label: 'Início', icon: '🏠', active: screen === 'home', onClick: () => setScreen('home') },
-    { key: 'markets', label: 'Mercados', icon: '🪙', active: screen === 'markets', onClick: () => setScreen('markets') },
-    { key: 'wallet', label: 'Carteira', icon: '💼', active: screen === 'wallet', onClick: () => setScreen('wallet') },
-    { key: 'rpc-market', label: 'RPC/R$', icon: '💎', active: screen === 'rpc-market', onClick: () => setScreen('rpc-market') },
-    { key: 'menu', label: 'Menu', icon: '☰', onClick: () => setIsGlobalDrawerOpen(true) },
-  ];
+  const bottomNavItems = isTestModeRestrictedUser
+    ? [
+        { key: 'test-mode', label: 'Teste', icon: '🧪', active: screen === 'test-mode', onClick: () => setScreen('test-mode') },
+        { key: 'test-ranking', label: 'Ranking', icon: '🏆', active: screen === 'test-ranking', onClick: () => setScreen('test-ranking') },
+        { key: 'test-report', label: 'Bug', icon: '🐞', active: screen === 'test-report', onClick: () => setScreen('test-report') },
+        { key: 'menu', label: 'Menu', icon: '☰', onClick: () => setIsGlobalDrawerOpen(true) },
+      ]
+    : [
+        { key: 'home', label: 'Início', icon: '🏠', active: screen === 'home', onClick: () => setScreen('home') },
+        { key: 'markets', label: 'Mercados', icon: '🪙', active: screen === 'markets', onClick: () => setScreen('markets') },
+        { key: 'wallet', label: 'Carteira', icon: '💼', active: screen === 'wallet', onClick: () => setScreen('wallet') },
+        { key: 'rpc-market', label: 'RPC/R$', icon: '💎', active: screen === 'rpc-market', onClick: () => setScreen('rpc-market') },
+        { key: 'menu', label: 'Menu', icon: '☰', onClick: () => setIsGlobalDrawerOpen(true) },
+      ];
 
   return (
     <AppShell
       canGoBack={canGoBack}
-      onBackHome={() => setScreen('home')}
+      onBackHome={() => setScreen(isTestModeRestrictedUser ? 'test-mode' : 'home')}
       onOpenMenu={() => setIsGlobalDrawerOpen(true)}
       onLogout={handleLogout}
       drawerOpen={isGlobalDrawerOpen}
