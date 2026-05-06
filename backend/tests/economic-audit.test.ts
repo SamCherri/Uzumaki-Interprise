@@ -136,3 +136,40 @@ test('detecta alertas de preço e crédito institucional sem origem e mantém fi
   const after = { tx: await prisma.transaction.count(), trades: await prisma.trade.count(), orders: await prisma.marketOrder.count() };
   assert.deepEqual(after, before);
 });
+
+test('não acusa divergência com trade antigo quando INITIAL_OFFER_BUY é evento mais recente', async () => {
+  await resetDb();
+  const adminRole = await mkRole('SUPER_ADMIN');
+  const admin = await mkUser('admin5@ea.test');
+  const founder = await mkUser('founder5@ea.test');
+  await prisma.userRole.create({ data: { userId: admin.id, roleId: adminRole.id } });
+
+  const c = await prisma.company.create({ data: { name: 'PX', ticker: 'PXAA', description: 'd', sector: 's', founderUserId: founder.id, status: 'ACTIVE', totalShares: 100, ownerSharePercent: 50, publicOfferPercent: 50, ownerShares: 50, publicOfferShares: 50, availableOfferShares: 50, initialPrice: 1, currentPrice: 1.5, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 150 } });
+  await prisma.trade.create({ data: { companyId: c.id, buyerId: admin.id, sellerId: founder.id, quantity: 1, unitPrice: 1.2, grossAmount: 1.2, buyFeeAmount: 0, sellFeeAmount: 0 } });
+  await prisma.companyOperation.create({ data: { companyId: c.id, userId: founder.id, type: 'INITIAL_OFFER_BUY', quantity: 1, unitPrice: 1.5, description: 'op recente' } });
+
+  const token = await auth(admin.id, ['SUPER_ADMIN']);
+  const res = await app.inject({ method: 'GET', url: '/api/admin/economic-audit', headers: { authorization: `Bearer ${token}` } });
+  assert.equal(res.statusCode, 200);
+  const codes = res.json().issues.filter((i: { companyId?: string }) => i.companyId === c.id).map((i: { code: string }) => i.code);
+  assert.equal(codes.includes('CURRENT_PRICE_DIVERGES_LAST_TRADE'), false);
+});
+
+test('não acusa COMPANY_REVENUE_BALANCE_MISMATCH em caso legítimo de budget reservado em buyback', async () => {
+  await resetDb();
+  const adminRole = await mkRole('SUPER_ADMIN');
+  const admin = await mkUser('admin6@ea.test');
+  const founder = await mkUser('founder6@ea.test');
+  await prisma.userRole.create({ data: { userId: admin.id, roleId: adminRole.id } });
+
+  const c = await prisma.company.create({ data: { name: 'PY', ticker: 'PYAA', description: 'd', sector: 's', founderUserId: founder.id, status: 'ACTIVE', totalShares: 100, ownerSharePercent: 50, publicOfferPercent: 50, ownerShares: 50, publicOfferShares: 50, availableOfferShares: 50, initialPrice: 1, currentPrice: 1, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 100 } });
+  await prisma.companyRevenueAccount.create({ data: { companyId: c.id, balance: 60, totalReceivedFees: 100, totalWithdrawn: 0, totalUsedForBoost: 0 } });
+  await prisma.feeDistribution.create({ data: { companyId: c.id, sourceType: 'INITIAL_OFFER_BUY', totalFeeAmount: 100, platformAmount: 0, companyAmount: 100, platformSharePercent: 0, companySharePercent: 100 } });
+  await prisma.projectBuybackProgram.create({ data: { companyId: c.id, createdByUserId: admin.id, status: 'ACTIVE', budgetRpc: 40, spentRpc: 0, remainingRpc: 40, maxPricePerShare: 1, targetShares: 10, reason: 'reserve budget' } });
+
+  const token = await auth(admin.id, ['SUPER_ADMIN']);
+  const res = await app.inject({ method: 'GET', url: '/api/admin/economic-audit?includeWarnings=true', headers: { authorization: `Bearer ${token}` } });
+  assert.equal(res.statusCode, 200);
+  const codes = res.json().issues.filter((i: { companyId?: string }) => i.companyId === c.id).map((i: { code: string }) => i.code);
+  assert.equal(codes.includes('COMPANY_REVENUE_BALANCE_MISMATCH'), false);
+});

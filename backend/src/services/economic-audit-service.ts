@@ -77,6 +77,13 @@ export async function runEconomicAudit(input: { actorRoles: string[]; filters?: 
     secondaryTradesByCompany.set(trade.companyId, list);
   }
 
+  const initialOfferOpsByCompany = new Map<string, typeof companyOperations>();
+  for (const op of companyOperations.filter((o) => o.type === 'INITIAL_OFFER_BUY')) {
+    const list = initialOfferOpsByCompany.get(op.companyId) ?? [];
+    list.push(op);
+    initialOfferOpsByCompany.set(op.companyId, list);
+  }
+
   for (const company of companies) {
     const expectedMarketCap = toNum(company.currentPrice) * company.totalShares;
     if (company.status === 'ACTIVE' && toNum(company.currentPrice) <= 0) {
@@ -86,21 +93,24 @@ export async function runEconomicAudit(input: { actorRoles: string[]; filters?: 
       issues.push({ code: 'COMPANY_MARKET_CAP_MISMATCH', severity: 'HIGH', category: 'PRICE_INTEGRITY', entity: 'Company', entityId: company.id, companyId: company.id, message: 'fictitiousMarketCap incompatível com currentPrice * totalShares.', recommendedAction: 'Recalcular market cap com base no preço atual.' });
     }
 
-    const companyTrades = (secondaryTradesByCompany.get(company.id) ?? []).sort((a,b)=> b.createdAt.getTime()-a.createdAt.getTime());
-    const initialOps = companyOperations.filter((op) => op.companyId === company.id && op.type === 'INITIAL_OFFER_BUY');
-    const hasInitialOp = initialOps.length > 0;
+    const companyTrades = (secondaryTradesByCompany.get(company.id) ?? []).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const initialOps = (initialOfferOpsByCompany.get(company.id) ?? []).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-    if (!hasInitialOp && companyTrades.length === 0 && Math.abs(toNum(company.currentPrice) - toNum(company.initialPrice)) > 0.000001) {
+    if (companyTrades.length === 0 && initialOps.length === 0 && Math.abs(toNum(company.currentPrice) - toNum(company.initialPrice)) > 0.000001) {
       issues.push({ code: 'PRICE_CHANGED_WITHOUT_ECONOMIC_EVENT', severity: 'CRITICAL', category: 'PRICE_INTEGRITY', entity: 'Company', entityId: company.id, companyId: company.id, message: 'currentPrice diferente de initialPrice sem Trade e sem compra inicial.', recommendedAction: 'Auditar alterações administrativas indevidas de preço.' });
     }
 
-    if (companyTrades.length > 0) {
+    const lastTradeAt = companyTrades[0]?.createdAt?.getTime() ?? -1;
+    const lastInitialOfferAt = initialOps[0]?.createdAt?.getTime() ?? -1;
+
+    if (companyTrades.length > 0 && lastTradeAt >= lastInitialOfferAt) {
       const lastTradePrice = toNum(companyTrades[0].unitPrice);
       if (Math.abs(lastTradePrice - toNum(company.currentPrice)) > 0.000001) {
         issues.push({ code: 'CURRENT_PRICE_DIVERGES_LAST_TRADE', severity: 'HIGH', category: 'PRICE_INTEGRITY', entity: 'Company', entityId: company.id, companyId: company.id, message: 'currentPrice divergente do último Trade do secundário.', recommendedAction: 'Auditar sincronização do preço com trades executados.' });
       }
     }
   }
+
 
   for (const o of orders) {
     if (['OPEN', 'PARTIALLY_FILLED'].includes(o.status) && o.type === 'BUY' && toNum(o.lockedCash) <= 0) issues.push({ code: 'OPEN_BUY_WITHOUT_LOCKED_CASH', severity: 'CRITICAL', category: 'ORDER_LOCK', entity: 'MarketOrder', entityId: o.id, companyId: o.companyId, userId: o.userId, message: 'Ordem BUY aberta/parcial sem lockedCash válido.', recommendedAction: 'Auditar lock RPC e matching.' });
@@ -182,8 +192,10 @@ export async function runEconomicAudit(input: { actorRoles: string[]; filters?: 
     if (Math.abs(toNum(rev.totalReceivedFees) - feeTotal) > 0.01) {
       issues.push({ code: 'COMPANY_REVENUE_FEES_MISMATCH', severity: 'HIGH', category: 'TRACEABILITY', entity: 'CompanyRevenueAccount', entityId: rev.id, companyId: rev.companyId, message: 'totalReceivedFees divergente da soma de FeeDistribution.companyAmount.', recommendedAction: 'Reconciliar conta institucional com distribuição de taxas.' });
     }
-    if (Math.abs(toNum(rev.balance) - expectedBalance) > 0.01) {
-      issues.push({ code: 'COMPANY_REVENUE_BALANCE_MISMATCH', severity: 'HIGH', category: 'TRACEABILITY', entity: 'CompanyRevenueAccount', entityId: rev.id, companyId: rev.companyId, message: 'Saldo institucional divergente de entradas rastreáveis menos saídas conhecidas.', recommendedAction: 'Executar reconciliação contábil institucional.' });
+    const hasReservedEconomicPrograms = buybacks.some((b) => b.companyId === rev.companyId && ['ACTIVE', 'COMPLETED', 'CANCELED'].includes(b.status))
+      || distributions.some((d) => d.companyId === rev.companyId);
+    if (!hasReservedEconomicPrograms && Math.abs(toNum(rev.balance) - expectedBalance) > 0.01) {
+      issues.push({ code: 'COMPANY_REVENUE_BALANCE_MISMATCH', severity: 'WARNING', category: 'TRACEABILITY', entity: 'CompanyRevenueAccount', entityId: rev.id, companyId: rev.companyId, message: 'Saldo institucional divergente de entradas rastreáveis menos saídas conhecidas.', recommendedAction: 'Executar reconciliação contábil institucional.' });
     }
   }
 for (const c of capitalFlowEntries) {
