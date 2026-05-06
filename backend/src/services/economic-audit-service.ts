@@ -32,7 +32,7 @@ export async function runEconomicAudit(input: { actorRoles: string[]; filters?: 
   const filters = input.filters ?? {};
   const issues: EconomicAuditIssue[] = [];
 
-  const [wallets, treasury, brokers, platforms, revenues, boostAccounts, holdings, orders, trades, companies, buybacks, reserve, reserveEntries, distributions, snapshots, payments, capitalFlowEntries, adminLogs] = await Promise.all([
+  const [wallets, treasury, brokers, platforms, revenues, boostAccounts, holdings, orders, trades, companies, buybacks, buybackExecutions, reserve, reserveEntries, distributions, snapshots, payments, capitalFlowEntries, adminLogs] = await Promise.all([
     prisma.wallet.findMany(),
     prisma.treasuryAccount.findMany(),
     prisma.brokerAccount.findMany(),
@@ -44,6 +44,7 @@ export async function runEconomicAudit(input: { actorRoles: string[]; filters?: 
     prisma.trade.findMany({ include: { buyOrder: true, sellOrder: true } }),
     prisma.company.findMany(),
     prisma.projectBuybackProgram.findMany({ include: { company: true } }),
+    prisma.projectBuybackExecution.findMany(),
     prisma.projectTokenReserve.findMany(),
     prisma.projectTokenReserveEntry.findMany(),
     prisma.projectHolderDistributionProgram.findMany(),
@@ -68,6 +69,11 @@ export async function runEconomicAudit(input: { actorRoles: string[]; filters?: 
   for (const o of orders) {
     if (['OPEN', 'PARTIALLY_FILLED'].includes(o.status) && o.type === 'BUY' && toNum(o.lockedCash) <= 0) issues.push({ code: 'OPEN_BUY_WITHOUT_LOCKED_CASH', severity: 'CRITICAL', category: 'ORDER_LOCK', entity: 'MarketOrder', entityId: o.id, companyId: o.companyId, userId: o.userId, message: 'Ordem BUY aberta/parcial sem lockedCash válido.', recommendedAction: 'Auditar lock RPC e matching.' });
     if (['OPEN', 'PARTIALLY_FILLED'].includes(o.status) && o.type === 'SELL' && o.lockedShares <= 0) issues.push({ code: 'OPEN_SELL_WITHOUT_LOCKED_SHARES', severity: 'CRITICAL', category: 'ORDER_LOCK', entity: 'MarketOrder', entityId: o.id, companyId: o.companyId, userId: o.userId, message: 'Ordem SELL aberta/parcial sem lockedShares válido.', recommendedAction: 'Auditar lock de shares.' });
+    if (['OPEN', 'PARTIALLY_FILLED'].includes(o.status) && o.remainingQuantity <= 0) issues.push({ code: 'OPEN_ORDER_INVALID_REMAINING', severity: 'HIGH', category: 'ORDER_LOCK', entity: 'MarketOrder', entityId: o.id, companyId: o.companyId, userId: o.userId, message: 'Ordem aberta/parcial com remainingQuantity <= 0.', recommendedAction: 'Auditar estado da ordem.' });
+    if (o.status === 'FILLED' && o.remainingQuantity > 0) issues.push({ code: 'FILLED_ORDER_WITH_REMAINING', severity: 'HIGH', category: 'ORDER_LOCK', entity: 'MarketOrder', entityId: o.id, companyId: o.companyId, userId: o.userId, message: 'Ordem FILLED com remainingQuantity > 0.', recommendedAction: 'Auditar fechamento da ordem.' });
+    if (o.remainingQuantity < 0) issues.push({ code: 'ORDER_NEGATIVE_REMAINING', severity: 'CRITICAL', category: 'ORDER_LOCK', entity: 'MarketOrder', entityId: o.id, companyId: o.companyId, userId: o.userId, message: 'Ordem com remainingQuantity negativo.', recommendedAction: 'Reconciliar book e matching.' });
+    if (toNum(o.lockedCash) < 0) issues.push({ code: 'ORDER_NEGATIVE_LOCKED_CASH', severity: 'CRITICAL', category: 'ORDER_LOCK', entity: 'MarketOrder', entityId: o.id, companyId: o.companyId, userId: o.userId, message: 'Ordem com lockedCash negativo.', recommendedAction: 'Auditar rotina de lock/unlock RPC.' });
+    if (o.lockedShares < 0) issues.push({ code: 'ORDER_NEGATIVE_LOCKED_SHARES', severity: 'CRITICAL', category: 'ORDER_LOCK', entity: 'MarketOrder', entityId: o.id, companyId: o.companyId, userId: o.userId, message: 'Ordem com lockedShares negativo.', recommendedAction: 'Auditar rotina de lock/unlock shares.' });
     if (o.status === 'CANCELED' && (toNum(o.lockedCash) > 0 || o.lockedShares > 0)) issues.push({ code: 'CANCELED_ORDER_WITH_LOCKED_BALANCE', severity: 'HIGH', category: 'ORDER_LOCK', entity: 'MarketOrder', entityId: o.id, companyId: o.companyId, userId: o.userId, message: 'Ordem cancelada ainda possui saldo travado.', recommendedAction: 'Auditar rotina de cancelamento.' });
   }
 
@@ -80,6 +86,16 @@ export async function runEconomicAudit(input: { actorRoles: string[]; filters?: 
   for (const b of buybacks) {
     if (b.status === 'ACTIVE' && b.expiresAt && b.expiresAt < now) issues.push({ code: 'BUYBACK_PROGRAM_EXPIRED_ACTIVE', severity: 'HIGH', category: 'BUYBACK', entity: 'ProjectBuybackProgram', entityId: b.id, companyId: b.companyId, message: 'Programa de recompra ativo e vencido.', recommendedAction: 'Revisar governança do programa.' });
     if (toNum(b.spentRpc) > toNum(b.budgetRpc)) issues.push({ code: 'BUYBACK_SPENT_EXCEEDS_BUDGET', severity: 'CRITICAL', category: 'BUYBACK', entity: 'ProjectBuybackProgram', entityId: b.id, companyId: b.companyId, message: 'spentRpc acima do budgetRpc.', recommendedAction: 'Auditar execuções e orçamento.' });
+    if (Math.abs((toNum(b.remainingRpc) + toNum(b.spentRpc)) - toNum(b.budgetRpc)) > 0.01) issues.push({ code: 'BUYBACK_BUDGET_MISMATCH', severity: 'HIGH', category: 'BUYBACK', entity: 'ProjectBuybackProgram', entityId: b.id, companyId: b.companyId, message: 'remainingRpc + spentRpc diverge do budgetRpc.', recommendedAction: 'Reconciliar orçamento da recompra.' });
+    if (b.status === 'COMPLETED' && toNum(b.remainingRpc) > 0) issues.push({ code: 'BUYBACK_COMPLETED_WITH_REMAINING', severity: 'HIGH', category: 'BUYBACK', entity: 'ProjectBuybackProgram', entityId: b.id, companyId: b.companyId, message: 'Programa COMPLETED com remainingRpc > 0.', recommendedAction: 'Revisar encerramento de recompra.' });
+    if (b.status === 'CANCELED' && toNum(b.remainingRpc) > 0) issues.push({ code: 'BUYBACK_CANCELED_WITH_REMAINING', severity: 'MEDIUM', category: 'BUYBACK', entity: 'ProjectBuybackProgram', entityId: b.id, companyId: b.companyId, message: 'Programa CANCELED com remainingRpc > 0.', recommendedAction: 'Validar política de devolução no cancelamento.' });
+  }
+
+  const reserveEntryExecutionIds = new Set(reserveEntries.map((entry) => entry.executionId));
+  for (const execution of buybackExecutions) {
+    if (!reserveEntryExecutionIds.has(execution.id)) {
+      issues.push({ code: 'BUYBACK_EXECUTION_WITHOUT_RESERVE_ENTRY', severity: 'CRITICAL', category: 'BUYBACK', entity: 'ProjectBuybackExecution', entityId: execution.id, companyId: execution.companyId, userId: execution.sellerUserId, message: 'Execução de recompra sem entrada na reserva.', recommendedAction: 'Auditar vínculo execução-reserva.' });
+    }
   }
 
   const reserveEntriesByCompany = new Map<string, number>();
@@ -92,8 +108,24 @@ export async function runEconomicAudit(input: { actorRoles: string[]; filters?: 
 
   for (const p of distributions) {
     if (toNum(p.distributedRpc) > toNum(p.budgetRpc)) issues.push({ code: 'HOLDER_DISTRIBUTION_EXCEEDS_BUDGET', severity: 'CRITICAL', category: 'HOLDER_DISTRIBUTION', entity: 'ProjectHolderDistributionProgram', entityId: p.id, companyId: p.companyId, message: 'distributedRpc maior que budgetRpc.', recommendedAction: 'Auditar pagamentos e budget do programa.' });
+    if (p.status === 'COMPLETED' && snapshots.some((s) => s.programId === p.id && s.status === 'PENDING')) issues.push({ code: 'HOLDER_DISTRIBUTION_COMPLETED_WITH_PENDING', severity: 'HIGH', category: 'HOLDER_DISTRIBUTION', entity: 'ProjectHolderDistributionProgram', entityId: p.id, companyId: p.companyId, message: 'Programa COMPLETED com snapshots PENDING.', recommendedAction: 'Auditar execução final da distribuição.' });
   }
   for (const s of snapshots) if (toNum(s.calculatedAmountRpc) < 0) issues.push({ code: 'NEGATIVE_DISTRIBUTION_SNAPSHOT_AMOUNT', severity: 'HIGH', category: 'HOLDER_DISTRIBUTION', entity: 'ProjectHolderDistributionSnapshot', entityId: s.id, companyId: s.companyId, userId: s.userId, message: 'Snapshot com valor calculado negativo.', recommendedAction: 'Recalcular snapshot e critérios.' });
+  const paymentBySnapshotCount = new Map<string, number>();
+  for (const pay of payments) {
+    paymentBySnapshotCount.set(pay.snapshotId, (paymentBySnapshotCount.get(pay.snapshotId) ?? 0) + 1);
+    const tx = await prisma.transaction.findUnique({ where: { id: pay.transactionId } });
+    if (!tx) issues.push({ code: 'HOLDER_PAYMENT_WITHOUT_TRANSACTION', severity: 'CRITICAL', category: 'HOLDER_DISTRIBUTION', entity: 'ProjectHolderDistributionPayment', entityId: pay.id, companyId: pay.companyId, userId: pay.userId, message: 'Pagamento de holder sem Transaction correspondente.', recommendedAction: 'Auditar integridade entre pagamento e extrato.' });
+  }
+  for (const [snapshotId, count] of paymentBySnapshotCount.entries()) {
+    if (count > 1) issues.push({ code: 'HOLDER_DUPLICATE_PAYMENT', severity: 'CRITICAL', category: 'HOLDER_DISTRIBUTION', entity: 'ProjectHolderDistributionSnapshot', entityId: snapshotId, message: 'Snapshot com pagamento duplicado.', recommendedAction: 'Auditar idempotência da distribuição.' });
+  }
+  for (const program of distributions.filter((p) => p.excludeFounder)) {
+    const company = companies.find((c) => c.id === program.companyId);
+    if (!company) continue;
+    const founderPaid = payments.some((pay) => pay.programId === program.id && pay.userId === company.founderUserId);
+    if (founderPaid) issues.push({ code: 'FOUNDER_PAID_WHEN_EXCLUDED', severity: 'CRITICAL', category: 'HOLDER_DISTRIBUTION', entity: 'ProjectHolderDistributionProgram', entityId: program.id, companyId: program.companyId, userId: company.founderUserId, message: 'Founder recebeu distribuição com excludeFounder=true.', recommendedAction: 'Auditar snapshot e regras de elegibilidade.' });
+  }
 
   for (const c of capitalFlowEntries) {
     if (toNum(c.amountRpc) <= 0) issues.push({ code: 'CAPITAL_FLOW_NON_POSITIVE_AMOUNT', severity: 'HIGH', category: 'TRACEABILITY', entity: 'CompanyCapitalFlowEntry', entityId: c.id, companyId: c.companyId, userId: c.actorUserId, message: 'Entry de capital com amountRpc <= 0.', recommendedAction: 'Corrigir fluxo institucional e exigir valores positivos.' });
