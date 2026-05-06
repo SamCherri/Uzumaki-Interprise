@@ -331,3 +331,12 @@ Em caso de conflito:
 - [~] Camada inicial de design system visual implementada no frontend com tokens globais, cards premium e componentes reutilizáveis base.
 - [~] Escopo focado em frontend visual, sem alteração de regras econômicas, backend, banco ou migration.
 - [ ] Pendências futuras: gráfico premium avançado, livro de ordens premium avançado e refinamentos mobile adicionais.
+
+
+## Atualização 2026-05-06 — Beta fechado: desativação da impulsão legada e CI automático
+- Rotas de escrita da impulsão legada desativadas com resposta **410** e mensagem orientando uso de aporte institucional ou recompra real em livro.
+- Histórico legado de boost preservado apenas para leitura (`GET`), sem remoção de tabelas/dados.
+- Regra reforçada: aporte institucional **não altera preço**; preço muda apenas por compra executada na oferta inicial ou por `Trade` real no secundário.
+- Frontend do dono atualizado para remover ação executável de impulsão legada, mantendo aviso read-only e contexto legado.
+- Workflow automático `.github/workflows/ci.yml` criado para `pull_request`, `push` em `main` e `workflow_dispatch`, incluindo typecheck/build backend+frontend e `test:critical`.
+- Checklist mínimo do beta fechado reforçado por testes de regressão econômica para bloqueio de boost legado sem mutação de preço/market cap/trades/orders.

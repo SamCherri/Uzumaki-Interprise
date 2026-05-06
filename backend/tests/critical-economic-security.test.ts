@@ -2038,3 +2038,71 @@ test('holder distribution: cálculo por centavos evita negativos com muitos hold
   assert.equal(program.status, 'COMPLETED');
   assert.equal(Number(program.budgetRpc), Number((Number(program.distributedRpc) + Number(program.refundedRpc)).toFixed(2)));
 });
+
+test('boost legado do fundador está desativado e não altera preço', async () => {
+  await resetDb();
+  const rUser = await mkRole('USER');
+  const founder = await mkUser('founder.boost@test.local', 'Founder');
+  await prisma.userRole.create({ data: { userId: founder.id, roleId: rUser.id } });
+
+  const company = await prisma.company.create({
+    data: {
+      name: 'LegacyBoost', ticker: 'LGB1', description: 'desc', sector: 'setor', founderUserId: founder.id, status: 'ACTIVE',
+      totalShares: 1000, circulatingShares: 200, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600,
+      availableOfferShares: 400, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 10000,
+      approvedAt: new Date(), revenueAccount: { create: {} }, boostAccount: { create: {} },
+    },
+  });
+
+  const founderToken = await token(founder.id, ['USER']);
+  const response = await app.inject({
+    method: 'POST',
+    url: `/api/project-boosts/companies/${company.id}/boost`,
+    headers: { authorization: `Bearer ${founderToken}` },
+    payload: { amountRpc: 50, source: 'PERSONAL_WALLET', reason: 'Teste de rota desativada' },
+  });
+
+  assert.equal(response.statusCode, 410, response.body);
+  assert.match(response.body, /impulsão legada desativada/i);
+
+  const after = await prisma.company.findUniqueOrThrow({ where: { id: company.id } });
+  assert.equal(String(after.currentPrice), '10');
+  assert.equal(String(after.fictitiousMarketCap), '10000');
+  assert.equal(await prisma.trade.count({ where: { companyId: company.id } }), 0);
+  assert.equal(await prisma.marketOrder.count({ where: { companyId: company.id } }), 0);
+  assert.equal(await prisma.companyBoostInjection.count({ where: { companyId: company.id } }), 0);
+});
+
+test('boost legado administrativo está desativado e não altera preço', async () => {
+  await resetDb();
+  const rAdmin = await mkRole('ADMIN');
+  const admin = await mkUser('admin.boost@test.local', 'Admin');
+  await prisma.userRole.create({ data: { userId: admin.id, roleId: rAdmin.id } });
+
+  const company = await prisma.company.create({
+    data: {
+      name: 'LegacyBoostAdmin', ticker: 'LGB2', description: 'desc', sector: 'setor', founderUserId: admin.id, status: 'ACTIVE',
+      totalShares: 1000, circulatingShares: 200, ownerSharePercent: 40, publicOfferPercent: 60, ownerShares: 400, publicOfferShares: 600,
+      availableOfferShares: 400, initialPrice: 10, currentPrice: 10, buyFeePercent: 1, sellFeePercent: 1, fictitiousMarketCap: 10000,
+      approvedAt: new Date(), revenueAccount: { create: {} }, boostAccount: { create: {} },
+    },
+  });
+
+  const adminToken = await token(admin.id, ['ADMIN']);
+  const response = await app.inject({
+    method: 'POST',
+    url: `/api/admin/project-boosts/companies/${company.id}/boost`,
+    headers: { authorization: `Bearer ${adminToken}` },
+    payload: { amountRpc: 50, source: 'ADMIN_ADJUSTMENT', reason: 'Teste admin desativado' },
+  });
+
+  assert.equal(response.statusCode, 410, response.body);
+  assert.match(response.body, /impulsão legada desativada/i);
+
+  const after = await prisma.company.findUniqueOrThrow({ where: { id: company.id } });
+  assert.equal(String(after.currentPrice), '10');
+  assert.equal(String(after.fictitiousMarketCap), '10000');
+  assert.equal(await prisma.trade.count({ where: { companyId: company.id } }), 0);
+  assert.equal(await prisma.marketOrder.count({ where: { companyId: company.id } }), 0);
+  assert.equal(await prisma.companyBoostInjection.count({ where: { companyId: company.id } }), 0);
+});

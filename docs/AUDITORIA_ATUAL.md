@@ -333,3 +333,12 @@ Fonte oficial: `docs/ROADMAP_PRIORITARIO.md`.
 - Risco atual registrado: PRs visuais superficiais (componente sem uso real, CSS sem substituição de layout, navegação parcial por perfil e duplicação visual).
 - Mitigação oficial: toda PR visual deve seguir `docs/FRONTEND_VISION.md` com checklist obrigatório e validação de navegação por perfil.
 - Componentes visuais novos devem ser aplicados em telas reais; não aceitar CSS isolado, componente sem uso, layout duplicado ou navegação quebrada por perfil.
+
+
+## Atualização 2026-05-06 — Beta fechado: desativação da impulsão legada e CI automático
+- Rotas de escrita da impulsão legada desativadas com resposta **410** e mensagem orientando uso de aporte institucional ou recompra real em livro.
+- Histórico legado de boost preservado apenas para leitura (`GET`), sem remoção de tabelas/dados.
+- Regra reforçada: aporte institucional **não altera preço**; preço muda apenas por compra executada na oferta inicial ou por `Trade` real no secundário.
+- Frontend do dono atualizado para remover ação executável de impulsão legada, mantendo aviso read-only e contexto legado.
+- Workflow automático `.github/workflows/ci.yml` criado para `pull_request`, `push` em `main` e `workflow_dispatch`, incluindo typecheck/build backend+frontend e `test:critical`.
+- Checklist mínimo do beta fechado reforçado por testes de regressão econômica para bloqueio de boost legado sem mutação de preço/market cap/trades/orders.
