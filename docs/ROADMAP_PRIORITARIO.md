@@ -316,3 +316,10 @@ Em caso de conflito:
 - Endpoints administrativos/auditoria para executar, listar e detalhar simulações.
 - Sem alteração de economia real (`Wallet`, `Trade`, `MarketOrder`, `Company`, `RpcMarketState`).
 - Pendências para PR 11: painel admin avançado do simulador e UX mobile refinada.
+
+
+## Atualização 2026-05-06 — PR 11 UX funcional e anti-erro humano
+- [~] Implementação parcial de UX funcional: componentes reutilizáveis de segurança (`ActionButton`, `EconomicNotice`, `ImpactPreviewCard`, `StatusMessage`, `ConfirmEconomicAction`) e integração inicial em fluxos sensíveis.
+- Mensagens de sucesso/erro padronizadas nas telas atualizadas e reforço de aviso de simulação RP.
+- Anti-duplo-clique reforçado por estado de loading em botões sensíveis.
+- Pendências para follow-up da PR 11: expandir confirmação/preview para 100% dos fluxos de mercado primário/secundário e painéis econômicos restantes.

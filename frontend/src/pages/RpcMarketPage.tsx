@@ -1,5 +1,9 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Button } from '../components/ui/Button';
+import { ActionButton } from '../components/ActionButton';
+import { EconomicNotice } from '../components/EconomicNotice';
+import { ImpactPreviewCard } from '../components/ImpactPreviewCard';
+import { StatusMessage } from '../components/StatusMessage';
 import { Toast } from '../components/ui/Toast';
 import { api } from '../services/api';
 import { formatCurrency, formatPercent, formatPrice, formatSignedPrice } from '../utils/formatters';
@@ -288,8 +292,9 @@ export function RpcMarketPage({ initialTradeFlow, onTradeFlowHandled }: { initia
           </div>
         </header>
 
-        {error && <p className="status-message error market-full-width">{error}</p>}
-        {message && <p className="status-message success market-full-width">{message}</p>}
+        <EconomicNotice />
+        {error && <StatusMessage type="error" message={error} />}
+        {message && <StatusMessage type="success" message={message} />}
 
         <nav className="market-top-tabs market-mobile-tabs market-full-width">
           <button className={activeTab === 'preco' ? 'quick-pill active' : 'quick-pill'} onClick={() => setActiveTab('preco')}>Preço</button>

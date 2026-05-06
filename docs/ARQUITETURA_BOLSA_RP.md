@@ -293,3 +293,22 @@ Objetivo da fase de PWA:
 - `summary`: métricas agregadas de preço, volume, recompras, reserva e distribuição simuladas.
 - `steps`: sequência auditável com estado anterior/posterior e issues de cada etapa.
 - `warnings`: alertas de risco (liquidez, self-trade bloqueado, pressão de venda etc.).
+
+
+## UX funcional e proteção contra erro humano
+
+Componentes introduzidos:
+- `ActionButton`: evita duplo clique com `loading` e `disabled` automático em ações sensíveis.
+- `EconomicNotice`: aviso padrão sobre natureza fictícia da simulação RP.
+- `ImpactPreviewCard`: resumo de antes/depois e impacto estimado.
+- `StatusMessage`: feedback padronizado de sucesso/erro/aviso.
+- `ConfirmEconomicAction`: confirmação explícita para operações sensíveis (base reutilizável).
+
+Telas impactadas nesta etapa:
+- Mercado RPC/R$ (`RpcMarketPage`) com aviso econômico, preview de impacto e mensagens padronizadas.
+- Test Mode (`TestModePage`) com aviso explícito de isolamento da economia real.
+- Auditoria econômica (`AdminEconomicAlertsPanel`) com linguagem read-only mais clara.
+
+Limitações e pendências:
+- Esta etapa não implementa visual premium, gráfico premium nem livro de ordens premium.
+- Cobertura dos novos componentes será expandida gradualmente para todos os fluxos sensíveis restantes.
