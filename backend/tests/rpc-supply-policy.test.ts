@@ -44,7 +44,7 @@ test('política RPC ignora fiat/legado e calcula apenas RPC real', async () => {
   await prisma.treasuryAccount.create({ data: { balance: 300 } });
   await prisma.brokerAccount.create({ data: { userId: auditor.id, available: 40, receivedTotal: 999 } });
   await prisma.platformAccount.create({ data: { balance: 50 } });
-  await prisma.projectBuybackProgram.create({ data: { companyId: company.id, createdByUserId: auditor.id, status: 'ACTIVE', budgetRpc: 40, remainingRpc: 30, spentRpc: 10, maxPricePerShare: 10, targetShares: 5, executedShares: 1, reason: 'teste', expiresAt: new Date(Date.now() + 86400000) } });
+  await prisma.projectBuybackProgram.create({ data: { companyId: company.id, createdByUserId: auditor.id, status: 'ACTIVE', budgetRpc: 40, remainingRpc: 30, spentRpc: 10, maxPricePerShare: 10, targetShares: 5, purchasedShares: 1, reason: 'teste', expiresAt: new Date(Date.now() + 86400000) } });
   await prisma.withdrawalRequest.create({ data: { code: 'WDRPC1', userId: user.id, amount: 500, status: 'COMPLETED' } });
   await prisma.testModeWallet.create({ data: { userId: auditor.id, rpcBalance: 5000, fiatBalance: 1000 } });
 
@@ -85,8 +85,8 @@ test('auditoria RPC detecta negativos críticos e revisão legado', async () => 
   await prisma.wallet.update({ where: { userId: auditor.id }, data: { rpcAvailableBalance: -1, rpcLockedBalance: -2, pendingWithdrawalBalance: -3 } });
   await prisma.treasuryAccount.create({ data: { balance: -4 } });
   await prisma.companyRevenueAccount.create({ data: { companyId: company.id, balance: -5 } });
-  await prisma.projectBuybackProgram.create({ data: { companyId: company.id, createdByUserId: auditor.id, status: 'ACTIVE', budgetRpc: 10, remainingRpc: -6, spentRpc: 16, maxPricePerShare: 10, targetShares: 5, executedShares: 0, reason: 'teste', expiresAt: new Date(Date.now() + 86400000) } });
-  await prisma.projectHolderDistributionProgram.create({ data: { companyId: company.id, createdByUserId: auditor.id, budgetRpc: 10, distributedRpc: 11, excludeFounder: true, reason: 'dist' } });
+  await prisma.projectBuybackProgram.create({ data: { companyId: company.id, createdByUserId: auditor.id, status: 'ACTIVE', budgetRpc: 10, remainingRpc: -6, spentRpc: 16, maxPricePerShare: 10, targetShares: 5, purchasedShares: 0, reason: 'teste', expiresAt: new Date(Date.now() + 86400000) } });
+  await prisma.projectHolderDistributionProgram.create({ data: { companyId: company.id, createdByUserId: auditor.id, budgetRpc: 10, distributedRpc: 11, eligibleShares: 100, eligibleHoldersCount: 2, excludeFounder: true, reason: 'dist' } });
 
   const auditResp = await app.inject({ method: 'GET', url: '/api/admin/rpc-supply-policy/audit', headers: { authorization: `Bearer ${await tk(auditor.id, ['AUDITOR'])}` } });
   assert.equal(auditResp.statusCode, 200, auditResp.body);
