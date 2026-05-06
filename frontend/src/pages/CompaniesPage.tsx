@@ -5,6 +5,8 @@ import { formatCurrency, formatPercent, formatPrice } from '../utils/formatters'
 import { translateCompanyStatus, translateOrderMode, translateOrderStatus, translateOrderType } from '../utils/labels';
 import { MarketLineChart, type MarketChartPoint } from '../components/MarketLineChart';
 import { OrderBook } from '../components/OrderBook';
+import { InfoCallout } from '../components/ui/InfoCallout';
+import { EmptyState } from '../components/ui/EmptyState';
 
 type Company = {
   id: string;
@@ -396,6 +398,7 @@ export function CompaniesPage() {
 
   return (
     <section className="card market-page market-shell">
+      <InfoCallout title="Mercado RP" tone="info"><p>Ativos e preços são da simulação RP. Não há dinheiro real, Pix, cartão ou blockchain.</p></InfoCallout>
       {!selected && (
         <>
           <h2>🪙 Mercados de moedas</h2>
