@@ -10,7 +10,6 @@ import { formatCurrency, formatPercent, formatPrice, formatSignedPrice } from '.
 import { MarketLineChart, type MarketChartPoint } from '../components/MarketLineChart';
 import { OrderBook } from '../components/OrderBook';
 import { PageShell } from '../components/ui/PageShell';
-import { PremiumCard } from '../components/ui/PremiumCard';
 import { MetricCard } from '../components/ui/MetricCard';
 import { InfoCallout } from '../components/ui/InfoCallout';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -305,12 +304,11 @@ export function RpcMarketPage({ initialTradeFlow, onTradeFlowHandled }: { initia
           </div>
           <div className="market-stats-row market-mini-stats">
             <MetricCard label="Preço atual" value={`R$ ${formatPrice(Number(market?.currentPrice ?? 0))}`} />
-            <MetricCard label="Saldo RPC" value={formatCurrency(Number(wallet?.rpcAvailableBalance ?? 0))} />
+            <MetricCard label="Máx" value={`R$ ${formatPrice(chartMetrics.max)}`} />
+            <MetricCard label="Mín" value={`R$ ${formatPrice(chartMetrics.min)}`} />
             <MetricCard label="Volume R$" value={formatCurrency(chartMetrics.fiatVolume)} />
-            <div className="market-mini-stat-card"><span className="market-mini-stat-label">Máx</span><strong>R$ {formatPrice(chartMetrics.max)}</strong></div>
-            <div className="market-mini-stat-card"><span className="market-mini-stat-label">Mín</span><strong>R$ {formatPrice(chartMetrics.min)}</strong></div>
-            <div className="market-mini-stat-card"><span className="market-mini-stat-label">Volume</span><strong>R$ {formatCurrency(chartMetrics.fiatVolume)}</strong></div>
-            <div className="market-mini-stat-card"><span className="market-mini-stat-label">Saldo RPC</span><strong>{formatCurrency(Number(wallet?.rpcAvailableBalance ?? 0))}</strong></div>
+            <MetricCard label="Volume RPC" value={formatCurrency(chartMetrics.rpcVolume)} />
+            <MetricCard label="Saldo RPC" value={formatCurrency(Number(wallet?.rpcAvailableBalance ?? 0))} />
           </div>
         </header>
 
