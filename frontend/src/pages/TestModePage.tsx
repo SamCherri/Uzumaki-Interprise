@@ -200,11 +200,15 @@ export function TestModePage() {
           <button type="button" className="quick-pill" onClick={() => setShowQuoteDetails((v) => !v)}>{showQuoteDetails ? 'Ocultar detalhes' : 'Ver detalhes da cotação'}</button>
           {showQuoteDetails && (
             <div className="summary-item compact-callout">
-              <p className="info-text"><strong>Detalhes da cotação</strong></p>
-              <p className="info-text">Compra entrada: R$ {tradeAmount || '0'} • RPC estimado: {buyQuote?.estimatedRpcAmount ?? '-'} • Taxa: {buyQuote?.feeAmount ? `R$ ${buyQuote.feeAmount}` : '-'}</p>
-              <p className="info-text">Preço efetivo compra: {buyQuote?.effectiveUnitPrice ?? '-'} • Preço após compra: {buyQuote?.estimatedPriceAfter ?? '-'}</p>
-              <p className="info-text">Venda entrada: {tradeAmount || '0'} RPC • R$ estimado: {sellQuote?.estimatedFiatAmount ?? '-'} • Taxa: {sellQuote?.feeAmount ? `R$ ${sellQuote.feeAmount}` : '-'}</p>
-              <p className="info-text">Preço efetivo venda: {sellQuote?.effectiveUnitPrice ?? '-'} • Preço após venda: {sellQuote?.estimatedPriceAfter ?? '-'}</p>
+              <strong>Detalhes da cotação</strong>
+              <p className="info-text">Compra: entrada R$ {tradeAmount || '0'} → recebe {buyQuote?.estimatedRpcAmount ?? '-'} RPC</p>
+              <p className="info-text">Taxa compra: {buyQuote?.feeAmount ? `R$ ${buyQuote.feeAmount}` : '-'}</p>
+              <p className="info-text">Preço efetivo compra: {buyQuote?.effectiveUnitPrice ?? '-'}</p>
+              <p className="info-text">Preço após compra: {buyQuote?.estimatedPriceAfter ?? '-'}</p>
+              <p className="info-text">Venda: entrada {tradeAmount || '0'} RPC → recebe R$ {sellQuote?.estimatedFiatAmount ?? '-'}</p>
+              <p className="info-text">Taxa venda: {sellQuote?.feeAmount ? `R$ ${sellQuote.feeAmount}` : '-'}</p>
+              <p className="info-text">Preço efetivo venda: {sellQuote?.effectiveUnitPrice ?? '-'}</p>
+              <p className="info-text">Preço após venda: {sellQuote?.estimatedPriceAfter ?? '-'}</p>
             </div>
           )}
         </section>
