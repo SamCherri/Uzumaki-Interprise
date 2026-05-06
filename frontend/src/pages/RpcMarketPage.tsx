@@ -1,6 +1,10 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Button } from '../components/ui/Button';
-import { Toast } from '../components/ui/Toast';
+import { ActionButton } from '../components/ActionButton';
+import { EconomicNotice } from '../components/EconomicNotice';
+import { ImpactPreviewCard } from '../components/ImpactPreviewCard';
+import { StatusMessage } from '../components/StatusMessage';
+import { ConfirmEconomicAction } from '../components/ConfirmEconomicAction';
 import { api } from '../services/api';
 import { formatCurrency, formatPercent, formatPrice, formatSignedPrice } from '../utils/formatters';
 import { MarketLineChart, type MarketChartPoint } from '../components/MarketLineChart';
@@ -16,6 +20,7 @@ type Timeframe = '1H' | '24H' | '7D' | '30D' | 'ALL';
 type RpcMarketTab = 'preco' | 'livro' | 'ordens' | 'trades' | 'dados';
 type TradeFlow = 'buy' | 'sell' | null;
 type RpcTradeMode = 'market' | 'limit';
+type PendingConfirmation = 'buy-market' | 'sell-market' | null;
 
 const timeframes: { key: Timeframe; label: string; hours: number | null }[] = [
   { key: '1H', label: '1H', hours: 1 },
@@ -57,6 +62,7 @@ export function RpcMarketPage({ initialTradeFlow, onTradeFlowHandled }: { initia
   const [isSelling, setIsSelling] = useState(false);
   const [isCreatingLimitOrder, setIsCreatingLimitOrder] = useState(false);
   const [cancelingOrderId, setCancelingOrderId] = useState<string | null>(null);
+  const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation>(null);
 
   async function load() {
     setIsLoading(true);
@@ -179,8 +185,7 @@ export function RpcMarketPage({ initialTradeFlow, onTradeFlowHandled }: { initia
     }))
     .filter((trade) => Number.isFinite(trade.price) && trade.price > 0), [filteredTrades]);
 
-  async function onBuy(event: FormEvent) {
-    event.preventDefault();
+  async function confirmBuy() {
     setError('');
     setMessage('');
     if (isBuying) return;
@@ -191,6 +196,7 @@ export function RpcMarketPage({ initialTradeFlow, onTradeFlowHandled }: { initia
       setFiatAmount('');
       setBuyQuote(null);
       setTradeFlow(null);
+      setPendingConfirmation(null);
       await load();
     } catch (err) {
       setError((err as Error).message);
@@ -199,8 +205,7 @@ export function RpcMarketPage({ initialTradeFlow, onTradeFlowHandled }: { initia
     }
   }
 
-  async function onSell(event: FormEvent) {
-    event.preventDefault();
+  async function confirmSell() {
     setError('');
     setMessage('');
     if (isSelling) return;
@@ -211,12 +216,25 @@ export function RpcMarketPage({ initialTradeFlow, onTradeFlowHandled }: { initia
       setRpcAmount('');
       setSellQuote(null);
       setTradeFlow(null);
+      setPendingConfirmation(null);
       await load();
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setIsSelling(false);
     }
+  }
+
+  function onBuy(event: FormEvent) {
+    event.preventDefault();
+    if (!buyQuote || Number(fiatAmount) < 0.01 || isBuying) return;
+    setPendingConfirmation('buy-market');
+  }
+
+  function onSell(event: FormEvent) {
+    event.preventDefault();
+    if (!sellQuote || Number(rpcAmount) < 0.01 || isSelling) return;
+    setPendingConfirmation('sell-market');
   }
 
 
@@ -288,8 +306,9 @@ export function RpcMarketPage({ initialTradeFlow, onTradeFlowHandled }: { initia
           </div>
         </header>
 
-        {error && <p className="status-message error market-full-width">{error}</p>}
-        {message && <p className="status-message success market-full-width">{message}</p>}
+        <EconomicNotice />
+        {error && <StatusMessage type="error" message={error} />}
+        {message && <StatusMessage type="success" message={message} />}
 
         <nav className="market-top-tabs market-mobile-tabs market-full-width">
           <button className={activeTab === 'preco' ? 'quick-pill active' : 'quick-pill'} onClick={() => setActiveTab('preco')}>Preço</button>
@@ -312,7 +331,7 @@ export function RpcMarketPage({ initialTradeFlow, onTradeFlowHandled }: { initia
 
         {activeTab === 'livro' && <section className="card nested-card market-tab-panel market-full-width"><h4>Livro de ordens RPC/R$</h4><p className="info-text">RPC/R$ ainda usa liquidez automática para execução. O livro mostra ordens limite pendentes.</p><div className="order-book-grid"><div className="summary-item"><span className="summary-label">Reserva RPC</span><strong>{formatCurrency(Number(market?.rpcReserve ?? 0))} RPC</strong></div><div className="summary-item"><span className="summary-label">Reserva R$</span><strong>R$ {formatCurrency(Number(market?.fiatReserve ?? 0))}</strong></div></div><OrderBook buyOrders={orderBook.buyOrders.map((o) => { const price = Number(o.limitPrice || 0); const fiat = Number(o.lockedFiatAmount || o.fiatAmount || 0); const quantity = price > 0 ? fiat / price : 0; return { id: o.id, price, quantity, total: fiat }; })} sellOrders={orderBook.sellOrders.map((o) => { const price = Number(o.limitPrice || 0); const quantity = Number(o.lockedRpcAmount || o.rpcAmount || 0); return { id: o.id, price, quantity, total: price * quantity }; })} currentPrice={Number(market?.currentPrice ?? 0)} quoteSymbol="R$" baseSymbol="RPC" emptyMessage="Sem ordens abertas neste livro." /></section>}
 
-        {activeTab === 'ordens' && <section className="card nested-card market-tab-panel market-full-width"><h4>Minhas ordens RPC/R$</h4>{myOrders.length===0?<p className="empty-state">Nenhuma ordem RPC/R$ criada ainda.</p>:<div className="mobile-card-list">{myOrders.map((order)=><article key={order.id} className="summary-item compact-card market-order-card"><p><strong>{order.side==='BUY_RPC'?'COMPRA':'VENDA'}</strong> · {order.status}</p><p>Preço limite: R$ {formatPrice(Number(order.limitPrice||0))}</p><p>Valor: {order.side==='BUY_RPC'?`R$ ${formatCurrency(Number(order.fiatAmount??0))}`:`${formatCurrency(Number(order.rpcAmount??0))} RPC`}</p><p>Travado: {order.side==='BUY_RPC'?`R$ ${formatCurrency(Number(order.lockedFiatAmount??0))}`:`${formatCurrency(Number(order.lockedRpcAmount??0))} RPC`}</p><p>Criada: {new Date(order.createdAt).toLocaleString('pt-BR')}</p>{order.executedAt && <p>Executada: {new Date(order.executedAt).toLocaleString('pt-BR')}</p>}{order.canceledAt && <p>Cancelada: {new Date(order.canceledAt).toLocaleString('pt-BR')}</p>}{order.status==='OPEN' && <button type="button" className="small-button" onClick={() => void onCancelOrder(order.id)} disabled={cancelingOrderId !== null}>{cancelingOrderId === order.id ? 'Cancelando...' : 'Cancelar'}</button>}</article>)}</div>}</section>}
+        {activeTab === 'ordens' && <section className="card nested-card market-tab-panel market-full-width"><h4>Minhas ordens RPC/R$</h4>{myOrders.length===0?<p className="empty-state">Nenhuma ordem RPC/R$ criada ainda.</p>:<div className="mobile-card-list">{myOrders.map((order)=><article key={order.id} className="summary-item compact-card market-order-card"><p><strong>{order.side==='BUY_RPC'?'COMPRA':'VENDA'}</strong> · {order.status}</p><p>Preço limite: R$ {formatPrice(Number(order.limitPrice||0))}</p><p>Valor: {order.side==='BUY_RPC'?`R$ ${formatCurrency(Number(order.fiatAmount??0))}`:`${formatCurrency(Number(order.rpcAmount??0))} RPC`}</p><p>Travado: {order.side==='BUY_RPC'?`R$ ${formatCurrency(Number(order.lockedFiatAmount??0))}`:`${formatCurrency(Number(order.lockedRpcAmount??0))} RPC`}</p><p>Criada: {new Date(order.createdAt).toLocaleString('pt-BR')}</p>{order.executedAt && <p>Executada: {new Date(order.executedAt).toLocaleString('pt-BR')}</p>}{order.canceledAt && <p>Cancelada: {new Date(order.canceledAt).toLocaleString('pt-BR')}</p>}{order.status==='OPEN' && <ActionButton type="button" className="small-button" onClick={() => void onCancelOrder(order.id)} loading={cancelingOrderId === order.id} loadingText="Cancelando..." disabled={cancelingOrderId !== null && cancelingOrderId !== order.id}>Cancelar</ActionButton>}</article>)}</div>}</section>}
 
         {activeTab === 'trades' && <section className="card nested-card market-tab-panel market-full-width"><h4>Últimos trades RPC/R$</h4><div className="mobile-card-list">{trades.length === 0 && <p className="empty-state">Sem negociações ainda.</p>}{trades.slice(0, 20).map((trade) => <article key={trade.id} className="summary-item compact-card market-order-card"><p><strong>{trade.side === 'BUY_RPC' ? 'COMPRA' : 'VENDA'}</strong> · {new Date(trade.createdAt).toLocaleTimeString('pt-BR')}</p><p>Preço: R$ {formatPrice(Number(trade.unitPrice))}</p><p>Quantidade: {formatCurrency(Number(trade.rpcAmount))} RPC</p><p>Total: R$ {formatCurrency(Number(trade.fiatAmount))}</p></article>)}</div></section>}
 
@@ -321,12 +340,35 @@ export function RpcMarketPage({ initialTradeFlow, onTradeFlowHandled }: { initia
         <div className="mobile-trade-actions"><Button variant="success" onClick={() => setTradeFlow('buy')}>Comprar</Button><Button variant="danger" onClick={() => setTradeFlow('sell')}>Vender</Button></div>
 
         {tradeFlow && <div className="trade-panel-backdrop" onClick={() => setTradeFlow(null)}><div className="trade-bottom-sheet market-trade-sheet" onClick={(event) => event.stopPropagation()}><div className="market-sheet-handle" aria-hidden="true" /><div className="trade-panel-header"><h4>{tradeFlow === 'buy' ? 'Comprar RPC' : 'Vender RPC'}</h4><button type="button" className="small-button" onClick={() => setTradeFlow(null)}>Fechar</button></div><nav className="quick-actions"><button type="button" className={tradeMode === 'market' ? 'quick-pill active' : 'quick-pill'} onClick={() => setTradeMode('market')}>Mercado</button><button type="button" className={tradeMode === 'limit' ? 'quick-pill active' : 'quick-pill'} onClick={() => setTradeMode('limit')}>Limite</button></nav>
-          {tradeFlow === 'buy' && tradeMode === 'market' && <form onSubmit={onBuy}><p className="market-sheet-balance-row">Saldo R$ disponível: {formatCurrency(Number(wallet?.fiatAvailableBalance ?? 0))}</p><input value={fiatAmount} onChange={(e) => setFiatAmount(e.target.value)} placeholder="Entrada em R$" required /><div className="market-sheet-mini-card"><p>Saída estimada em RPC: {formatCurrency(Number(buyQuote?.estimatedRpcAmount ?? 0))}</p><p>Preço médio estimado: R$ {formatPrice(Number(buyQuote?.effectiveUnitPrice ?? 0))}</p><p>Taxa aplicada: {buyQuote?.feePercent ?? 1}%</p><p>Taxa da Exchange: R$ {formatCurrency(Number(buyQuote?.feeAmount ?? 0))}</p><p>Valor líquido usado na operação: R$ {formatCurrency(Number(buyQuote?.netFiatAmount ?? 0))}</p></div>{buyQuoteError && <p className="info-text">{buyQuoteError}</p>}<Button variant="success" type="submit" isLoading={isBuying} disabled={!buyQuote || Number(fiatAmount) < 0.01}>Comprar agora</Button></form>}
-          {tradeFlow === 'sell' && tradeMode === 'market' && <form onSubmit={onSell}><p className="market-sheet-balance-row">Saldo RPC disponível: {formatCurrency(Number(wallet?.rpcAvailableBalance ?? 0))}</p><input value={rpcAmount} onChange={(e) => setRpcAmount(e.target.value)} placeholder="Entrada em RPC" required /><div className="market-sheet-mini-card"><p>Saída estimada em R$ (bruto): {formatCurrency(Number(sellQuote?.grossEstimatedFiatAmount ?? 0))}</p><p>Preço médio estimado: R$ {formatPrice(Number(sellQuote?.effectiveUnitPrice ?? 0))}</p><p>Taxa aplicada: {sellQuote?.feePercent ?? 1}%</p><p>Taxa da Exchange: R$ {formatCurrency(Number(sellQuote?.feeAmount ?? 0))}</p><p>Você recebe líquido: R$ {formatCurrency(Number(sellQuote?.estimatedFiatAmount ?? 0))}</p></div>{sellQuoteError && <p className="info-text">{sellQuoteError}</p>}<Button variant="danger" type="submit" isLoading={isSelling} disabled={!sellQuote || Number(rpcAmount) < 0.01}>Vender agora</Button></form>}
-          {tradeFlow === 'buy' && tradeMode === 'limit' && <form onSubmit={onCreateLimitOrder}><p className="market-sheet-balance-row">Saldo R$ disponível: {formatCurrency(Number(wallet?.fiatAvailableBalance ?? 0))}</p><input value={limitFiatAmount} onChange={(e) => setLimitFiatAmount(e.target.value)} placeholder="Entrada em R$" required /><input value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço limite" required /><p className="info-text">O preço limite considera a taxa da Exchange. Executa se o preço efetivo total for menor ou igual ao limite.</p><button className="button-success" type="submit" disabled={isCreatingLimitOrder || Number(limitFiatAmount) < 0.01 || Number(limitPrice) <= 0}>{isCreatingLimitOrder ? 'Enviando...' : 'Criar ordem de compra'}</button></form>}
-          {tradeFlow === 'sell' && tradeMode === 'limit' && <form onSubmit={onCreateLimitOrder}><p className="market-sheet-balance-row">Saldo RPC disponível: {formatCurrency(Number(wallet?.rpcAvailableBalance ?? 0))}</p><input value={limitRpcAmount} onChange={(e) => setLimitRpcAmount(e.target.value)} placeholder="Entrada em RPC" required /><input value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço limite" required /><p className="info-text">O preço limite considera a taxa da Exchange. Executa se o preço líquido for maior ou igual ao limite.</p><button className="button-danger" type="submit" disabled={isCreatingLimitOrder || Number(limitRpcAmount) < 0.01 || Number(limitPrice) <= 0}>{isCreatingLimitOrder ? 'Enviando...' : 'Criar ordem de venda'}</button></form>}
+          {tradeFlow === 'buy' && tradeMode === 'market' && <form onSubmit={onBuy}><p className="market-sheet-balance-row">Saldo R$ disponível: {formatCurrency(Number(wallet?.fiatAvailableBalance ?? 0))}</p><input value={fiatAmount} onChange={(e) => setFiatAmount(e.target.value)} placeholder="Entrada em R$" required /><ImpactPreviewCard title="Preview da compra RPC" items={[{ label: 'Entrada', value: `R$ ${formatCurrency(Number(fiatAmount || 0))}` },{ label: 'Saída estimada', value: `${formatCurrency(Number(buyQuote?.estimatedRpcAmount ?? 0))} RPC` },{ label: 'Preço médio estimado', value: `R$ ${formatPrice(Number(buyQuote?.effectiveUnitPrice ?? 0))}` },{ label: 'Taxa estimada', value: `R$ ${formatCurrency(Number(buyQuote?.feeAmount ?? 0))} (${buyQuote?.feePercent ?? 1}%)` },{ label: 'Saldo disponível', value: `R$ ${formatCurrency(Number(wallet?.fiatAvailableBalance ?? 0))}` }]} warnings={["Execução depende da liquidez atual e pode variar no momento do envio."]} />{buyQuoteError && <p className="info-text">{buyQuoteError}</p>}<ActionButton variant="success" type="submit" loading={isBuying} loadingText="Comprando..." disabled={!buyQuote || Number(fiatAmount) < 0.01}>Comprar agora</ActionButton></form>}
+          {tradeFlow === 'sell' && tradeMode === 'market' && <form onSubmit={onSell}><p className="market-sheet-balance-row">Saldo RPC disponível: {formatCurrency(Number(wallet?.rpcAvailableBalance ?? 0))}</p><input value={rpcAmount} onChange={(e) => setRpcAmount(e.target.value)} placeholder="Entrada em RPC" required /><ImpactPreviewCard title="Preview da venda RPC" items={[{ label: 'Entrada', value: `${formatCurrency(Number(rpcAmount || 0))} RPC` },{ label: 'Saída estimada (líquida)', value: `R$ ${formatCurrency(Number(sellQuote?.estimatedFiatAmount ?? 0))}` },{ label: 'Preço médio estimado', value: `R$ ${formatPrice(Number(sellQuote?.effectiveUnitPrice ?? 0))}` },{ label: 'Taxa estimada', value: `R$ ${formatCurrency(Number(sellQuote?.feeAmount ?? 0))} (${sellQuote?.feePercent ?? 1}%)` },{ label: 'Saldo disponível', value: `${formatCurrency(Number(wallet?.rpcAvailableBalance ?? 0))} RPC` }]} warnings={["Execução depende da liquidez atual e pode ocorrer com variação de preço."]} />{sellQuoteError && <p className="info-text">{sellQuoteError}</p>}<ActionButton variant="danger" type="submit" loading={isSelling} loadingText="Vendendo..." disabled={!sellQuote || Number(rpcAmount) < 0.01}>Vender agora</ActionButton></form>}
+          {tradeFlow === 'buy' && tradeMode === 'limit' && <form onSubmit={onCreateLimitOrder}><p className="market-sheet-balance-row">Saldo R$ disponível: {formatCurrency(Number(wallet?.fiatAvailableBalance ?? 0))}</p><input value={limitFiatAmount} onChange={(e) => setLimitFiatAmount(e.target.value)} placeholder="Entrada em R$" required /><input value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço limite" required /><p className="info-text">O preço limite considera a taxa da Exchange. Executa se o preço efetivo total for menor ou igual ao limite.</p><ActionButton variant="success" type="submit" loading={isCreatingLimitOrder} loadingText="Enviando..." disabled={Number(limitFiatAmount) < 0.01 || Number(limitPrice) <= 0}>Criar ordem de compra</ActionButton></form>}
+          {tradeFlow === 'sell' && tradeMode === 'limit' && <form onSubmit={onCreateLimitOrder}><p className="market-sheet-balance-row">Saldo RPC disponível: {formatCurrency(Number(wallet?.rpcAvailableBalance ?? 0))}</p><input value={limitRpcAmount} onChange={(e) => setLimitRpcAmount(e.target.value)} placeholder="Entrada em RPC" required /><input value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} placeholder="Preço limite" required /><p className="info-text">O preço limite considera a taxa da Exchange. Executa se o preço líquido for maior ou igual ao limite.</p><ActionButton variant="danger" type="submit" loading={isCreatingLimitOrder} loadingText="Enviando..." disabled={Number(limitRpcAmount) < 0.01 || Number(limitPrice) <= 0}>Criar ordem de venda</ActionButton></form>}
         </div></div>}
       </div>
+
+        <ConfirmEconomicAction
+          open={pendingConfirmation === 'buy-market'}
+          title="Confirmar compra de RPC"
+          description="Revise o impacto estimado antes de confirmar a compra."
+          confirmText="Confirmar compra"
+          loading={isBuying}
+          onCancel={() => setPendingConfirmation(null)}
+          onConfirm={() => void confirmBuy()}
+        >
+          <ImpactPreviewCard title="Impacto estimado" items={[{ label: 'Entrada', value: `R$ ${formatCurrency(Number(fiatAmount || 0))}` }, { label: 'Saída', value: `${formatCurrency(Number(buyQuote?.estimatedRpcAmount ?? 0))} RPC` }, { label: 'Taxa', value: `R$ ${formatCurrency(Number(buyQuote?.feeAmount ?? 0))}` }]} warnings={["Não é dinheiro real. Operação em simulação RP."]} />
+        </ConfirmEconomicAction>
+        <ConfirmEconomicAction
+          open={pendingConfirmation === 'sell-market'}
+          title="Confirmar venda de RPC"
+          description="Revise o impacto estimado antes de confirmar a venda."
+          confirmText="Confirmar venda"
+          loading={isSelling}
+          onCancel={() => setPendingConfirmation(null)}
+          onConfirm={() => void confirmSell()}
+        >
+          <ImpactPreviewCard title="Impacto estimado" items={[{ label: 'Entrada', value: `${formatCurrency(Number(rpcAmount || 0))} RPC` }, { label: 'Saída', value: `R$ ${formatCurrency(Number(sellQuote?.estimatedFiatAmount ?? 0))}` }, { label: 'Taxa', value: `R$ ${formatCurrency(Number(sellQuote?.feeAmount ?? 0))}` }]} warnings={["Não é dinheiro real. Operação em simulação RP."]} />
+        </ConfirmEconomicAction>
     </section>
   );
 }

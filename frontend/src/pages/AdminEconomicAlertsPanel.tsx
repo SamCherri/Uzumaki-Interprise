@@ -46,7 +46,7 @@ export function AdminEconomicAlertsPanel() {
       <div className="section-header">
         <div>
           <h3>Alertas econômicos</h3>
-          <p>Monitoramento de inconsistências para prevenção de bugs no mercado.</p>
+          <p>Auditoria econômica somente leitura para prevenção de erros humanos e inconsistências de simulação.</p>
         </div>
         <button className="button-secondary" onClick={loadAlerts} disabled={loading}>
           {loading ? 'Atualizando...' : 'Atualizar alertas'}
@@ -63,7 +63,7 @@ export function AdminEconomicAlertsPanel() {
 
       {data && data.alerts.length === 0 && !loading && (
         <article className="summary-item">
-          <strong>Nenhuma inconsistência econômica detectada.</strong>
+          <strong>Nenhuma inconsistência econômica encontrada.</strong><p>Este painel é somente leitura e não executa correções automáticas.</p>
         </article>
       )}
 

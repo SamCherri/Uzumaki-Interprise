@@ -309,3 +309,10 @@ Fonte oficial: `docs/ROADMAP_PRIORITARIO.md`.
 - Garantia de isolamento: simulação não altera `Wallet`, `Company`, `Trade`, `MarketOrder`, `ProjectTokenReserve`, `ProjectBuybackProgram`, `ProjectHolderDistributionProgram` e `RpcMarketState` reais.
 - Cenários disponíveis: baseline completo, baixa liquidez, entrada/saída de baleia, venda em massa, recompra sem liquidez e tentativa de self-trade.
 - Limitações atuais: replay de run não implementado; UX avançada e visual premium ficam para etapas futuras.
+
+
+## Atualização 2026-05-06 — PR 11 UX funcional e proteção anti-erro
+- UX com proteção anti-clique duplo reforçada em ações econômicas sensíveis via botão de ação com `loading` + `disabled`.
+- Avisos econômicos padronizados reforçando que R$ e RPC são fictícios e que não existe dinheiro real, Pix, cartão, gateway, cripto real ou blockchain.
+- Preview de impacto introduzido em fluxo de mercado RPC/R$ para compra com estimativas de entrada, taxa, preço e risco de liquidez.
+- Separação real/simulado reforçada no Test Mode com aviso explícito de isolamento econômico.
