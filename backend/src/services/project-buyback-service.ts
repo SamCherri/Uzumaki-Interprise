@@ -48,7 +48,7 @@ export async function createBuybackProgram(input: { companyId: string; actorUser
 }
 
 export async function executeBuybackProgram(input: { programId: string; actorUserId: string; actorRoles?: string[]; maxExecutions?: number; ip?: string; userAgent?: string | null }) {
-  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+  const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const loaded = await tx.projectBuybackProgram.findUnique({ where: { id: input.programId }, include: { company: true } });
     if (!loaded) throw new HttpError(404, 'Programa não encontrado.');
     const isOwner = loaded.company.founderUserId === input.actorUserId;
@@ -58,7 +58,7 @@ export async function executeBuybackProgram(input: { programId: string; actorUse
     const lockedProgram = await tx.projectBuybackProgram.findUnique({ where: { id: input.programId } });
     if (!lockedProgram) throw new HttpError(404, 'Programa não encontrado.');
     const program = await expireProgramIfNeeded(tx, lockedProgram.id, input.actorUserId);
-    if (program.status === 'EXPIRED') throw new HttpError(400, 'Programa expirado.');
+    if (program.status === 'EXPIRED') return { expired: true as const };
     if (program.status !== 'ACTIVE') throw new HttpError(400, 'Programa não está ativo.');
 
     const sellOrders = await tx.marketOrder.findMany({ where: { companyId: program.companyId, type: 'SELL', status: { in: ['OPEN', 'PARTIALLY_FILLED'] }, remainingQuantity: { gt: 0 }, limitPrice: { lte: program.maxPricePerShare }, userId: { notIn: [loaded.company.founderUserId, input.actorUserId] } }, orderBy: [{ limitPrice: 'asc' }, { createdAt: 'asc' }], take: input.maxExecutions ?? 100 });
@@ -125,32 +125,40 @@ export async function executeBuybackProgram(input: { programId: string; actorUse
 
     const updatedProgram = await tx.projectBuybackProgram.update({ where: { id: program.id }, data: { remainingRpc: finalRemaining, spentRpc, purchasedShares, status: shouldComplete ? 'COMPLETED' : 'ACTIVE', completedAt: shouldComplete ? new Date() : null } });
     await tx.adminLog.create({ data: { userId: input.actorUserId, action: 'PROJECT_BUYBACK_EXECUTE', entity: 'ProjectBuybackProgram', reason: `Execuções: ${executed}; taxa: ISENTA`, current: JSON.stringify({ programId: program.id, spentRpc: String(spentRpc), remainingRpc: String(finalRemaining) }), ip: input.ip ?? null, userAgent: input.userAgent ?? null } });
-    return { program: updatedProgram, executions: executed };
+    return { expired: false as const, program: updatedProgram, executions: executed };
   });
+
+  if (result.expired) throw new HttpError(400, 'Programa expirado.');
+  return result;
 }
 
 export async function cancelBuybackProgram(input: { programId: string; actorUserId: string; actorRoles?: string[]; ip?: string; userAgent?: string | null }) {
-  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+  const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.$queryRaw`SELECT id FROM "ProjectBuybackProgram" WHERE id = ${input.programId} FOR UPDATE`;
     const program = await tx.projectBuybackProgram.findUnique({ where: { id: input.programId }, include: { company: true } });
     if (!program) throw new HttpError(404, 'Programa não encontrado.');
     const isOwner = program.company.founderUserId === input.actorUserId;
     if (!isOwner && !hasAdminRole(input.actorRoles ?? [])) throw new HttpError(403, 'Sem permissão.');
-    if (program.status !== 'ACTIVE') throw new HttpError(400, 'Apenas ACTIVE pode cancelar.');
+    const expiredProgram = await expireProgramIfNeeded(tx, program.id, input.actorUserId);
+    if (expiredProgram.status === 'EXPIRED') return { expired: true as const };
+    if (expiredProgram.status !== 'ACTIVE') throw new HttpError(400, 'Apenas ACTIVE pode cancelar.');
 
-    const remainingBeforeCancel = program.remainingRpc;
+    const remainingBeforeCancel = expiredProgram.remainingRpc;
     const canceled = await tx.projectBuybackProgram.updateMany({
-      where: { id: program.id, status: 'ACTIVE', remainingRpc: remainingBeforeCancel },
+      where: { id: expiredProgram.id, status: 'ACTIVE', remainingRpc: remainingBeforeCancel },
       data: { status: 'CANCELED', canceledAt: new Date(), remainingRpc: ZERO },
     });
     if (canceled.count !== 1) throw new HttpError(409, 'Conflito de concorrência ao cancelar programa.');
 
     if (remainingBeforeCancel.gt(0)) {
-      await tx.companyRevenueAccount.update({ where: { companyId: program.companyId }, data: { balance: { increment: remainingBeforeCancel } } });
+      await tx.companyRevenueAccount.update({ where: { companyId: expiredProgram.companyId }, data: { balance: { increment: remainingBeforeCancel } } });
     }
 
-    const updated = await tx.projectBuybackProgram.findUniqueOrThrow({ where: { id: program.id } });
-    await tx.adminLog.create({ data: { userId: input.actorUserId, action: 'PROJECT_BUYBACK_CANCEL', entity: 'ProjectBuybackProgram', reason: 'Cancelado pelo ator autorizado', current: JSON.stringify({ programId: program.id, refundedRpc: String(remainingBeforeCancel) }), ip: input.ip ?? null, userAgent: input.userAgent ?? null } });
-    return updated;
+    const updated = await tx.projectBuybackProgram.findUniqueOrThrow({ where: { id: expiredProgram.id } });
+    await tx.adminLog.create({ data: { userId: input.actorUserId, action: 'PROJECT_BUYBACK_CANCEL', entity: 'ProjectBuybackProgram', reason: 'Cancelado pelo ator autorizado', current: JSON.stringify({ programId: expiredProgram.id, refundedRpc: String(remainingBeforeCancel) }), ip: input.ip ?? null, userAgent: input.userAgent ?? null } });
+    return { expired: false as const, program: updated };
   });
+
+  if (result.expired) throw new HttpError(400, 'Programa expirado.');
+  return result.program;
 }
