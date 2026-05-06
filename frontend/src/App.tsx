@@ -14,6 +14,7 @@ import { TestModeRankingPage } from './pages/TestModeRankingPage';
 import { TestModeReportPage } from './pages/TestModeReportPage';
 import { api, getCurrentUser, CurrentUserResponse } from './services/api';
 import { SideDrawer, SideDrawerItem } from './components/SideDrawer';
+import { BrandLogo } from './components/BrandLogo';
 
 type PublicTab = 'login' | 'register';
 type PrivateScreen = 'home' | 'markets' | 'wallet' | 'rpc-market' | 'withdrawals' | 'company-request' | 'admin' | 'broker' | 'my-projects' | 'test-mode' | 'test-ranking' | 'test-report';
@@ -233,50 +234,41 @@ export function App() {
   const globalDrawerItems = useMemo<SideDrawerItem[]>(() => {
     const items: SideDrawerItem[] = [
       ...(shouldShowTestModeEntry ? [
-        { key: 'test-mode', label: 'Modo Teste', icon: '🧪', active: screen === 'test-mode', onClick: () => setScreen('test-mode'), section: 'main' } as SideDrawerItem,
-        { key: 'test-ranking', label: 'Ranking Teste', icon: '🏆', active: screen === 'test-ranking', onClick: () => setScreen('test-ranking'), section: 'main' } as SideDrawerItem,
-        { key: 'test-report', label: 'Reportar Bug', icon: '🐞', active: screen === 'test-report', onClick: () => setScreen('test-report'), section: 'main' } as SideDrawerItem,
+        { key: 'test-mode', label: 'Modo Teste', icon: 'TM', active: screen === 'test-mode', onClick: () => setScreen('test-mode'), section: 'main' } as SideDrawerItem,
+        { key: 'test-ranking', label: 'Ranking Teste', icon: 'RK', active: screen === 'test-ranking', onClick: () => setScreen('test-ranking'), section: 'main' } as SideDrawerItem,
+        { key: 'test-report', label: 'Reportar Bug', icon: 'BG', active: screen === 'test-report', onClick: () => setScreen('test-report'), section: 'main' } as SideDrawerItem,
       ] : []),
       ...((isTestModeRestrictedUser
         ? []
         : [
-            { key: 'home', label: 'Início', icon: '🏠', active: screen === 'home', onClick: () => setScreen('home'), section: 'main' },
-            { key: 'markets', label: 'Mercados', icon: '🪙', active: screen === 'markets', onClick: () => setScreen('markets'), section: 'main' },
-            { key: 'wallet', label: 'Carteira', icon: '💼', active: screen === 'wallet', onClick: () => setScreen('wallet'), section: 'main' },
-            { key: 'rpc-market', label: 'RPC/R$', icon: '💴', active: screen === 'rpc-market', onClick: () => setScreen('rpc-market'), section: 'main' },
-            { key: 'withdrawals', label: 'Saque', icon: '🏧', active: screen === 'withdrawals', onClick: () => setScreen('withdrawals'), section: 'secondary' },
-            { key: 'company-request', label: 'Criar token', icon: '🚀', active: screen === 'company-request', onClick: () => setScreen('company-request'), section: 'secondary' },
+            { key: 'home', label: 'Início', icon: 'IN', active: screen === 'home', onClick: () => setScreen('home'), section: 'main' },
+            { key: 'markets', label: 'Mercados', icon: 'MK', active: screen === 'markets', onClick: () => setScreen('markets'), section: 'main' },
+            { key: 'wallet', label: 'Carteira', icon: 'CT', active: screen === 'wallet', onClick: () => setScreen('wallet'), section: 'main' },
+            { key: 'rpc-market', label: 'RPC/R$', icon: 'RP', active: screen === 'rpc-market', onClick: () => setScreen('rpc-market'), section: 'main' },
+            { key: 'withdrawals', label: 'Saque', icon: 'SQ', active: screen === 'withdrawals', onClick: () => setScreen('withdrawals'), section: 'secondary' },
+            { key: 'company-request', label: 'Criar token', icon: 'TK', active: screen === 'company-request', onClick: () => setScreen('company-request'), section: 'secondary' },
           ] as SideDrawerItem[])),
     ];
 
-    if (canSeeMyProjects && !isTestModeRestrictedUser) items.push({ key: 'my-projects', label: 'Meus Projetos', icon: '📊', active: screen === 'my-projects', onClick: () => setScreen('my-projects'), section: 'secondary' });
-    if (roles.canSeeAdmin) items.push({ key: 'admin', label: 'Admin', icon: '🛠️', active: screen === 'admin', onClick: () => setScreen('admin'), section: 'main' });
-    if (roles.canSeeBroker && !isTestModeRestrictedUser) items.push({ key: 'broker', label: 'Corretor', icon: '🤝', active: screen === 'broker', onClick: () => setScreen('broker'), section: 'secondary' });
+    if (canSeeMyProjects && !isTestModeRestrictedUser) items.push({ key: 'my-projects', label: 'Meus Projetos', icon: 'MP', active: screen === 'my-projects', onClick: () => setScreen('my-projects'), section: 'secondary' });
+    if (roles.canSeeAdmin) items.push({ key: 'admin', label: 'Admin', icon: 'AD', active: screen === 'admin', onClick: () => setScreen('admin'), section: 'main' });
+    if (roles.canSeeBroker && !isTestModeRestrictedUser) items.push({ key: 'broker', label: 'Corretor', icon: 'CR', active: screen === 'broker', onClick: () => setScreen('broker'), section: 'secondary' });
 
-    items.push({ key: 'logout', label: 'Sair', icon: '🚪', danger: true, section: 'danger', onClick: handleLogout });
+    items.push({ key: 'logout', label: 'Sair', icon: 'SA', danger: true, section: 'danger', onClick: handleLogout });
     return items;
   }, [canSeeMyProjects, handleLogout, isTestModeRestrictedUser, roles.canSeeAdmin, roles.canSeeBroker, screen, shouldShowTestModeEntry]);
 
   if (!token) {
     return (
-      <main className="container auth-shell">
-        <section className="card public-entry-card">
-          <header className="public-entry-header">
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-              <img src="/assets/logo-full.png" alt="RPC Exchange" style={{ maxWidth: '320px', height: 'auto' }} />
-            </div>
-            <p className="warning">Esta é uma ferramenta de simulação/interpretação de uma exchange. Nenhum valor possui conversão para dinheiro real.</p>
-            <p className="info-text">Sem cripto real, sem blockchain, sem Pix, sem cartão e sem gateway de pagamento.</p>
+      <main className="container auth-shell app-shell">
+        <section className="card public-entry-card auth-card premium-panel">
+          <header className="public-entry-header page-hero-compact">
+            <BrandLogo size="hero" className="auth-logo auth-lockup" />
+            <p className="warning compact-callout">Ambiente RP de simulação econômica. Saldos e tokens não possuem valor real.</p>
+            <p className="info-text">Sem Pix, cartão, blockchain, cripto real ou promessa de lucro.</p>
           </header>
 
-          <article className="card install-card nested-card">
-            <h3>📲 Instalar aplicativo</h3>
-            <p className="info-text">Use a RPC Exchange como app no celular.</p>
-            <button className="button-primary" onClick={handleInstallClick} type="button">
-              Instalar aplicativo
-            </button>
-            {installHint && <p className="info-text">{installHint}</p>}
-          </article>
+          
 
           <div className="benefits-grid nested-card">
             <span>🪙 Crie e negocie tokens</span>
@@ -305,7 +297,16 @@ export function App() {
           ) : (
             <RegisterPage onSwitchLogin={() => setPublicTab('login')} />
           )}
-        </section>
+        
+
+          <article className="card install-card nested-card glass-panel">
+            <h3>📲 Instalar aplicativo</h3>
+            <p className="info-text">Use a RPC Exchange como app no celular.</p>
+            <button className="button-primary" onClick={handleInstallClick} type="button">
+              Instalar aplicativo
+            </button>
+            {installHint && <p className="info-text">{installHint}</p>}
+          </article></section>
       </main>
     );
   }
@@ -322,12 +323,8 @@ export function App() {
             <span className="back-placeholder desktop-only" />
           )}
           <button className="hamburger-button mobile-only" type="button" aria-label="Abrir menu" onClick={() => setIsGlobalDrawerOpen(true)}>☰</button>
-          <div className="mobile-topbar-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <img src="/assets/rpc_exchange_icon.png" alt="RPC" style={{ width: '42px', height: '42px' }} />
-            <div style={{ textAlign: 'left' }}>
-              <span className="mobile-topbar-badge">Simulação RP</span>
-              <img src="/assets/logo-full.png" alt="RPC Exchange" style={{ height: '24px', width: 'auto', display: 'block' }} />
-            </div>
+          <div className="mobile-topbar-title">
+            <BrandLogo size="sm" subtitle={false} />
           </div>
           <button className="button-danger small-button desktop-only" onClick={handleLogout}>
             Sair
@@ -362,9 +359,7 @@ export function App() {
           <section className="mobile-home-summary mobile-only">
             <div className="mobile-hero-card">
               <span className="mobile-hero-kicker">Painel principal</span>
-              <div style={{ marginBottom: '10px' }}>
-                <img src="/assets/logo-full.png" alt="RPC Exchange" style={{ maxWidth: '240px', height: 'auto' }} />
-              </div>
+              <div style={{ marginBottom: '10px' }}><BrandLogo size="md" /></div>
               <p>Negocie tokens, acompanhe sua carteira e acesse seus painéis pelo menu.</p>
             </div>
 

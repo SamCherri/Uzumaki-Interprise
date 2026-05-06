@@ -901,3 +901,80 @@ input[type="checkbox"] {
 .metric-card-helper,.metric-card-trend { margin:4px 0 0; font-size:.8rem; color: var(--color-muted); }
 .metric-card-positive .metric-card-value { color: #86efac; }
 .metric-card-negative .metric-card-value { color: #fda4af; }
+
+:root {
+  --bg-app: #070d19;
+  --bg-panel: rgba(14, 22, 40, 0.92);
+  --bg-panel-soft: rgba(22, 33, 56, 0.52);
+  --text-main: #e6edf8;
+  --accent-blue: #3b82f6;
+  --accent-purple: #8b5cf6;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --shadow-panel: 0 16px 40px rgba(2, 6, 23, 0.45);
+}
+
+body { background: radial-gradient(circle at top, #111c34 0%, var(--bg-app) 55%); color: var(--text-main); overflow-x:hidden; }
+.app-shell { max-width: 100vw; }
+.premium-panel { background: var(--bg-panel); border-radius: var(--radius-xl); box-shadow: var(--shadow-panel); }
+.glass-panel { background: var(--bg-panel-soft); }
+.auth-card { padding: 14px; }
+.auth-panel { display: grid; gap: 10px; }
+.auth-logo { display:flex; justify-content:center; margin-bottom: 6px; }
+.app-logo { display:block; width:100%; height:auto; object-fit:contain; border-radius:14px; background:#0d1628; padding:8px; }
+.app-logo-sm { max-width: 40px; }
+.app-logo-hero { max-width: 200px; }
+.compact-callout { margin: 6px auto; font-size:.86rem; }
+.nav-drawer { width:min(86vw, 360px); padding: 14px; border-radius: 0; border-left:1px solid var(--border-soft); }
+.side-drawer-list { gap: 6px; }
+.side-drawer-item, .nav-item { min-height: 40px; padding: 8px 10px; border-radius: 10px; font-size: .92rem; }
+.side-drawer-item span:first-child { font-size:.72rem; opacity:.8; min-width: 22px; }
+.page-hero-compact { gap: 6px; }
+.metric-grid { display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap:8px; }
+.metric-card { padding:10px; border-radius:12px; }
+
+@media (max-width: 640px){
+  .container { padding: 10px; }
+  .public-entry-card { width: 100%; }
+  .app-logo-hero { max-width: 170px; }
+  .trade-price-big { font-size: 1.45rem; }
+  .card { padding: 12px; }
+  .market-stats-row { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+.auth-lockup { display:flex; align-items:center; gap:10px; justify-content:center; max-width:220px; margin:0 auto; }
+.auth-lockup strong { display:block; font-size:1.05rem; letter-spacing:.01em; }
+.auth-lockup small { display:block; color:var(--text-muted); font-size:.75rem; }
+.auth-lockup .app-logo-sm { width:40px; height:40px; border-radius:10px; background:#0b1426; padding:4px; }
+.public-entry-card .install-card { padding:10px; }
+.public-entry-card .benefits-grid { grid-template-columns: repeat(2,minmax(0,1fr)); font-size:.82rem; gap:4px; }
+.auth-panel form { display:grid; gap:8px; }
+.auth-panel input, .auth-panel button { min-height:42px; }
+.nav-icon-badge { width:22px; height:22px; border-radius:7px; display:inline-flex; align-items:center; justify-content:center; font-size:.62rem; font-weight:700; background:rgba(59,130,246,.2); border:1px solid rgba(59,130,246,.35); color:#dbeafe; }
+.side-drawer-item { min-height:36px; padding:7px 10px; }
+.testmode-shell { display:grid; gap:10px; }
+.testmode-hero { padding:12px; display:grid; gap:8px; }
+.testmode-hero-top { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+@media (max-width: 640px){
+  .public-entry-card { padding:12px; }
+  .public-entry-card .install-card { order: 5; }
+  .public-entry-card .benefits-grid { display:none; }
+  .auth-lockup { max-width:190px; }
+}
+.brand-logo { display:flex; align-items:center; gap:10px; }
+.brand-logo-icon { width:40px; height:40px; border-radius:10px; object-fit:contain; background:#0b1426; padding:4px; border:1px solid rgba(148,163,184,.22); }
+.brand-logo-text strong { display:block; font-size:1.02rem; line-height:1.1; }
+.brand-logo-text small { display:block; color:var(--text-muted); font-size:.74rem; }
+.brand-logo-sm .brand-logo-icon { width:28px; height:28px; border-radius:8px; }
+.brand-logo-sm .brand-logo-text strong { font-size:.88rem; }
+.brand-logo-sm .brand-logo-text small { display:none; }
+.brand-logo-hero { max-width:220px; margin:0 auto; justify-content:center; }
+.brand-logo-hero .brand-logo-icon { width:44px; height:44px; }
+.mobile-topbar-title .brand-logo { justify-content:flex-start; }
+.side-drawer-item.active { box-shadow: inset 0 0 0 1px rgba(147,197,253,.36); }
+.side-drawer-item.danger { margin-top: 4px; background: rgba(127,29,29,.18); border-color: rgba(239,68,68,.35); color:#fecaca; }
+@media (max-width: 640px){
+  .brand-logo-hero { max-width:190px; }
+}

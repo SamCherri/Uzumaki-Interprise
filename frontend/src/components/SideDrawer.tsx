@@ -39,7 +39,7 @@ export function SideDrawer({ title, subtitle, open, onClose, items }: SideDrawer
   return (
     <div className="side-drawer-backdrop" onClick={onClose} aria-label="Fechar menu lateral" role="presentation">
       <aside
-        className="side-drawer"
+        className="side-drawer nav-drawer"
         onClick={(event) => event.stopPropagation()}
         aria-label={title}
         role="dialog"
@@ -69,11 +69,11 @@ export function SideDrawer({ title, subtitle, open, onClose, items }: SideDrawer
                 onClose();
               }}
             >
-              {item.icon ? <span aria-hidden="true">{item.icon}</span> : null}
+              {item.icon ? <span className="nav-icon-badge" aria-hidden="true">{item.icon}</span> : null}
               <span>{item.label}</span>
             </button>
           ))}
-          {secondaryItems.length > 0 && <p className="side-drawer-section-label">Acessos extras</p>}
+          {secondaryItems.length > 0 && <p className="side-drawer-section-label">Mercado e conta</p>}
           {secondaryItems.map((item) => (
             <button
               key={item.key}
@@ -84,11 +84,11 @@ export function SideDrawer({ title, subtitle, open, onClose, items }: SideDrawer
                 onClose();
               }}
             >
-              {item.icon ? <span aria-hidden="true">{item.icon}</span> : null}
+              {item.icon ? <span className="nav-icon-badge" aria-hidden="true">{item.icon}</span> : null}
               <span>{item.label}</span>
             </button>
           ))}
-          {dangerItems.length > 0 && <p className="side-drawer-section-label danger">Sessão</p>}
+          {dangerItems.length > 0 && <p className="side-drawer-section-label danger">Conta</p>}
           {dangerItems.map((item) => (
             <button
               key={item.key}
@@ -99,7 +99,7 @@ export function SideDrawer({ title, subtitle, open, onClose, items }: SideDrawer
                 onClose();
               }}
             >
-              {item.icon ? <span aria-hidden="true">{item.icon}</span> : null}
+              {item.icon ? <span className="nav-icon-badge" aria-hidden="true">{item.icon}</span> : null}
               <span>{item.label}</span>
             </button>
           ))}

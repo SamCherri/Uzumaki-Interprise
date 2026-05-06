@@ -27,10 +27,7 @@ export function LoginPage({ onSuccess, onSwitchRegister }: LoginPageProps) {
   }
 
   return (
-    <section className="auth-panel nested-card">
-      <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-        <img src="/assets/logo-full.png" alt="RPC Exchange" style={{ maxWidth: '200px', height: 'auto' }} />
-      </div>
+    <section className="auth-panel">
       <h2>Entrar</h2>
       <form onSubmit={handleSubmit}>
         <label>
