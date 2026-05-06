@@ -15,8 +15,8 @@ async function resetDb() {
     prisma.projectBuybackExecution.deleteMany(), prisma.projectBuybackProgram.deleteMany(), prisma.companyInitialOffer.deleteMany(), prisma.companyHolding.deleteMany(),
     prisma.companyRevenueAccount.deleteMany(), prisma.company.deleteMany(),
     prisma.coinIssuance.deleteMany(), prisma.coinTransfer.deleteMany(), prisma.withdrawalRequest.deleteMany(),
-    prisma.brokerAccount.deleteMany(), prisma.wallet.deleteMany(), prisma.userRole.deleteMany(), prisma.role.deleteMany(), prisma.user.deleteMany(),
-    prisma.platformAccount.deleteMany(), prisma.treasuryAccount.deleteMany(), prisma.testModeWallet.deleteMany(),
+    prisma.brokerAccount.deleteMany(), prisma.wallet.deleteMany(), prisma.testModeWallet.deleteMany(), prisma.userRole.deleteMany(), prisma.role.deleteMany(), prisma.user.deleteMany(),
+    prisma.platformAccount.deleteMany(), prisma.treasuryAccount.deleteMany(),
   ]);
 }
 
