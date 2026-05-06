@@ -506,7 +506,7 @@ export function CompaniesPage() {
               </div>
               <div className="chart-meta market-price-card"><div><span>Atual</span><strong>{formatPrice(chartData.lastPrice)}</strong></div><div><span>Máximo</span><strong>{formatPrice(chartData.maxPrice)}</strong></div><div><span>Mínimo</span><strong>{formatPrice(chartData.minPrice)}</strong></div></div>
               <div className="volume-mini-chart">
-                {filteredTrades.length === 0 && <p className="empty-state volume-empty-state">Sem volume ainda neste intervalo</p>}
+                {filteredTrades.length === 0 && <EmptyState title="Sem volume" description="Sem volume ainda neste intervalo." />}
                 {filteredTrades.length > 0 && <div className="volume-bars">{filteredTrades.map((trade) => {
                   const max = Math.max(...filteredTrades.map((item) => item.quantity));
                   const height = max > 0 ? Math.max(6, (trade.quantity / max) * 60) : 6;
