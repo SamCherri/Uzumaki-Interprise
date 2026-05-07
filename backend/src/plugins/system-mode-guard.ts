@@ -21,8 +21,8 @@ const PUBLIC_ALLOWED_PREFIXES = ['/api/auth/login', '/api/auth/register', '/api/
 const ADMIN_PREFIX = '/api/admin';
 
 export async function globalSystemModeGuard(request: FastifyRequest, reply: FastifyReply) {
-  const config = await ensureSystemModeConfig();
-  if (config.mode !== 'TEST') return;
+  const config = await prisma.systemModeConfig.findUnique({ where: { id: SYSTEM_MODE_ID } });
+  if (!config || config.mode !== 'TEST') return;
 
   const path = request.url.split('?')[0];
   const isPublicAllowed = PUBLIC_ALLOWED_PREFIXES.some((prefix) => path.startsWith(prefix));
