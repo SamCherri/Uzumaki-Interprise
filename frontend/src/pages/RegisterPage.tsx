@@ -12,64 +12,121 @@ export function RegisterPage({ onSwitchLogin }: RegisterPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    setIsLoading(true);
     try {
       await api('/auth/register', {
         method: 'POST',
         body: JSON.stringify({ name, characterName, bankAccountNumber, email, password }),
       });
-      setMessage('Conta criada com sucesso. Entre com o e-mail cadastrado.');
-      setName('');
-      setCharacterName('');
-      setBankAccountNumber('');
-      setEmail('');
-      setPassword('');
-      if (onSwitchLogin) onSwitchLogin();
+      setMessage('✓ Conta criada com sucesso! Redirecionando para login...');
+      setTimeout(() => {
+        setName('');
+        setCharacterName('');
+        setBankAccountNumber('');
+        setEmail('');
+        setPassword('');
+        if (onSwitchLogin) onSwitchLogin();
+      }, 1500);
     } catch (error) {
       setMessage((error as Error).message);
+    } finally {
+      setIsLoading(false);
     }
   }
 
   return (
     <section className="auth-panel nested-card">
-      <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-        <img src="/assets/logo-full.png" alt="RPC Exchange" style={{ maxWidth: '200px', height: 'auto' }} />
+      <div className="auth-logo-container">
+        <img src="/assets/logo-full.png" alt="RPC Exchange" className="auth-logo" />
       </div>
-      <h2>Criar conta</h2>
-      <form onSubmit={handleSubmit}>
+      
+      <div className="auth-header">
+        <h2>Criar conta</h2>
+        <p className="auth-subtitle">Junte-se à comunidade RPC Exchange</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="auth-form">
         <label>
-          Nome
-          <input placeholder="Seu nome" value={name} onChange={(event) => setName(event.target.value)} required />
+          <span className="label-text">Nome completo</span>
+          <input 
+            placeholder="Seu nome" 
+            value={name} 
+            onChange={(event) => setName(event.target.value)} 
+            disabled={isLoading}
+            required 
+          />
         </label>
+
         <label>
-          Nome do personagem
-          <input placeholder="Nome do personagem" value={characterName} onChange={(event) => setCharacterName(event.target.value)} required minLength={3} />
+          <span className="label-text">Nome do personagem (RP)</span>
+          <input 
+            placeholder="Nome do seu personagem" 
+            value={characterName} 
+            onChange={(event) => setCharacterName(event.target.value)} 
+            disabled={isLoading}
+            required 
+            minLength={3} 
+          />
         </label>
+
         <label>
-          Número da conta bancária fictícia do RP
-          <input placeholder="Ex.: RP-12345" value={bankAccountNumber} onChange={(event) => setBankAccountNumber(event.target.value)} required minLength={3} />
+          <span className="label-text">Número da conta bancária</span>
+          <input 
+            placeholder="Ex.: RP-12345" 
+            value={bankAccountNumber} 
+            onChange={(event) => setBankAccountNumber(event.target.value)} 
+            disabled={isLoading}
+            required 
+            minLength={3} 
+          />
+          <small className="label-hint">Fictícia, usada apenas no RP</small>
         </label>
-        <p className="info-text">A conta bancária é fictícia e usada apenas dentro do RP.</p>
+
         <label>
-          E-mail
-          <input placeholder="seuemail@exemplo.com" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+          <span className="label-text">E-mail</span>
+          <input 
+            placeholder="seu.email@exemplo.com" 
+            type="email" 
+            value={email} 
+            onChange={(event) => setEmail(event.target.value)} 
+            disabled={isLoading}
+            required 
+          />
         </label>
+
         <label>
-          Senha
-          <input placeholder="Mínimo 8 caracteres" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} />
+          <span className="label-text">Senha</span>
+          <input 
+            placeholder="Mínimo 8 caracteres" 
+            type="password" 
+            value={password} 
+            onChange={(event) => setPassword(event.target.value)} 
+            disabled={isLoading}
+            required 
+            minLength={8} 
+          />
+          <small className="label-hint">Use uma senha forte com números e símbolos</small>
         </label>
-        <button className="button-primary" type="submit">Cadastrar</button>
+
+        <button className="button-primary" type="submit" disabled={isLoading}>
+          {isLoading ? 'Criando conta...' : 'Cadastrar'}
+        </button>
       </form>
-      {message && <p className="info-text">{message}</p>}
-      {onSwitchLogin && (
-        <p className="auth-switch-row">
-          Já tem conta?{' '}
-          <button className="link-button" type="button" onClick={onSwitchLogin}>
-            Ir para login
-          </button>
+
+      {message && (
+        <p className={`auth-message ${message.includes('sucesso') ? 'success' : 'error'}`}>
+          {message}
         </p>
+      )}
+
+      {onSwitchLogin && (
+        <div className="auth-footer">
+          <p>Já tem conta? <button className="link-button" type="button" onClick={onSwitchLogin}>Ir para login</button></p>
+        </div>
       )}
     </section>
   );
